@@ -1,0 +1,252 @@
+// BIRDS — PostgreSQL schema (CLAUDE.md §17). Spec #30.
+// Constraints Prisma cannot express (CHECK constraints, append-only triggers, the audit hash chain)
+// live in the hand-written SQL appended to the init migration — see prisma/sql/integrity.sql.
+
+generator client {
+  provider               = "prisma-client"
+  output                 = "../src/generated/prisma"
+  moduleFormat           = "esm"
+  importFileExtension    = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// §17.2
+model Role {
+  id          Int              @id @default(autoincrement())
+  name        String           @unique @db.VarChar(50)
+  description String?
+  users       User[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+// §17.3
+model RolePermission {
+  id       Int     @id @default(autoincrement())
+  role     String  @db.VarChar(50)
+  pageId   String  @map("page_id") @db.VarChar(50)
+  enabled  Boolean @default(true)
+  roleRef  Role    @relation(fields: [role], references: [name], onUpdate: Cascade)
+
+  @@unique([role, pageId])
+  @@map("role_permissions")
+}
+
+// §17.1 — plus must_change_password (admin reset flow, spec #29)
+model User {
+  id                 String    @id @db.VarChar(10)
+  username           String    @unique @db.VarChar(50)
+  passwordHash       String    @map("password_hash") @db.VarChar(255)
+  name               String    @db.VarChar(100)
+  role               String    @db.VarChar(50)
+  scope              String    @db.VarChar(100)
+  email              String    @unique @db.VarChar(150)
+  isActive           Boolean   @default(true) @map("is_active")
+  failedAttempts     Int       @default(0) @map("failed_attempts")
+  lockedUntil        DateTime? @map("locked_until") @db.Timestamptz
+  mustChangePassword Boolean   @default(false) @map("must_change_password")
+  lastLogin          DateTime? @map("last_login") @db.Timestamptz
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  roleRef       Role               @relation(fields: [role], references: [name], onUpdate: Cascade)
+  incidents     Incident[]
+  timeline      IncidentTimeline[]
+  evidence      Evidence[]
+  notifications Notification[]
+  configUpdates SystemConfig[]
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+// §17.4
+model OrgHierarchy {
+  id        Int    @id @default(autoincrement())
+  hq        String @default("HQ") @db.VarChar(50)
+  sector    String @db.VarChar(50)
+  battalion String @db.VarChar(50)
+  bop       String @db.VarChar(100)
+
+  @@unique([sector, battalion, bop])
+  @@map("org_hierarchy")
+}
+
+// §17.5
+model IncidentCategory {
+  id            String                @id @db.VarChar(10)
+  name          String                @unique @db.VarChar(100)
+  isActive      Boolean               @default(true) @map("is_active")
+  subcategories IncidentSubcategory[]
+
+  @@map("incident_categories")
+}
+
+model IncidentSubcategory {
+  id         Int              @id @default(autoincrement())
+  categoryId String           @map("category_id") @db.VarChar(10)
+  name       String           @db.VarChar(100)
+  isActive   Boolean          @default(true) @map("is_active")
+  category   IncidentCategory @relation(fields: [categoryId], references: [id])
+
+  @@unique([categoryId, name])
+  @@map("incident_subcategories")
+}
+
+// §17.6 — status/severity CHECK constraints are in prisma/sql/integrity.sql
+model Incident {
+  id              String   @id @db.VarChar(30)
+  title           String   @db.VarChar(255)
+  category        String   @db.VarChar(100)
+  subcategory     String?  @db.VarChar(100)
+  severity        String   @db.VarChar(20)
+  status          String   @db.VarChar(20)
+  incidentDate    DateTime @map("incident_date") @db.Date
+  incidentTime    DateTime @map("incident_time") @db.Time(0)
+  location        String?  @db.VarChar(255)
+  bop             String?  @db.VarChar(100)
+  sector          String?  @db.VarChar(50)
+  battalion       String?  @db.VarChar(50)
+  lat             Decimal? @db.Decimal(10, 7)
+  lng             Decimal? @db.Decimal(10, 7)
+  description     String
+  personsInvolved String?  @map("persons_involved")
+  actionTaken     String?  @map("action_taken")
+  outcome         String?
+  createdBy       String   @map("created_by") @db.VarChar(10)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  creator       User               @relation(fields: [createdBy], references: [id])
+  timeline      IncidentTimeline[]
+  evidence      Evidence[]
+  notifications Notification[]
+
+  @@index([status], map: "idx_incidents_status")
+  @@index([sector], map: "idx_incidents_sector")
+  @@index([incidentDate], map: "idx_incidents_date")
+  @@index([category], map: "idx_incidents_category")
+  @@index([sector, status], map: "idx_incidents_sector_status")
+  @@index([createdBy, status], map: "idx_incidents_creator_status")
+  @@map("incidents")
+}
+
+// §17.7 — append-only (UPDATE/DELETE blocked by trigger)
+model IncidentTimeline {
+  id         Int      @id @default(autoincrement())
+  incidentId String   @map("incident_id") @db.VarChar(30)
+  action     String   @db.VarChar(50)
+  userName   String   @map("user_name") @db.VarChar(100)
+  userId     String?  @map("user_id") @db.VarChar(10)
+  status     String   @db.VarChar(20)
+  notes      String?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Restrict)
+  user     User?    @relation(fields: [userId], references: [id])
+
+  @@index([incidentId, createdAt])
+  @@map("incident_timeline")
+}
+
+// §17.8 — deleted_at supports the soft-delete in §19.4
+model Evidence {
+  id           Int       @id @default(autoincrement())
+  incidentId   String    @map("incident_id") @db.VarChar(30)
+  fileName     String    @map("file_name") @db.VarChar(255)
+  originalName String    @map("original_name") @db.VarChar(255)
+  mimeType     String    @map("mime_type") @db.VarChar(100)
+  fileSize     BigInt    @map("file_size")
+  storagePath  String    @map("storage_path") @db.VarChar(500)
+  // SHA-256 of the stored bytes, for chain-of-custody verification (null for seed placeholders)
+  sha256       String?   @db.VarChar(64)
+  fileMetadata Json?     @map("file_metadata")
+  uploadedBy   String?   @map("uploaded_by") @db.VarChar(10)
+  uploadedAt   DateTime  @default(now()) @map("uploaded_at") @db.Timestamptz
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
+
+  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Restrict)
+  uploader User?    @relation(fields: [uploadedBy], references: [id])
+
+  @@index([incidentId])
+  @@map("evidence")
+}
+
+// §17.9 — tamper-evident: seq/prev_hash/row_hash are set by a trigger (SHA-256 hash chain);
+// UPDATE/DELETE/TRUNCATE raise an exception. See prisma/sql/integrity.sql and DOUBT-005.
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  seq       BigInt?  @unique
+  timestamp DateTime @default(now()) @db.Timestamptz
+  userId    String?  @map("user_id") @db.VarChar(10)
+  username  String   @db.VarChar(50)
+  action    String   @db.VarChar(100)
+  details   String?
+  ipAddress String?  @map("ip_address") @db.Inet
+  userAgent String?  @map("user_agent")
+  prevHash  String?  @map("prev_hash") @db.VarChar(64)
+  rowHash   String?  @map("row_hash") @db.VarChar(64)
+
+  @@index([timestamp])
+  @@index([username])
+  @@index([action])
+  @@map("audit_log")
+}
+
+// §17.10
+model Notification {
+  id         Int      @id @default(autoincrement())
+  userId     String?  @map("user_id") @db.VarChar(10)
+  title      String   @db.VarChar(200)
+  message    String
+  type       String?  @db.VarChar(50)
+  isRead     Boolean  @default(false) @map("is_read")
+  incidentId String?  @map("incident_id") @db.VarChar(30)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user     User?     @relation(fields: [userId], references: [id])
+  incident Incident? @relation(fields: [incidentId], references: [id])
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+// §17.11
+model SystemConfig {
+  key         String   @id @db.VarChar(100)
+  value       String
+  description String?
+  updatedBy   String?  @map("updated_by") @db.VarChar(10)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  updater User? @relation(fields: [updatedBy], references: [id])
+
+  @@map("system_config")
+}
+
+// §17.12 — one row per login session; the token is rotated in place on refresh.
+// previous_token_hash + rotated_at detect refresh-token reuse; last_seen_at enforces idle timeout (spec #28).
+model RefreshToken {
+  id                String    @id @default(uuid()) @db.Uuid
+  userId            String    @map("user_id") @db.VarChar(10)
+  tokenHash         String    @unique @map("token_hash") @db.VarChar(255)
+  previousTokenHash String?   @map("previous_token_hash") @db.VarChar(255)
+  rotatedAt         DateTime? @map("rotated_at") @db.Timestamptz
+  expiresAt         DateTime  @map("expires_at") @db.Timestamptz
+  lastSeenAt        DateTime  @default(now()) @map("last_seen_at") @db.Timestamptz
+  ipAddress         String?   @map("ip_address") @db.Inet
+  userAgent         String?   @map("user_agent")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  revoked           Boolean   @default(false)
+  revokedReason     String?   @map("revoked_reason") @db.VarChar(50)
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, revoked])
+  @@index([previousTokenHash])
+  @@map("refresh_tokens")
+}

@@ -1,0 +1,318 @@
+import { useMemo, useState } from 'react';
+import { Bar, Doughnut } from 'react-chartjs-2';
+import { axisOptions, legendPosition, PALETTE } from '../lib/chart';
+import { useApp } from '../context/AppContext';
+import { useToast } from '../context/ToastContext';
+import * as reportsApi from '../api/reports';
+import { errorMessage } from '../api/client';
+import useApi from '../hooks/useApi';
+import useMediaQuery from '../hooks/useMediaQuery';
+import { formatDateDisplay, SEVERITY_HEX, todayISO } from '../utils/helpers';
+import Card from '../components/ui/Card';
+import ErrorState from '../components/ui/ErrorState';
+import Spinner from '../components/ui/Spinner';
+
+// Specs #19, #20 — analytics and trend analysis. All figures are computed by the server over
+// filed incidents (drafts excluded) within the signed-in user's scope.
+
+const RANGES = [
+  { id: '30d', label: '30 Days', days: 30, granularity: 'day' },
+  { id: '6m', label: '6 Months', months: 6, granularity: 'week' },
+  { id: '12m', label: '1 Year', months: 12, granularity: 'month' },
+  { id: '3y', label: '3 Years', months: 36, granularity: 'quarter' },
+];
+const GRANULARITIES = [
+  { id: 'day', label: 'Daily', noun: 'day' },
+  { id: 'week', label: 'Weekly', noun: 'week' },
+  { id: 'month', label: 'Monthly', noun: 'month' },
+  { id: 'quarter', label: 'Quarterly', noun: 'quarter' },
+  { id: 'year', label: 'Yearly', noun: 'year' },
+];
+const SEVERITIES = ['Low', 'Medium', 'High', 'Critical'];
+
+function rangeStart(range) {
+  const [y, m, d] = todayISO().split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (range.days) dt.setUTCDate(dt.getUTCDate() - range.days + 1);
+  else dt.setUTCMonth(dt.getUTCMonth() - range.months + 1, 1);
+  return dt.toISOString().slice(0, 10);
+}
+
+/** Same dates one year earlier, for the year-on-year comparison */
+const minusYear = (iso) => `${Number(iso.slice(0, 4)) - 1}${iso.slice(4)}`;
+
+function riskLabel(ratio) {
+  if (ratio >= 0.6) return { text: 'Critical Sector', cls: 'bg-red-50 text-red-700 border-red-200/80' };
+  if (ratio >= 0.4) return { text: 'High Risk', cls: 'bg-orange-50 text-orange-700 border-orange-200/80' };
+  if (ratio >= 0.2) return { text: 'Moderate', cls: 'bg-amber-50 text-amber-700 border-amber-200/80' };
+  return { text: 'Normal Ops', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200/80' };
+}
+
+async function loadAnalytics(filters, granularity) {
+  const [summary, trends, previous, severity, categories, sectors] = await Promise.all([
+    reportsApi.summary(filters),
+    reportsApi.trends({ ...filters, granularity }),
+    reportsApi.trends({ ...filters, granularity, dateFrom: minusYear(filters.dateFrom), dateTo: minusYear(todayISO()) }),
+    reportsApi.bySeverity(filters),
+    reportsApi.byCategory(filters),
+    reportsApi.bySector(filters),
+  ]);
+  return { summary, trends, previous, severity, categories, sectors };
+}
+
+function Kpi({ title, value, icon, tone, badge, children }) {
+  const tones = {
+    emerald: 'border-emerald-100 from-emerald-50/60 text-emerald-800 bg-emerald-100 text-emerald-700',
+    red: 'border-red-100 from-red-50/60 text-red-800 bg-red-100 text-red-700',
+    blue: 'border-blue-100 from-blue-50/60 text-blue-800 bg-blue-100 text-blue-700',
+    amber: 'border-amber-100 from-amber-50/60 text-amber-800 bg-amber-100 text-amber-800',
+  }[tone].split(' ');
+  return (
+    <div className={`rounded-2xl border ${tones[0]} bg-gradient-to-br ${tones[1]} to-white p-5 shadow-sm`}>
+      <div className="flex items-center justify-between">
+        <span className={`text-xs font-extrabold uppercase tracking-wider ${tones[2]}`}>{title}</span>
+        <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${tones[3]} ${tones[4]}`}>
+          <i className={`fas ${icon} text-sm`} />
+        </span>
+      </div>
+      <div className="mt-3 flex items-baseline gap-2">
+        <span className="text-3xl font-black text-gray-900">{value}</span>
+        {badge && <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${tones[3]} ${tones[4]}`}>{badge}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+export default function Analytics() {
+  const { meta, hasPermission } = useApp();
+  const { showToast } = useToast();
+  const isNarrow = useMediaQuery('(max-width: 639px)');
+  const fontSize = isNarrow ? 10 : 12;
+
+  const [rangeId, setRangeId] = useState('12m');
+  const [granularity, setGranularity] = useState('month');
+  const [sector, setSector] = useState('');
+  const [battalion, setBattalion] = useState('');
+  const [exporting, setExporting] = useState(false);
+
+  const range = RANGES.find((r) => r.id === rangeId);
+  // No dateTo: the server extends the range to the latest incident date
+  const filters = useMemo(() => ({ dateFrom: rangeStart(range), sector, battalion }), [range, sector, battalion]);
+  const { data, error, message, reload, loading } = useApi(() => loadAnalytics(filters, granularity), [filters, granularity]);
+
+  const hierarchy = meta?.hierarchy || {};
+  const battalions = Object.keys(hierarchy[sector] || {});
+  const gNoun = GRANULARITIES.find((g) => g.id === granularity).noun;
+
+  const chosenRange = (r) => {
+    setRangeId(r.id);
+    setGranularity(r.granularity);
+  };
+
+  const exportExcel = async () => {
+    setExporting(true);
+    try {
+      const name = await reportsApi.exportReport('excel', { ...filters, type: 'statistical' });
+      showToast(`Downloaded ${name}`, 'success');
+    } catch (err) {
+      showToast(errorMessage(err), 'error');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const trendData = useMemo(() => {
+    if (!data) return null;
+    const cur = data.trends.series;
+    const prev = data.previous.series;
+    return {
+      labels: cur.map((p) => p.period),
+      datasets: [
+        { label: 'Previous year', data: cur.map((_, i) => prev[i]?.count ?? 0), backgroundColor: 'rgba(59, 130, 246, 0.45)', borderRadius: 6 },
+        { label: 'Incidents', data: cur.map((p) => p.count), backgroundColor: 'rgba(22, 101, 52, 0.85)', borderRadius: 6 },
+        { label: 'High & Critical', data: cur.map((p) => p.bySeverity.High + p.bySeverity.Critical), backgroundColor: 'rgba(239, 68, 68, 0.8)', borderRadius: 6 },
+      ],
+    };
+  }, [data]);
+
+  if (error) return <Card><ErrorState message={message} onRetry={reload} /></Card>;
+  if (!data) return <Spinner />;
+
+  const { summary } = data;
+  const critical = summary.bySeverity.High + summary.bySeverity.Critical;
+  const resolved = summary.approved + summary.closed;
+  const resolutionRate = summary.total ? Math.round((resolved / summary.total) * 100) : 0;
+  const series = data.trends.series;
+  const last = series[series.length - 1]?.count ?? 0;
+  const before = series[series.length - 2]?.count;
+  const change = before ? Math.round(((last - before) / before) * 100) : null;
+  const categories = data.categories.filter((c) => c.count > 0);
+
+  return (
+    <div className={`space-y-6 ${loading ? 'opacity-70 transition-opacity' : 'transition-opacity'}`}>
+      {/* Header & Filter Control Bar */}
+      <div className="flex flex-col gap-4 rounded-2xl border border-gray-200/80 bg-white p-5 shadow-sm xl:flex-row xl:items-center xl:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-bgb-200/60 bg-bgb-50 font-bold text-bgb-700">
+              <i className="fas fa-chart-line text-sm" />
+            </span>
+            <h1 className="text-xl font-black tracking-tight text-gray-900 sm:text-2xl">Border Operations Analytics</h1>
+          </div>
+          <p className="mt-1 pl-11 text-xs font-medium text-gray-500 sm:text-sm">Threat distribution, trends and sector risk for filed incidents in your area of responsibility</p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          <select value={sector} onChange={(e) => { setSector(e.target.value); setBattalion(''); }} className="form-input w-auto text-xs font-bold" aria-label="Sector">
+            <option value="">All Sectors</option>
+            {Object.keys(hierarchy).map((s) => <option key={s}>{s}</option>)}
+          </select>
+          <select value={battalion} onChange={(e) => setBattalion(e.target.value)} disabled={!sector} className="form-input w-auto text-xs font-bold" aria-label="Battalion">
+            <option value="">All Battalions</option>
+            {battalions.map((b) => <option key={b}>{b}</option>)}
+          </select>
+          <div className="flex rounded-xl border border-gray-200 bg-gray-100 p-1">
+            {RANGES.map((r) => (
+              <button key={r.id} type="button" onClick={() => chosenRange(r)} className={`rounded-lg px-3 py-1 text-xs font-bold transition-all ${rangeId === r.id ? 'bg-bgb-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
+                {r.label}
+              </button>
+            ))}
+          </div>
+          <select value={granularity} onChange={(e) => setGranularity(e.target.value)} className="form-input w-auto text-xs font-bold" aria-label="Trend granularity">
+            {GRANULARITIES.map((g) => (
+              // The server caps a trend at 750 periods
+              <option key={g.id} value={g.id} disabled={g.id === 'day' && range.months > 24}>
+                {g.label}
+              </option>
+            ))}
+          </select>
+          {hasPermission(null, 'reports') && (
+            <button type="button" onClick={exportExcel} disabled={exporting} className="btn btn-primary rounded-xl px-3.5 py-2 text-xs font-bold shadow-sm">
+              <i className={`fas ${exporting ? 'fa-spinner fa-spin' : 'fa-file-excel'} text-xs`} /> Export Excel
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* KPI Stat Cards Grid */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
+        <Kpi title="Total Analyzed" value={summary.total} icon="fa-layer-group" tone="emerald" badge={change === null ? null : `${change >= 0 ? '+' : ''}${change}% vs prev ${gNoun}`}>
+          <p className="mt-1 text-xs font-medium text-gray-500">Filed incidents in the selected period</p>
+        </Kpi>
+        <Kpi title="High & Critical" value={critical} icon="fa-shield-virus" tone="red" badge={`${Math.round((critical / (summary.total || 1)) * 100)}% of total`}>
+          <p className="mt-1 text-xs font-medium text-gray-500">{summary.highSeverityOpen} still open</p>
+        </Kpi>
+        <Kpi title="Resolution Rate" value={`${resolutionRate}%`} icon="fa-check-circle" tone="blue" badge={`${resolved} approved/closed`}>
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+            <div className="h-full rounded-full bg-blue-600 transition-all duration-500" style={{ width: `${resolutionRate}%` }} />
+          </div>
+        </Kpi>
+        <Kpi title="Pending Review" value={summary.pendingReview} icon="fa-clock" tone="amber" badge={summary.returned ? `${summary.returned} returned` : null}>
+          <p className="mt-1 text-xs font-medium text-gray-500">Submitted, reviewed or verified, awaiting the next step</p>
+        </Kpi>
+      </div>
+
+      {/* Trend */}
+      <Card title={`${GRANULARITIES.find((g) => g.id === granularity).label} Incident Trend (${formatDateDisplay(data.trends.from)} to ${formatDateDisplay(data.trends.to)})`} icon="fa-chart-bar">
+        <div className="h-72 pt-2 sm:h-80">
+          <Bar
+            data={trendData}
+            options={{
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { position: 'top', labels: { font: { size: fontSize, weight: '600' }, boxWidth: 14 } }, tooltip: { mode: 'index', intersect: false } },
+              scales: axisOptions(fontSize),
+            }}
+          />
+        </div>
+      </Card>
+
+      {/* Secondary Charts Grid */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <Card title="Severity Threat Matrix" icon="fa-exclamation-triangle">
+          <div className="h-64 pt-2">
+            <Bar
+              data={{
+                labels: data.severity.map((s) => s.severity),
+                datasets: [{ label: 'Incidents', data: data.severity.map((s) => s.count), backgroundColor: data.severity.map((s) => SEVERITY_HEX[s.severity]), borderRadius: 8 }],
+              }}
+              options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: axisOptions(fontSize) }}
+            />
+          </div>
+        </Card>
+
+        <Card title="Risk by Sector" icon="fa-building">
+          <div className="h-64 pt-2">
+            <Bar
+              data={{
+                labels: data.sectors.map((s) => s.sector),
+                datasets: SEVERITIES.map((sev) => ({ label: sev, data: data.sectors.map((s) => s.bySeverity[sev] || 0), backgroundColor: SEVERITY_HEX[sev], borderRadius: 4 })),
+              }}
+              options={{
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: fontSize } } } },
+                scales: { x: { ...axisOptions(fontSize).x, stacked: true }, y: { ...axisOptions(fontSize).y, stacked: true } },
+              }}
+            />
+          </div>
+        </Card>
+
+        <Card title="Category Type Breakdown" icon="fa-chart-pie">
+          <div className="h-64 pt-2">
+            <Doughnut
+              data={{
+                labels: categories.map((c) => c.category),
+                datasets: [{ data: categories.map((c) => c.count), backgroundColor: PALETTE, borderWidth: 2, borderColor: '#ffffff' }],
+              }}
+              options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: legendPosition(isNarrow), labels: { boxWidth: 12, padding: 8, font: { size: fontSize } } } } }}
+            />
+          </div>
+        </Card>
+      </div>
+
+      {/* Sector risk table */}
+      <Card title="Sector Operational Risk Summary" icon="fa-shield-alt" bodyClassName="">
+        {data.sectors.length === 0 ? (
+          <p className="p-6 text-center text-sm text-gray-400">No filed incidents in this period.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs sm:text-sm">
+              <thead className="border-b border-gray-200 bg-gray-50 text-xs font-extrabold uppercase text-gray-500">
+                <tr>
+                  <th className="px-4 py-3">Sector</th>
+                  <th className="px-4 py-3">Total Incidents</th>
+                  <th className="px-4 py-3">High/Critical Ratio</th>
+                  <th className="px-4 py-3">Risk Score</th>
+                  <th className="px-4 py-3 text-right">Risk Assessment</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 font-medium text-gray-700">
+                {data.sectors.map((s) => {
+                  const high = (s.bySeverity.High || 0) + (s.bySeverity.Critical || 0);
+                  const ratio = s.total ? high / s.total : 0;
+                  const risk = riskLabel(ratio);
+                  return (
+                    <tr key={s.sector} className="transition-colors hover:bg-gray-50/80">
+                      <td className="px-4 py-3 font-bold text-gray-900">{s.sector}</td>
+                      <td className="px-4 py-3 font-bold">{s.total}</td>
+                      <td className="px-4 py-3">
+                        <span className={`rounded-md border px-2 py-0.5 font-bold ${risk.cls}`}>{(ratio * 100).toFixed(1)}%</span>
+                      </td>
+                      <td className="px-4 py-3 font-mono" title="Low 1, Medium 2, High 3, Critical 4 per incident">{s.riskScore}</td>
+                      <td className="px-4 py-3 text-right">
+                        <span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${risk.cls}`}>{risk.text}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}

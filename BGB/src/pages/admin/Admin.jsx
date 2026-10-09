@@ -1,0 +1,89 @@
+import { useState } from 'react';
+import * as adminApi from '../../api/admin';
+import useApi from '../../hooks/useApi';
+import Card from '../../components/ui/Card';
+import ErrorState from '../../components/ui/ErrorState';
+import Spinner from '../../components/ui/Spinner';
+import { DemoBadge } from '../../components/ui/Demo';
+import AdminUsers from './AdminUsers';
+import AdminPermissions from './AdminPermissions';
+import AdminCategories from './AdminCategories';
+import AdminOrg from './AdminOrg';
+import AdminWorkflow from './AdminWorkflow';
+import AdminSettings from './AdminSettings';
+import AdminOperations from './AdminOperations';
+
+// Spec #46 — administrative module. Every change goes through /api/v1/admin or /api/v1/users,
+// is validated and audited by the server.
+const TABS = [
+  { id: 'users', label: 'Users & Roles', icon: 'fa-users' },
+  { id: 'permissions', label: 'Permissions Matrix', icon: 'fa-shield-alt' },
+  { id: 'categories', label: 'Categories', icon: 'fa-tags' },
+  { id: 'org', label: 'Org Hierarchy', icon: 'fa-sitemap' },
+  { id: 'workflow', label: 'Workflow', icon: 'fa-project-diagram' },
+  { id: 'settings', label: 'Security & System', icon: 'fa-lock' },
+  { id: 'operations', label: 'Operations', icon: 'fa-server', demo: true },
+];
+
+async function loadAdmin() {
+  const [permissions, org, config] = await Promise.all([adminApi.getPermissions(), adminApi.getOrgHierarchy(), adminApi.getConfig()]);
+  return { permissions, org, config };
+}
+
+export default function Admin() {
+  const [tab, setTab] = useState('users');
+  const { data, error, message, reload, setData } = useApi(loadAdmin, []);
+
+  if (error) return <Card><ErrorState message={message} onRetry={reload} /></Card>;
+  if (!data) return <Spinner />;
+
+  const update = (key) => (value) => setData((d) => ({ ...d, [key]: value }));
+  const { permissions, org, config } = data;
+  const grants = Object.values(permissions.permissions).reduce((n, list) => n + list.length, 0);
+
+  return (
+    <div className="space-y-4 sm:space-y-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[
+          ['System Roles', permissions.roles.length, 'text-bgb-700'],
+          ['Module Grants', `${grants} / ${permissions.roles.length * permissions.pageIds.length}`, 'text-blue-600'],
+          ['Organizational Units', `${Object.keys(org.hierarchy).length} sectors · ${org.units.length} BOPs`, 'text-navy-800'],
+          ['Idle Timeout', `${config.find((c) => c.key === 'session.timeout_minutes')?.value ?? '–'} min`, 'text-emerald-700'],
+        ].map(([label, value, cls]) => (
+          <div key={label} className="rounded-xl border border-gray-100 bg-white p-3 shadow-sm sm:p-4">
+            <p className="text-xs text-gray-500">{label}</p>
+            <p className={`mt-1 text-lg font-bold sm:text-xl ${cls}`}>{value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex gap-2 overflow-x-auto border-b border-gray-200 pb-2 scrollbar-none" role="tablist">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            role="tab"
+            aria-selected={tab === t.id}
+            onClick={() => setTab(t.id)}
+            className={`flex items-center gap-2 whitespace-nowrap rounded-lg px-4 py-2.5 text-xs font-bold transition-all sm:text-sm ${
+              tab === t.id ? 'bg-bgb-600 text-white shadow-md' : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+            }`}
+          >
+            <i className={`fas ${t.icon} text-xs`} />
+            {t.label}
+            {t.demo && <DemoBadge />}
+          </button>
+        ))}
+      </div>
+
+      <div>
+        {tab === 'users' && <AdminUsers roles={permissions.roles} hierarchy={org.hierarchy} />}
+        {tab === 'permissions' && <AdminPermissions matrix={permissions} onChange={update('permissions')} />}
+        {tab === 'categories' && <AdminCategories />}
+        {tab === 'org' && <AdminOrg org={org} onChange={update('org')} />}
+        {tab === 'workflow' && <AdminWorkflow />}
+        {tab === 'settings' && <AdminSettings config={config} onChange={update('config')} />}
+        {tab === 'operations' && <AdminOperations config={config} onChange={update('config')} />}
+      </div>
+    </div>
+  );
+}
