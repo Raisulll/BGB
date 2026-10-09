@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
+import GlobalSearch from './GlobalSearch';
 import NotificationsMenu from './NotificationsMenu';
 import LanguageSwitcher from './LanguageSwitcher';
 import { useI18n } from '../../i18n/I18nContext';
@@ -17,6 +18,7 @@ function getPageDetails(pathname) {
   if (pathname === '/audit') return { key: 'audit', icon: 'fa-clipboard-list' };
   if (pathname === '/admin') return { key: 'admin', icon: 'fa-cogs' };
   if (pathname === '/change-password') return { key: 'password', icon: 'fa-key' };
+  if (pathname === '/profile') return { key: 'profile', icon: 'fa-id-badge' };
   return { key: 'default', icon: 'fa-shield-alt' };
 }
 
@@ -24,7 +26,7 @@ function getPageDetails(pathname) {
 const BST_CLOCK = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
 
 export default function Header({ onToggleSidebar, collapsed }) {
-  const { currentUser, logout } = useApp();
+  const { currentUser, logout, hasPermission } = useApp();
   const { t, tv } = useI18n();
   const { pathname } = useLocation();
   const navigate = useNavigate();
@@ -83,7 +85,7 @@ export default function Header({ onToggleSidebar, collapsed }) {
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <h1 className="truncate text-base font-bold text-slate-900 sm:text-lg tracking-wide">{t(`page.${page.key}.title`)}</h1>
-              <span className="hidden md:inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+              <span className="hidden 2xl:inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                 {t('header.online')}
               </span>
@@ -93,10 +95,12 @@ export default function Header({ onToggleSidebar, collapsed }) {
         </div>
       </div>
 
-      {/* Right section: Operational Clock + Notifications + User Menu */}
+      {/* Right section: Search + Operational Clock + Notifications + User Menu */}
       <div className="flex items-center gap-2 sm:gap-3">
+        {hasPermission(null, 'incidents') && <GlobalSearch />}
+
         {/* Live System Clock */}
-        <div className="hidden lg:flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-1.5 border border-slate-200/80 text-xs text-slate-700 font-mono shadow-xs">
+        <div className="hidden 2xl:flex items-center gap-2 whitespace-nowrap rounded-xl bg-slate-100 px-3 py-1.5 border border-slate-200/80 text-xs text-slate-700 font-mono shadow-xs">
           <i className="fas fa-clock text-emerald-600 animate-pulse" />
           <span className="font-semibold tracking-wider">
             {timeStr} {t('header.bst')}
@@ -159,6 +163,17 @@ export default function Header({ onToggleSidebar, collapsed }) {
               </div>
 
               <div className="mt-3 space-y-1.5 border-t border-slate-100 pt-2">
+                <button
+                  id="menu-profile"
+                  onClick={() => {
+                    setUserMenuOpen(false);
+                    navigate('/profile');
+                  }}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-50 py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100 transition-colors"
+                >
+                  <i className="fas fa-id-badge" />
+                  {t('header.profile')}
+                </button>
                 <button
                   onClick={() => {
                     setUserMenuOpen(false);

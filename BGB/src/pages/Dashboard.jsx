@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Line } from 'react-chartjs-2';
 import { axisOptions } from '../lib/chart';
@@ -7,7 +7,7 @@ import * as reportsApi from '../api/reports';
 import * as incidentsApi from '../api/incidents';
 import useApi from '../hooks/useApi';
 import useMediaQuery from '../hooks/useMediaQuery';
-import { formatDateDisplay } from '../utils/helpers';
+import { cn, formatDateDisplay, todayISO } from '../utils/helpers';
 import Card from '../components/ui/Card';
 import ErrorState from '../components/ui/ErrorState';
 import Spinner from '../components/ui/Spinner';
@@ -22,18 +22,37 @@ const monthLabel = (period, t) => {
   return `${t(`month.${Number(m)}`)} ${y.slice(2)}`;
 };
 
+// Period presets for the dashboard figures (incident date). "all" = no date filter, 12-month trend.
+const DAY = 86_400_000;
+const shiftISO = (iso, days) => new Date(Date.parse(`${iso}T00:00:00Z`) + days * DAY).toISOString().slice(0, 10);
+const PRESETS = ['all', '7', '30', '90', 'year', 'custom'];
+function periodRange(preset, custom) {
+  const today = todayISO();
+  if (preset === 'all') return {};
+  if (preset === 'year') return { dateFrom: `${today.slice(0, 4)}-01-01`, dateTo: today };
+  if (preset === 'custom') return { dateFrom: custom.from || undefined, dateTo: custom.to || undefined };
+  return { dateFrom: shiftISO(today, 1 - Number(preset)), dateTo: today };
+}
+// Trend buckets that suit the span: days up to a month, weeks up to half a year, then months
+function granularityFor({ dateFrom, dateTo }) {
+  if (!dateFrom) return 'month';
+  const days = (Date.parse(dateTo || todayISO()) - Date.parse(dateFrom)) / DAY + 1;
+  return days <= 31 ? 'day' : days <= 183 ? 'week' : 'month';
+}
+
 // Spec #17 — role-based dashboard. Every figure comes from the server and is limited to the
 // signed-in user's scope; drafts are excluded from statistics.
-async function loadDashboard(canList) {
+async function loadDashboard(canList, range) {
+  const granularity = granularityFor(range);
   const [summary, trends, resolved, categories, sectors, recent] = await Promise.all([
-    reportsApi.summary(),
-    reportsApi.trends({ granularity: 'month' }),
-    reportsApi.trends({ granularity: 'month', status: 'Approved,Closed' }),
-    reportsApi.byCategory(),
-    reportsApi.bySector(),
-    canList ? incidentsApi.list({ pageSize: 5, sort: 'createdAt', order: 'desc' }) : null,
+    reportsApi.summary(range),
+    reportsApi.trends({ granularity, ...range }),
+    reportsApi.trends({ granularity, status: 'Approved,Closed', ...range }),
+    reportsApi.byCategory(range),
+    reportsApi.bySector(range),
+    canList ? incidentsApi.list({ pageSize: 5, sort: 'createdAt', order: 'desc', ...range }) : null,
   ]);
-  return { summary, trends, resolved, categories, sectors, recent: recent?.data || [] };
+  return { summary, trends, resolved, categories, sectors, recent: recent?.data || [], granularity };
 }
 
 export default function Dashboard() {
@@ -42,7 +61,11 @@ export default function Dashboard() {
   const isNarrow = useMediaQuery('(max-width: 639px)');
   const fontSize = isNarrow ? 10 : 12;
   const canList = hasPermission(null, 'incidents');
-  const { data, error, message, reload } = useApi(() => loadDashboard(canList), [canList]);
+  const [preset, setPreset] = useState('all');
+  const [custom, setCustom] = useState({ from: '', to: '' });
+  const range = useMemo(() => periodRange(preset, custom), [preset, custom]);
+  const { data, error, message, reload, loading } = useApi(() => loadDashboard(canList, range), [canList, range]);
+  const bucketLabel = (p) => (data?.granularity === 'month' ? monthLabel(p.period, t) : formatDateDisplay(p.start).slice(0, 5));
 
   const monthlyTrendData = useMemo(() => {
     if (!data) return null;
@@ -50,8 +73,8 @@ export default function Dashboard() {
     const resolvedBy = new Map(data.resolved.series.map((p) => [p.period, p.count]));
     const last = series[series.length - 1];
     return {
-      labels: series.map((p) => monthLabel(p.period, t)),
-      currentMonthLabel: last ? monthLabel(last.period, t) : '',
+      labels: series.map(bucketLabel),
+      currentMonthLabel: last ? bucketLabel(last) : '',
       currentTotal: last?.count ?? 0,
       datasets: [
         {
@@ -90,7 +113,7 @@ export default function Dashboard() {
         },
       ],
     };
-  }, [data, t]);
+  }, [data, t]); // bucketLabel derives from data and t
 
   if (error) return <Card><ErrorState message={message} onRetry={reload} /></Card>;
   if (!data) return <Spinner />;
@@ -175,8 +198,34 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* What is waiting for this user */}
-      <WorkQueue overdueInScope={summary.overdue ?? 0} />
+      {/* What is waiting for this user (current work: not limited by the period below) */}
+      <WorkQueue />
+
+      {/* Period for the figures below */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-1 rounded-xl border border-gray-200 bg-white p-1 shadow-sm" role="group" aria-label={t('dash.period')}>
+          {PRESETS.map((p) => (
+            <button
+              key={p}
+              id={`period-${p}`}
+              type="button"
+              onClick={() => setPreset(p)}
+              aria-pressed={preset === p}
+              className={cn('rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors', preset === p ? 'bg-bgb-700 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100')}
+            >
+              {t(`dash.period_${p}`)}
+            </button>
+          ))}
+        </div>
+        {preset === 'custom' && (
+          <div className="flex flex-wrap items-center gap-2">
+            <input id="period-from" type="date" value={custom.from} max={custom.to || todayISO()} onChange={(e) => setCustom((c) => ({ ...c, from: e.target.value }))} className="form-input w-auto" aria-label={t('incidents.dateFrom')} />
+            <span className="text-xs text-gray-500">–</span>
+            <input id="period-to" type="date" value={custom.to} min={custom.from || undefined} max={todayISO()} onChange={(e) => setCustom((c) => ({ ...c, to: e.target.value }))} className="form-input w-auto" aria-label={t('incidents.dateTo')} />
+          </div>
+        )}
+        {loading && <i className="fas fa-spinner fa-spin text-bgb-500" aria-hidden="true" />}
+      </div>
 
       {/* Primary KPI Summary Grid */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 xl:grid-cols-5">
@@ -202,7 +251,8 @@ export default function Dashboard() {
                 <i className="fas fa-calendar-check text-[10px]" /> {t('dash.current', { month: monthlyTrendData.currentMonthLabel, n: monthlyTrendData.currentTotal })}
               </span>
               <span className="inline-flex items-center gap-1 font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200/60">
-                <i className="fas fa-history text-[10px]" /> {t('dash.window')}
+                <i className="fas fa-history text-[10px]" />{' '}
+                {range.dateFrom ? t('dash.rangeWindow', { from: formatDateDisplay(range.dateFrom), to: formatDateDisplay(range.dateTo || todayISO()) }) : t('dash.window')}
               </span>
             </div>
           }

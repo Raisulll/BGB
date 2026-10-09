@@ -12,6 +12,7 @@ import { daysWaiting, OverdueBadge, SeverityBadge, StatusBadge } from '../compon
 import IncidentComments from '../components/incidents/IncidentComments';
 import PrintableIncident from '../components/incidents/PrintableIncident';
 import ReasonBanner from '../components/incidents/ReasonBanner';
+import RelatedIncidents from '../components/incidents/RelatedIncidents';
 import Card from '../components/ui/Card';
 import EvidenceMedia, { PREVIEW_TYPES } from '../components/incidents/EvidenceMedia';
 import ErrorState from '../components/ui/ErrorState';
@@ -397,6 +398,8 @@ export default function IncidentDetail() {
                 })}
               </ol>
             </Card>
+
+            <RelatedIncidents incidentId={inc.id} />
 
             <Card title={t('detail.reportInfo')} icon="fa-user-shield">
               <dl className="space-y-2 text-sm">

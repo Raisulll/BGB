@@ -203,6 +203,7 @@ export default {
     "RETURN_INCIDENT": "RETURN INCIDENT",
     "REVIEW_INCIDENT": "REVIEW INCIDENT",
     "ROLE_CHANGE": "ROLE CHANGE",
+    "SESSIONS_REVOKED": "SESSIONS REVOKED",
     "SESSION_TIMEOUT": "SESSION TIMEOUT",
     "SUBMIT_INCIDENT": "SUBMIT INCIDENT",
     "TOKEN_REUSE": "TOKEN REUSE",
@@ -317,6 +318,14 @@ export default {
     "nIncidents": "{n} incidents",
     "noSector": "No filed incidents in your area yet.",
     "normal": "Normal Sector",
+    "period": "Period",
+    "period_30": "30 days",
+    "period_7": "7 days",
+    "period_90": "90 days",
+    "period_all": "All time",
+    "period_custom": "Custom",
+    "period_year": "This year",
+    "rangeWindow": "{from} – {to}",
     "recent": "Recent Border Incidents",
     "report": "Report Incident",
     "reports": "Reports",
@@ -420,6 +429,10 @@ export default {
     "title": "Directory Sign-in (AD/LDAP)",
     "url": "Server URL (LDAPS)"
   },
+  "dup": {
+    "hint": "These reports are from the same place around the same time. Check them before filing; if this is the same event, add to the existing report instead.",
+    "title": "Possibly already reported ({n})"
+  },
   "error": {
     "generic": "Something went wrong. Please try again.",
     "load": "Could not load data.",
@@ -502,6 +515,7 @@ export default {
     "collapseSidebar": "Collapse sidebar",
     "expandSidebar": "Expand sidebar",
     "online": "HQ ONLINE",
+    "profile": "My profile",
     "role": "Role",
     "signOut": "Sign Out from BIRDS",
     "toggleNav": "Toggle navigation",
@@ -609,9 +623,14 @@ export default {
     "filterStatus": "Filter by status",
     "lastTwo": "Last 2 Incidents",
     "locations": "Incident Locations",
+    "mode": "Map display",
+    "modeClusters": "Clusters",
+    "modeHeat": "Heatmap",
+    "modePoints": "Points",
     "noLocations": "No matching incident locations.",
     "point": "Operational Point",
     "recentTwo": "Recent Incidents (Last 2)",
+    "shown": "{n} incidents on the map",
     "total": "{n} Total",
     "viewDetails": "View Details"
   },
@@ -771,6 +790,10 @@ export default {
       "subtitle": "Change Your Password",
       "title": "Account Security"
     },
+    "profile": {
+      "subtitle": "Account, Sessions & Sign-in Activity",
+      "title": "My Profile"
+    },
     "reports": {
       "subtitle": "Generate PDF/Excel Official Documents",
       "title": "Reports & Export"
@@ -844,6 +867,25 @@ export default {
     "uploaded": "Uploaded",
     "when": "Date & time"
   },
+  "profile": {
+    "access": "Pages you can open",
+    "activity": "Recent sign-in activity",
+    "activityNote": "Your own sign-in and security events. Report failed sign-ins you didn't make to your administrator.",
+    "browserOn": "{browser} on {os}",
+    "email": "E-mail",
+    "lastActive": "Last active {ago}",
+    "lastLogin": "Last sign-in",
+    "memberSince": "Account created",
+    "noActivity": "No sign-in events recorded yet.",
+    "revokeConfirm": "Sign out {n} other session(s)? They will need to sign in again.",
+    "revokeOthers": "Sign out other sessions",
+    "revoked": "{n} other session(s) signed out",
+    "sessions": "Where you're signed in ({n})",
+    "sessionsNote": "If you don't recognise a session, sign it out and change your password.",
+    "signedIn": "signed in {date}",
+    "thisDevice": "This device",
+    "unknownDevice": "Unknown device"
+  },
   "queue": {
     "action": "Need my action",
     "actionOverdue": "Of those, overdue",
@@ -851,6 +893,15 @@ export default {
     "overdueArea": "Overdue in my area",
     "returned": "Returned to me",
     "title": "Waiting for you"
+  },
+  "related": {
+    "dayApart": "1 day apart",
+    "daysApart": "{n} days apart",
+    "km": "{km} km away",
+    "none": "No incidents at the same BOP or within 5 km in the 30 days around this one.",
+    "sameBop": "Same BOP",
+    "sameDay": "same day",
+    "title": "Related Incidents"
   },
   "rep": {
     "allSeverities": "All Severities",
@@ -905,6 +956,12 @@ export default {
     "HQ Administrator": "HQ Administrator",
     "Sector Officer": "Sector Officer",
     "Verifier/Approver": "Verifier/Approver"
+  },
+  "search": {
+    "all": "Search all for \"{q}\"",
+    "label": "Search incidents",
+    "noMatch": "No matching incidents in your area",
+    "placeholder": "Reference no. or title"
   },
   "session": {
     "ended": "Your session has ended. Please sign in again.",

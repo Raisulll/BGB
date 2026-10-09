@@ -487,3 +487,14 @@ Added after the session summary: deferred items now appear in **Admin › Operat
 - Bug found by the browser run: `timeAgo(iso, t)` needs `t` (CLAUDE.md §8 listed `timeAgo(iso)`; corrected)
 - Verified: `workflow-extras.test.ts` (7) → **128/128**; headless Chrome 21 checks (sector_off, batt_op, auditor, hq_admin) incl. a generated A4 PDF that was inspected; section 1 browser suite re-run clean
 - Live: the new migration must reach Supabase (`npm run db:deploy` or the planned reset). Grants: `incident_comments` is a new table, so **re-run `supabase-demo-access.sql`** after migrating
+
+**Added later — "section 3" (user request).**
+- **Header search** (`components/layout/GlobalSearch.jsx`): suggestions from the list API, Enter opens the highlighted result, a full or 4-digit reference (current year), or `/incidents?q=`; "/" focuses it; shown from 1024 px (Incidents page search below that). The Incidents page now follows `?q=` changes while mounted. Header decluttered: clock and "HQ ONLINE" badge only from 1536 px (the header overflowed at 1024/1280 with the sidebar open)
+- **Map**: date range; display modes Points / Clusters (`leaflet.markercluster` 1.5.3, clusters coloured by worst severity) / Heatmap (`leaflet.heat` 0.2.0, severity-weighted). Plugins need a global `L`: `lib/leafletGlobal.js` (sets `window.L`) is imported first by `lib/leafletPlugins.js`; both only in the MapView chunk. Popup links navigate in-app. Legend moved below the filters
+- **Related incidents**: `GET /incidents/:id/related` (same BOP or within 5 km, ±30 days, max 8; haversine; visibility rules) + card on the detail page with the reason ("Same BOP · 1 day apart")
+- **Duplicate warning**: `GET /incidents/similar` (±1 day and within 1 km, or same BOP + category; max 5; `excludeId`; `create` permission) + amber panel in the form from step 2 (debounced; advisory, never blocks; links in the same tab so the unsaved-changes guard applies — a second tab could trip refresh-token reuse detection)
+- **Dashboard period**: All / 7 / 30 / 90 days / This year / Custom for summary, category, sector, recent list and trend (daily ≤31 days, weekly ≤183, monthly beyond); the work queue stays current (fetches its own overdue count)
+- **Profile** (`/profile`, user menu): `GET /auth/profile` (account, own unrevoked sessions with "This device", last 15 own sign-in/security audit events) and `POST /auth/sessions/revoke-others` (audited `SESSIONS_REVOKED`)
+- Tests: `nearby-profile.test.ts` (6) → **134/134**; headless Chrome section 3 suite (25 checks) plus sections 1 and 2 re-run clean; 390 px without overflow; `npm audit` 0
+- Test-script lessons: scripts must wait for responses after tab clicks (count requests by `pageSize`), and data-dependent checks must tolerate earlier runs (lists are capped). The dev DB now holds test incidents up to BIRDS-2026-1078 — the planned reset clears them
+- Live: no new migration this time; deploy + the pending reset from the previous block

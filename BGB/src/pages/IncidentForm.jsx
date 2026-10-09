@@ -10,6 +10,7 @@ import { cn, FILE_ICONS, fileKind, formatDateTime, formatFileSize, todayISO } fr
 import Card from '../components/ui/Card';
 import EvidenceMedia, { LocalMedia, PREVIEW_TYPES } from '../components/incidents/EvidenceMedia';
 import ReasonBanner from '../components/incidents/ReasonBanner';
+import DuplicateWarning from '../components/incidents/DuplicateWarning';
 import ErrorState from '../components/ui/ErrorState';
 import Spinner from '../components/ui/Spinner';
 import { useI18n } from '../i18n/I18nContext';
@@ -380,6 +381,9 @@ function IncidentFormBody({ existing, initialStep }) {
           className="space-y-6"
           noValidate
         >
+          {/* Same place, around the same time: possibly already reported (advisory) */}
+          {activeStep >= 2 && <DuplicateWarning form={form} excludeId={existing?.id} />}
+
           {/* STEP 1: Basic Information & Threat Classification */}
           {activeStep === 1 && (
             <div className="space-y-5 animate-fade-in">

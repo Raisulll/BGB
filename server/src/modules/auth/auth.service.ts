@@ -226,6 +226,57 @@ export async function logout(sessionId: string, user: Express.AuthUser, ctx: Req
 }
 
 // ---------------------------------------------------------------------------
+// Own profile: account, active sessions, recent sign-in events (specs #24, #28)
+// ---------------------------------------------------------------------------
+const SIGN_IN_EVENTS = ['LOGIN', 'LOGIN_FAILED', 'LOGIN_BLOCKED', 'LOGOUT', 'SESSION_TIMEOUT', 'PASSWORD_CHANGE', 'PASSWORD_RESET', 'SESSIONS_REVOKED', 'ACCOUNT_LOCKED'];
+
+export async function profile(authUser: Express.AuthUser, sessionId: string) {
+  const [user, sessions, activity] = await Promise.all([
+    prisma.user.findUniqueOrThrow({ where: { id: authUser.id } }),
+    prisma.refreshToken.findMany({
+      where: { userId: authUser.id, revoked: false, expiresAt: { gt: new Date() } },
+      orderBy: { lastSeenAt: 'desc' },
+    }),
+    // The user's own security events only; the full audit trail stays with the audit permission
+    prisma.auditLog.findMany({
+      where: { userId: authUser.id, action: { in: SIGN_IN_EVENTS } },
+      orderBy: { seq: 'desc' },
+      take: 15,
+      select: { timestamp: true, action: true, ipAddress: true },
+    }),
+  ]);
+  return {
+    user: { ...(await toUserDto(user)), lastLogin: user.lastLogin?.toISOString() ?? null, createdAt: user.createdAt.toISOString() },
+    sessions: sessions.map((s) => ({
+      id: s.id,
+      current: s.id === sessionId,
+      startedAt: s.createdAt.toISOString(),
+      lastSeenAt: s.lastSeenAt.toISOString(),
+      expiresAt: s.expiresAt.toISOString(),
+      ipAddress: s.ipAddress,
+      userAgent: s.userAgent,
+    })),
+    activity: activity.map((a) => ({ date: a.timestamp.toISOString(), action: a.action, ipAddress: a.ipAddress })),
+  };
+}
+
+/** Ends every session of this user except the current one ("sign out other devices"). */
+export async function revokeOtherSessions(authUser: Express.AuthUser, sessionId: string, ctx: RequestContext) {
+  const { count } = await prisma.refreshToken.updateMany({
+    where: { userId: authUser.id, revoked: false, id: { not: sessionId } },
+    data: { revoked: true, revokedReason: 'revoked_by_user' },
+  });
+  await writeAudit({
+    action: 'SESSIONS_REVOKED',
+    username: authUser.username,
+    userId: authUser.id,
+    details: `Signed out ${count} other session${count === 1 ? '' : 's'}`,
+    ctx,
+  });
+  return { revoked: count };
+}
+
+// ---------------------------------------------------------------------------
 // Change own password (spec #29)
 // ---------------------------------------------------------------------------
 export async function changePassword(

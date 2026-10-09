@@ -255,6 +255,7 @@ All dates **must** be displayed as `DD-MM-YYYY`. Use `formatDateDisplay()` from 
 | `/incidents/new` | `IncidentForm.jsx` | `create` |
 | `/incidents/:id` | `IncidentDetail.jsx` | `incidents` |
 | `/change-password` | `ChangePassword.jsx` | (just auth; forced while `mustChangePassword`) |
+| `/profile` | `Profile.jsx` | (just auth) |
 | `/incidents/:id/edit` | `IncidentForm.jsx` | `create` |
 | `/map` | `MapView.jsx` | `map` |
 | `/analytics` | `Analytics.jsx` | `analytics` |
@@ -785,6 +786,8 @@ All endpoints require `Authorization: Bearer <access_token>` unless marked **Pub
 | POST | `/auth/refresh` | Exchange refresh token for new access token | #28 |
 | POST | `/auth/change-password` | Authenticated user changes own password | #29 |
 | POST | `/auth/admin/reset-password` | Admin resets a user's password (temp password) | #29 |
+| GET | `/auth/profile` | Own account, active sessions, last 15 own sign-in/security events | #24, #28 |
+| POST | `/auth/sessions/revoke-others` | Sign out the caller's other sessions (audited `SESSIONS_REVOKED`) | #28 |
 
 ### 19.2 Users  (`/api/v1/users`)
 
@@ -811,6 +814,8 @@ All endpoints require `Authorization: Bearer <access_token>` unless marked **Pub
 | DELETE | `/incidents/:id` | create | Discard a never-submitted draft (creator; soft, hidden everywhere, audited) | #5, #25 |
 | POST | `/incidents/:id/comments` | incidents | Comment (filers/reviewers; not drafts/archived); append-only, notifies creator + earlier commenters | #12, #23 |
 | POST | `/incidents/:id/print` | incidents | Audit entry before the browser prints a single incident | #22, #24 |
+| GET | `/incidents/:id/related` | incidents | Same BOP or within 5 km, ±30 days (max 8) | #8, #16 |
+| GET | `/incidents/similar` | create | Possible duplicates while filing: ±1 day, within 1 km or same BOP + category (max 5, advisory) | #5, #25 |
 | POST | `/incidents/:id/submit` | create | Submit Draft → Submitted | #13 |
 | POST | `/incidents/:id/review` | reviewer | Submitted → Reviewed | #14 |
 | POST | `/incidents/:id/verify` | approver | Reviewed → Verified | #14 |

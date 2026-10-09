@@ -9,7 +9,7 @@ import { useI18n } from '../../i18n/I18nContext';
 // Counts come from the list API (server applies scope, workflow rules and the overdue setting).
 const count = (query, signal) => incidentsApi.list({ ...query, pageSize: 1 }, signal).then((r) => r.total);
 
-export default function WorkQueue({ overdueInScope }) {
+export default function WorkQueue() {
   const { meta, hasPermission } = useApp();
   const { t } = useI18n();
   const canCreate = hasPermission(null, 'create');
@@ -17,13 +17,14 @@ export default function WorkQueue({ overdueInScope }) {
 
   const { data } = useApi(
     async (signal) => {
-      const [action, actionOverdue, returned, drafts] = await Promise.all([
+      const [action, actionOverdue, returned, drafts, overdueInScope] = await Promise.all([
         canAct || canCreate ? count({ needsAction: 'true' }, signal) : null,
         canAct ? count({ needsAction: 'true', overdue: 'true' }, signal) : null,
         canCreate ? count({ createdBy: 'me', status: 'Returned' }, signal) : null,
         canCreate ? count({ createdBy: 'me', status: 'Draft' }, signal) : null,
+        count({ overdue: 'true' }, signal),
       ]);
-      return { action, actionOverdue, returned, drafts };
+      return { action, actionOverdue, returned, drafts, overdueInScope };
     },
     [canAct, canCreate],
   );
@@ -33,7 +34,7 @@ export default function WorkQueue({ overdueInScope }) {
     data?.actionOverdue != null && { to: '/incidents?view=action&overdue=true', icon: 'fa-hourglass-end', label: t('queue.actionOverdue'), n: data.actionOverdue, tone: 'red' },
     data?.returned != null && { to: '/incidents?view=mine&status=Returned', icon: 'fa-undo', label: t('queue.returned'), n: data.returned, tone: 'purple' },
     data?.drafts != null && { to: '/incidents?view=drafts', icon: 'fa-pencil-alt', label: t('queue.drafts'), n: data.drafts, tone: 'slate' },
-    { to: '/incidents?overdue=true', icon: 'fa-stopwatch', label: t('queue.overdueArea'), n: overdueInScope, tone: 'red' },
+    { to: '/incidents?overdue=true', icon: 'fa-stopwatch', label: t('queue.overdueArea'), n: data?.overdueInScope, tone: 'red' },
   ].filter(Boolean);
 
   const TONES = {

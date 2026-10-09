@@ -72,6 +72,15 @@ authRouter.get('/me', requireAuthAllowPasswordChange, apiLimiter, async (req, re
   });
 });
 
+// Own profile: account details, active sessions, recent sign-in events
+authRouter.get('/profile', requireAuth, apiLimiter, async (req, res) => {
+  res.json(await auth.profile(req.user!, req.sessionId!));
+});
+
+authRouter.post('/sessions/revoke-others', requireAuth, apiLimiter, async (req, res) => {
+  res.json(await auth.revokeOtherSessions(req.user!, req.sessionId!, requestContext(req)));
+});
+
 authRouter.post('/change-password', requireAuthAllowPasswordChange, apiLimiter, async (req, res) => {
   const { currentPassword, newPassword } = changePasswordSchema.parse(req.body);
   await auth.changePassword(req.user!, req.sessionId!, currentPassword, newPassword, requestContext(req));

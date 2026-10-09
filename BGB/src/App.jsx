@@ -16,6 +16,7 @@ const Reports = lazy(() => import('./pages/Reports'));
 const AuditTrail = lazy(() => import('./pages/AuditTrail'));
 const Admin = lazy(() => import('./pages/admin/Admin'));
 const ChangePassword = lazy(() => import('./pages/ChangePassword'));
+const Profile = lazy(() => import('./pages/Profile'));
 
 function RequireAuth({ children }) {
   const { currentUser } = useApp();
@@ -86,6 +87,8 @@ export default function App() {
             }
           />
           <Route path="change-password" element={<ChangePassword />} />
+          {/* Own account: any signed-in user (specs #24, #28) */}
+          <Route path="profile" element={<Profile />} />
           <Route
             path="incidents/:id/edit"
             element={

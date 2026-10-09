@@ -142,6 +142,28 @@ paths:
                       sessionTimeoutMinutes: { type: integer, example: 30 }
                       password: { $ref: '#/components/schemas/PasswordRules' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+  /auth/profile:
+    get:
+      tags: [Auth]
+      summary: Own account, active sessions and recent sign-in events
+      description: 'Sessions are the caller''s unrevoked, unexpired sessions (`current` marks this one). Activity is the caller''s own last 15 sign-in/security audit events (LOGIN, LOGIN_FAILED, LOGOUT, SESSION_TIMEOUT, PASSWORD_CHANGE, ...); the full audit trail still needs the audit permission.'
+      responses:
+        '200':
+          description: Profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { type: object, description: 'As in /auth/me, plus lastLogin and createdAt' }
+                  sessions: { type: array, items: { type: object, properties: { id: { type: string, format: uuid }, current: { type: boolean }, startedAt: { type: string, format: date-time }, lastSeenAt: { type: string, format: date-time }, expiresAt: { type: string, format: date-time }, ipAddress: { type: [string, 'null'] }, userAgent: { type: [string, 'null'] } } } }
+                  activity: { type: array, items: { type: object, properties: { date: { type: string, format: date-time }, action: { type: string }, ipAddress: { type: [string, 'null'] } } } }
+  /auth/sessions/revoke-others:
+    post:
+      tags: [Auth]
+      summary: Sign out every other session of the caller (audited SESSIONS_REVOKED)
+      responses:
+        '200': { description: How many sessions were ended, content: { application/json: { schema: { type: object, properties: { revoked: { type: integer } } } } } }
   /auth/change-password:
     post:
       tags: [Auth]
@@ -245,6 +267,21 @@ paths:
         '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/IncidentDetail' } } } }
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
+  /incidents/similar:
+    get:
+      tags: [Incidents]
+      summary: Possible duplicates of a report being filed
+      description: 'Visible incidents within 1 day of `date` that are within 1 km of lat/lng, or at the same BOP in the same category. Advisory: filing is never blocked. Each item carries `match` { daysApart, distanceKm, sameBop, sameCategory }.'
+      x-permission: create
+      parameters:
+        - { name: date, in: query, required: true, schema: { type: string, format: date } }
+        - { name: lat, in: query, schema: { type: number } }
+        - { name: lng, in: query, schema: { type: number } }
+        - { name: bop, in: query, schema: { type: string } }
+        - { name: category, in: query, schema: { type: string } }
+        - { name: excludeId, in: query, schema: { type: string }, description: The record being edited }
+      responses:
+        '200': { description: Up to 5 candidates, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/NearbyIncident' } } } } }
   /incidents/meta:
     get:
       tags: [Incidents]
@@ -306,6 +343,15 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
+  /incidents/{id}/related:
+    parameters: [{ $ref: '#/components/parameters/IncidentId' }]
+    get:
+      tags: [Incidents]
+      summary: Incidents at the same BOP or within 5 km, within 30 days either side
+      x-permission: incidents
+      responses:
+        '200': { description: 'Up to 8, closest in time first', content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/NearbyIncident' } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
   /incidents/{id}/comments:
     parameters: [{ $ref: '#/components/parameters/IncidentId' }]
     post:
@@ -1217,6 +1263,12 @@ components:
         personsInvolved: { type: [string, 'null'] }
         actionTaken: { type: [string, 'null'] }
         outcome: { type: [string, 'null'] }
+    NearbyIncident:
+      allOf:
+        - $ref: '#/components/schemas/IncidentSummary'
+        - type: object
+          properties:
+            match: { type: object, properties: { daysApart: { type: integer }, distanceKm: { type: [number, 'null'] }, sameBop: { type: boolean }, sameCategory: { type: boolean } } }
     IncidentSummary:
       type: object
       properties:

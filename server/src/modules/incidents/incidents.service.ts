@@ -257,6 +257,87 @@ export async function listIncidents(user: AuthUser, q: ListIncidentsQuery) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Same place, around the same time: related incidents (detail page) and the duplicate check
+// (incident form). Only incidents the user may see are considered.
+// ---------------------------------------------------------------------------
+const DAY_MS = 86_400_000;
+
+function distanceKm(aLat: number, aLng: number, bLat: number, bLng: number) {
+  const rad = (d: number) => (d * Math.PI) / 180;
+  const h = Math.sin(rad(bLat - aLat) / 2) ** 2 + Math.cos(rad(aLat)) * Math.cos(rad(bLat)) * Math.sin(rad(bLng - aLng) / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.sqrt(h));
+}
+
+export interface NearbyQuery {
+  date: string; // YYYY-MM-DD
+  lat?: number | null;
+  lng?: number | null;
+  bop?: string | null;
+  category?: string | null;
+  excludeId?: string;
+}
+
+async function nearby(user: AuthUser, q: NearbyQuery, windowDays: number, matches: (m: { daysApart: number; km: number | null; sameBop: boolean; sameCategory: boolean }) => boolean, limit: number) {
+  const scope = await resolveScope(user.scope);
+  const day = fromDateString(q.date).getTime();
+  const [rows, cutoff] = await Promise.all([
+    prisma.incident.findMany({
+      where: {
+        AND: [
+          visibilityWhere(user, scope),
+          { incidentDate: { gte: new Date(day - windowDays * DAY_MS), lte: new Date(day + windowDays * DAY_MS) } },
+          ...(q.excludeId ? [{ id: { not: q.excludeId } }] : []),
+        ],
+      },
+      include: { creator: { select: { name: true } } },
+      take: 2000,
+    }),
+    overdueCutoff(),
+  ]);
+  const hasGps = q.lat != null && q.lng != null;
+  return rows
+    .map((r) => {
+      const km = hasGps && r.lat !== null && r.lng !== null ? distanceKm(q.lat!, q.lng!, Number(r.lat), Number(r.lng)) : null;
+      const m = {
+        daysApart: Math.round(Math.abs(r.incidentDate.getTime() - day) / DAY_MS),
+        km,
+        sameBop: Boolean(q.bop) && r.bop === q.bop,
+        sameCategory: Boolean(q.category) && r.category === q.category,
+      };
+      return { r, m };
+    })
+    .filter(({ m }) => matches(m))
+    .sort((a, b) => a.m.daysApart - b.m.daysApart || (a.m.km ?? Infinity) - (b.m.km ?? Infinity))
+    .slice(0, limit)
+    .map(({ r, m }) => ({
+      ...toSummaryDto(r, user, cutoff),
+      match: { daysApart: m.daysApart, distanceKm: m.km === null ? null : Math.round(m.km * 10) / 10, sameBop: m.sameBop, sameCategory: m.sameCategory },
+    }));
+}
+
+/** Incidents at the same BOP or within 5 km, within 30 days either side (closest in time first). */
+export async function relatedIncidents(user: AuthUser, id: string) {
+  const inc = await loadVisible(user, id);
+  const q: NearbyQuery = {
+    date: toDateString(inc.incidentDate),
+    lat: inc.lat === null ? null : Number(inc.lat),
+    lng: inc.lng === null ? null : Number(inc.lng),
+    bop: inc.bop,
+    category: inc.category,
+    excludeId: id,
+  };
+  return nearby(user, q, 30, (m) => m.sameBop || (m.km !== null && m.km <= 5), 8);
+}
+
+/**
+ * Possible duplicates of a report being filed: within a day, and within 1 km, or at the same BOP
+ * in the same category. Advisory only: the form shows them, filing is never blocked.
+ */
+export async function similarIncidents(user: AuthUser, q: NearbyQuery) {
+  return nearby(user, q, 1, (m) => m.daysApart <= 1 && ((m.km !== null && m.km <= 1) || (m.sameBop && m.sameCategory)), 5);
+}
+
 export async function getIncident(user: AuthUser, id: string) {
   const [inc, cutoff] = await Promise.all([loadVisible(user, id), overdueCutoff()]);
   return toDetailDto(inc, user, cutoff, await mayComment(user, inc));

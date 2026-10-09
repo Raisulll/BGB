@@ -97,6 +97,8 @@ Errors always use `{ error: { code, message, details? } }`.
 | POST | `/:id/submit` | create | Draft/Returned → Submitted (creator only) |
 | POST | `/:id/comments` | incidents | Body `{ body }` (≤4000). Roles that file or review incidents, not on drafts or archived records. Append-only (`incident_comments` triggers), audited `COMMENT_INCIDENT`, notifies the creator and earlier commenters (type `comment`) |
 | POST | `/:id/print` | incidents | Records `PRINT_INCIDENT` before the browser prints the single-incident report |
+| GET | `/:id/related` | incidents | Visible incidents at the same BOP or within 5 km, within ±30 days; max 8, closest in time first; each with `match` { daysApart, distanceKm, sameBop, sameCategory } |
+| GET | `/similar` | create | Duplicate check while filing: `date` (+ `lat`/`lng`, `bop`, `category`, `excludeId`); ±1 day and within 1 km, or same BOP + category; max 5; advisory |
 | POST | `/:id/{review,verify,approve,close,return,reject}` | incidents + role | Body `{ notes? }`; `notes` required for return/reject |
 
 GIS: `GET /api/v1/gis/incidents` (permission `map`) returns lightweight markers within scope.

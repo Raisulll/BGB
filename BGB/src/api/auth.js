@@ -37,6 +37,10 @@ export async function resume() {
 }
 
 export const me = () => api('/auth/me');
+/** Own account, active sessions and recent sign-in events. */
+export const profile = () => api('/auth/profile');
+/** Signs out every other session of this user. */
+export const revokeOtherSessions = () => api('/auth/sessions/revoke-others', { method: 'POST' });
 
 /** reason: 'manual' | 'timeout' — a timeout is audited as SESSION_TIMEOUT (spec #28) */
 export async function logout(reason = 'manual') {

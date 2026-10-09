@@ -7,6 +7,8 @@ import * as incidentsApi from '../api/incidents';
 import useApi from '../hooks/useApi';
 import { formatDateDisplay, SEVERITY_HEX } from '../utils/helpers';
 import { StatusBadge } from '../components/ui/Badges';
+import { ClusterLayer, HeatLayer } from '../components/map/MapLayers';
+import { cn } from '../utils/helpers';
 import Card from '../components/ui/Card';
 import ErrorState from '../components/ui/ErrorState';
 import { useI18n } from '../i18n/I18nContext';
@@ -17,9 +19,22 @@ export default function MapView() {
   const [category, setCategory] = useState('');
   const [severity, setSeverity] = useState('');
   const [status, setStatus] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  // points = one marker per location (default), clusters = grouped by zoom, heat = density by severity
+  const [mode, setMode] = useState('points');
 
   // Specs #8, #18 — markers for geotagged incidents within the user's scope, filtered server-side
-  const { data, error, message, reload } = useApi(() => incidentsApi.gis({ category, severity, status }), [category, severity, status]);
+  const { data, error, message, reload } = useApi(
+    () => incidentsApi.gis({ category, severity, status, dateFrom, dateTo }),
+    [category, severity, status, dateFrom, dateTo],
+  );
+  const layerLabels = useMemo(() => ({ view: t('map.viewDetails'), severity: (s) => tv('severity', s), status: (s) => tv('status', s) }), [t, tv]);
+  const MODES = [
+    ['points', 'fa-map-marker-alt', t('map.modePoints')],
+    ['clusters', 'fa-circle-nodes', t('map.modeClusters')],
+    ['heat', 'fa-fire', t('map.modeHeat')],
+  ];
   const filtered = useMemo(() => (data || []).filter((i) => i.lat != null && i.lng != null), [data]);
 
   // Group incidents by GPS location / BOP and extract last 2 recent incidents
@@ -59,8 +74,8 @@ export default function MapView() {
     <div className="space-y-4 sm:space-y-6">
       {/* Map Filter Bar */}
       <Card bodyClassName="p-3 sm:p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
+        <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3 xl:grid-cols-5">
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
@@ -100,6 +115,14 @@ export default function MapView() {
                 </option>
               ))}
             </select>
+            <label className="flex items-center gap-2">
+              <span className="w-10 shrink-0 text-xs font-medium text-gray-500">{t('incidents.dateFrom')}</span>
+              <input id="map-date-from" type="date" value={dateFrom} max={dateTo || undefined} onChange={(e) => setDateFrom(e.target.value)} className="form-input" />
+            </label>
+            <label className="flex items-center gap-2">
+              <span className="w-10 shrink-0 text-xs font-medium text-gray-500">{t('incidents.dateTo')}</span>
+              <input id="map-date-to" type="date" value={dateTo} min={dateFrom || undefined} onChange={(e) => setDateTo(e.target.value)} className="form-input" />
+            </label>
           </div>
 
           <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600 sm:gap-4">
@@ -127,10 +150,29 @@ export default function MapView() {
 
       {/* Interactive GIS Map */}
       <Card bodyClassName="p-2 sm:p-4">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 sm:mb-3">
+          <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1" role="group" aria-label={t('map.mode')}>
+            {MODES.map(([id, icon, label]) => (
+              <button
+                key={id}
+                id={`map-mode-${id}`}
+                type="button"
+                onClick={() => setMode(id)}
+                aria-pressed={mode === id}
+                className={cn('flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors', mode === id ? 'bg-bgb-700 text-white shadow-sm' : 'text-gray-600 hover:bg-white')}
+              >
+                <i className={`fas ${icon}`} /> {label}
+              </button>
+            ))}
+          </div>
+          <span className="text-xs text-gray-500">{t('map.shown', { n: filtered.length })}</span>
+        </div>
         <div className="h-[400px] overflow-hidden rounded-xl sm:h-[520px]">
           <MapContainer center={[21.5, 92.0]} zoom={7} className="h-full w-full">
             <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
-            {locationGroups.map((loc) => (
+            {mode === 'clusters' && <ClusterLayer incidents={filtered} labels={layerLabels} />}
+            {mode === 'heat' && <HeatLayer incidents={filtered} />}
+            {mode === 'points' && locationGroups.map((loc) => (
               <CircleMarker
                 key={loc.key}
                 center={[loc.lat, loc.lng]}

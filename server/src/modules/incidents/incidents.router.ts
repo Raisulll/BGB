@@ -5,7 +5,7 @@ import { requirePermission } from '../../middleware/rbac.js';
 import { notFound } from '../../utils/errors.js';
 import { exportHandler } from '../reports/reports.router.js';
 import { requestContext } from '../../utils/requestContext.js';
-import { commentSchema, createIncidentSchema, listIncidentsSchema, updateIncidentSchema, workflowActionSchema } from './incidents.schema.js';
+import { commentSchema, createIncidentSchema, listIncidentsSchema, similarQuerySchema, updateIncidentSchema, workflowActionSchema } from './incidents.schema.js';
 import * as service from './incidents.service.js';
 import { archiveIncident, restoreIncident } from './archive.service.js';
 import { WORKFLOW_ACTIONS, type WorkflowAction } from './workflow.js';
@@ -33,6 +33,11 @@ incidentsRouter.get('/meta', requirePermission('incidents'), async (req, res) =>
   res.json(await service.incidentMeta(req.user!));
 });
 
+// Possible duplicates of a report being filed (advisory; the form shows them)
+incidentsRouter.get('/similar', requirePermission('create'), async (req, res) => {
+  res.json(await service.similarIncidents(req.user!, similarQuerySchema.parse(req.query)));
+});
+
 incidentsRouter.post('/', requirePermission('create'), async (req, res) => {
   const input = createIncidentSchema.parse(req.body);
   res.status(201).json(await service.createIncident(req.user!, input, requestContext(req)));
@@ -40,6 +45,11 @@ incidentsRouter.post('/', requirePermission('create'), async (req, res) => {
 
 incidentsRouter.get('/:id', requirePermission('incidents'), async (req, res) => {
   res.json(await service.getIncident(req.user!, incidentId(req)));
+});
+
+// Same BOP or within 5 km, within 30 days either side
+incidentsRouter.get('/:id/related', requirePermission('incidents'), async (req, res) => {
+  res.json(await service.relatedIncidents(req.user!, incidentId(req)));
 });
 
 incidentsRouter.get('/:id/timeline', requirePermission('incidents'), async (req, res) => {

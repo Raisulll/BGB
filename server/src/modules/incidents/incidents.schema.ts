@@ -43,6 +43,16 @@ export const createIncidentSchema = z
 // PATCH: any subset of the fields. Status changes go through the workflow endpoints.
 export const updateIncidentSchema = z.object(incidentFields).partial().strict();
 
+// Duplicate check while filing (GET /incidents/similar)
+export const similarQuerySchema = z.object({
+  date: isoDate,
+  lat: z.coerce.number().min(-90).max(90).optional(),
+  lng: z.coerce.number().min(-180).max(180).optional(),
+  bop: trimmed(100).optional(),
+  category: trimmed(100).optional(),
+  excludeId: z.string().regex(/^BIRDS-\d{4}-\d{4,}$/).optional(),
+});
+
 export const commentSchema = z.object({ body: trimmed(4_000).pipe(z.string().min(1, 'Comment is empty')) }).strict();
 
 export const workflowActionSchema = z.object({ notes: trimmed(2_000).optional() }).strict();

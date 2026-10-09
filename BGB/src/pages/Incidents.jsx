@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import * as incidentsApi from '../api/incidents';
@@ -54,6 +54,15 @@ export default function Incidents() {
   });
   const [page, setPage] = useState(1);
   const [showMore, setShowMore] = useState(false);
+
+  // The header search can open this page again with a new ?q= while it's already mounted
+  const urlQ = params.get('q');
+  useEffect(() => {
+    if (urlQ !== null) {
+      setFilters((f) => (f.q === urlQ ? f : { ...f, q: urlQ }));
+      setPage(1);
+    }
+  }, [urlQ]);
   const q = useDebounced(filters.q.trim());
 
   const writeUrl = (nextView, nextFilters) => {
