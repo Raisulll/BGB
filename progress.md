@@ -412,3 +412,10 @@ Added after the session summary: deferred items now appear in **Admin › Operat
 5. Documentation set (#52): user manual, admin manual, DB schema/ERD; fill in remaining OpenAPI examples
 6. UAT test cases (#57), training outline (#53)
 7. Re-date seed data; move Playwright e2e tests into the repo
+
+**Added after the session summary — demo hosting decided (DOUBT-010 resolved).** No VPS is available, so the TEC demo will run on **Render (API + built SPA on one URL) + Supabase (Postgres + Storage for evidence)**, Singapore region, demo data only. Not built yet. Full plan, findings and setup steps: `server/docs/installation-guide/demo-hosting-render-supabase.md`. This replaces TODO item 2 above; revised order for the next sessions:
+1. Serve the SPA from Express (one Render service, same-origin cookie); CSP check incl. map tiles
+2. S3 storage driver (`STORAGE_DRIVER=s3`) for Supabase Storage, wrapped by `EncryptedStorage` (spec #33)
+3. `render.yaml` + Supabase role/migration/seed steps; the user creates the accounts and enters secrets
+4. Deploy and verify (full workflow on the live URL, evidence survives a restart, real client IPs in the audit log)
+5. Then: flaky mail test, `BGB/README.md`, security docs, documentation set, UAT (items 1, 3–7 above)

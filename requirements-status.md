@@ -73,7 +73,7 @@
 | 53 | Training | `NOT STARTED` | Docs | 3 training courses + slides planned §28 |
 | 54 | Warranty & Support (1 year) | `NOT STARTED` | `N/A (INFRA)` | Commercial commitment — not a code task |
 | 55 | Customization (forms, workflows, hierarchy) | `IN PROGRESS` | Both | Categories, hierarchy, permissions and policies configurable in the Admin UI (Session 9). Custom form fields / workflow stages are not configurable |
-| 56 | Deployment (installation + commissioning) | `IN PROGRESS` | Infra+Docs | README deployment guide done; full install guide §27.5 planned |
+| 56 | Deployment (installation + commissioning) | `IN PROGRESS` | Infra+Docs | README deployment guide done; full install guide §27.5 planned. TEC demo hosting decided: Render + Supabase, plan in `server/docs/installation-guide/demo-hosting-render-supabase.md` (DOUBT-010) |
 | 57 | Acceptance Testing (UAT) | `NOT STARTED` | Docs | Test case document + UAT run planned §29 |
 | 58 | Future Expansion (GIS, mobile, surveillance) | `FRONTEND DONE` | Both | Leaflet GIS done; modular architecture supports expansion |
 

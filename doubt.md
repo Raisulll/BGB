@@ -244,7 +244,7 @@ The hook exists (`server/src/modules/evidence/scanner.ts`) and runs on every fil
 
 **TEC Spec**: #2 — 3-tier architecture; #56 — Deployment; #27 — HTTPS/TLS
 **Raised on**: 2026-10-09
-**Status**: OPEN
+**Status**: RESOLVED (demo hosting)
 
 ### The ambiguity
 The frontend no longer carries demo data; it needs the API and PostgreSQL behind it on the same origin (the refresh cookie is `SameSite=Strict`, path `/api/v1/auth`). The existing `BGB/vercel.json` deploys the frontend alone, so a Vercel deployment can't sign anyone in (the client reports "Cannot reach the BIRDS API"). We don't know how the TEC will see the system: a live URL, our laptop on site, or BGB's own test server.
@@ -258,7 +258,7 @@ The frontend no longer carries demo data; it needs the API and PostgreSQL behind
 None yet; nothing is deployed. Option A is recommended because it is also what production needs. The login page hides the demo-account shortcuts in production builds unless `VITE_SHOW_DEMO_ACCOUNTS=true`.
 
 ### Resolution (if resolved)
-*Confirm with the bid team how and where the TEC will evaluate the system.*
+2026-10-09, user decision (no VPS available): **Option D — Render web service (API + built SPA on one URL) + Supabase Postgres + Supabase Storage for evidence**, both in Singapore. Demo/seed data only; real BGB data never goes on these services, and production stays on BGB-hosted servers (Option A design). Not built yet; plan and findings in `server/docs/installation-guide/demo-hosting-render-supabase.md`.
 
 ---
 ## DOUBT-011 — Must a Draft Incident Be Complete?
