@@ -304,7 +304,7 @@ Each item maps to the 58 specs in `projectDetails.md`. **`requirements-status.md
 | 30 | Enterprise relational database | DONE | PostgreSQL + Prisma |
 | 31 | Secure REST API | DONE | All §19 groups live except backups (deferred) and server-side PDF; OpenAPI 3.1 at `/api/docs` |
 | 32 | AD/LDAP integration | PENDING | Integration hook architecture needed |
-| 33 | Centralized file storage + retention policy | PARTIAL | Local dataUrl in demo; needs cloud/server storage |
+| 33 | Centralized file storage + retention policy | PARTIAL | Server storage: local disk or S3-compatible driver; disposal rule open (DOUBT-012) |
 | 34 | Automated scheduled backup | PENDING | Backend infrastructure requirement |
 | 35 | Disaster recovery site support | PENDING | Infrastructure requirement |
 | 36 | High availability / redundancy | PENDING | Infrastructure requirement |
@@ -821,7 +821,7 @@ All endpoints require `Authorization: Bearer <access_token>` unless marked **Pub
 
 ### 19.4 Evidence  (`/api/v1/incidents/:id/evidence`)
 
-> **Implemented (Session 6)**, plus `POST /:eid/verify` (SHA-256 re-check). Local-disk storage driver only; the S3/MinIO driver is pending. Details in `server/README.md`.
+> **Implemented (Session 6)**, plus `POST /:eid/verify` (SHA-256 re-check). Storage drivers: local disk and S3-compatible (MinIO / AWS S3 / Supabase Storage, Session 12), both encrypted at rest. Details in `server/README.md`.
 
 | Method | Path | Permission | Description | Spec |
 |---|---|---|---|---|

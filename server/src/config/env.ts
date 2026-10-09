@@ -10,7 +10,16 @@ const schema = z.object({
   DB_POOL_MAX: z.coerce.number().int().positive().default(9),
 
   CORS_ORIGINS: z.string().default('http://localhost:5173'),
-  TRUST_PROXY: z.string().default('loopback'),
+  // Express "trust proxy": a hop count (e.g. 1 behind one load balancer such as Render's),
+  // true/false, or proxy addresses/subnets (e.g. loopback, 10.0.0.0/8)
+  TRUST_PROXY: z
+    .string()
+    .default('loopback')
+    .transform((v): boolean | number | string => (/^\d+$/.test(v) ? Number(v) : v === 'true' ? true : v === 'false' ? false : v)),
+
+  // Spec #2 / #56 — folder of the built SPA (BGB/dist) to serve from this process (single-service
+  // hosting, e.g. the Render demo). Unset when Nginx serves the SPA (§15).
+  SERVE_SPA_DIR: z.string().optional(),
 
   JWT_PRIVATE_KEY_PATH: z.string().default('keys/jwt-private.pem'),
   JWT_PUBLIC_KEY_PATH: z.string().default('keys/jwt-public.pem'),
@@ -23,10 +32,17 @@ const schema = z.object({
   // §20: 100 requests per minute per signed-in user. Raise only for development/test tooling.
   API_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(10).max(100_000).default(100),
 
-  // Evidence storage (specs #10, #33). "local" writes under EVIDENCE_DIR; an S3/MinIO driver
-  // plugs into the same interface (src/config/storage.ts).
-  STORAGE_DRIVER: z.enum(['local']).default('local'),
+  // Evidence storage (specs #10, #33). "local" writes under EVIDENCE_DIR; "s3" uses any
+  // S3-compatible store (MinIO, AWS S3, Supabase Storage) — see src/config/storage.ts.
+  STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
   EVIDENCE_DIR: z.string().default('storage/evidence'),
+  S3_ENDPOINT: z.string().url().optional(), // unset = AWS S3
+  S3_REGION: z.string().default('us-east-1'),
+  S3_BUCKET: z.string().optional(),
+  S3_ACCESS_KEY_ID: z.string().optional(),
+  S3_SECRET_ACCESS_KEY: z.string().optional(),
+  // Path-style URLs (endpoint/bucket/key): needed by MinIO and Supabase Storage
+  S3_FORCE_PATH_STYLE: z.enum(['true', 'false']).default('true').transform((v) => v === 'true'),
   EVIDENCE_MAX_FILE_MB: z.coerce.number().positive().default(50),
   EVIDENCE_MAX_INCIDENT_MB: z.coerce.number().positive().default(500),
   EVIDENCE_MAX_FILES_PER_UPLOAD: z.coerce.number().int().positive().default(10),
@@ -58,6 +74,10 @@ const schema = z.object({
 });
 
 const parsed = schema
+  .refine((e) => e.STORAGE_DRIVER !== 's3' || (!!e.S3_BUCKET && !!e.S3_ACCESS_KEY_ID && !!e.S3_SECRET_ACCESS_KEY), {
+    message: 'STORAGE_DRIVER=s3 needs S3_BUCKET, S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY',
+    path: ['STORAGE_DRIVER'],
+  })
   .refine((e) => e.NODE_ENV !== 'production' || !!e.EVIDENCE_ENCRYPTION_KEY, {
     message: 'EVIDENCE_ENCRYPTION_KEY is required in production (evidence must be encrypted at rest, spec #27)',
     path: ['EVIDENCE_ENCRYPTION_KEY'],

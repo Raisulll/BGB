@@ -50,7 +50,7 @@
 | 30 | Database (enterprise RDBMS) | `DONE` | Backend | PostgreSQL + Prisma 7; 3 migrations, integrity CHECKs and append-only triggers |
 | 31 | REST API / Integration interface | `DONE` | Backend | All §19 groups live + archive/mail admin routes (Session 10). OpenAPI 3.1 in `server/docs/api/openapi.yaml`, served at `/api/v1/openapi.json` + Swagger UI `/api/docs` (on outside production, `API_DOCS`); a test keeps it valid and in step with the routers (Session 11). Backup routes deferred with #34 |
 | 32 | AD/LDAP Integration | `NOT STARTED` | Backend | Deferred until BGB provides directory details (user decision 2026-10-09, DOUBT-002). Shown in Admin › Security & System with a DEMO badge |
-| 33 | File Storage (centralized + configurable retention) | `IN PROGRESS` | Backend | Storage interface + local-disk driver with quotas (Session 6). S3/MinIO driver and retention job pending |
+| 33 | File Storage (centralized + configurable retention) | `IN PROGRESS` | Backend | Storage interface + local-disk driver with quotas (Session 6); S3-compatible driver (`STORAGE_DRIVER=s3`: MinIO / AWS S3 / Supabase Storage), encrypted like local (Session 12). Retention flags past-retention records (Session 10); disposal rule open (DOUBT-012) |
 | 34 | Backup (automated scheduled) | `NOT STARTED` | Backend | Deferred: not needed for the demo version (user decision 2026-10-09). Production plan unchanged: `node-cron` + `pg_dump` §22 Shown in Admin › Operations with a DEMO badge (not functional). |
 | 35 | Disaster Recovery | `NOT STARTED` | `N/A (INFRA)` | Deferred for the demo version (user decision 2026-10-09). Production plan: PostgreSQL streaming replication to a DR site, docs §22 Shown in Admin › Operations with a DEMO badge (not functional). |
 | 36 | High Availability | `NOT STARTED` | `N/A (INFRA)` | Deferred for the demo version (user decision 2026-10-09). Production plan: PM2 cluster + load balancer Shown in Admin › Operations with a DEMO badge (not functional). |
@@ -73,7 +73,7 @@
 | 53 | Training | `NOT STARTED` | Docs | 3 training courses + slides planned §28 |
 | 54 | Warranty & Support (1 year) | `NOT STARTED` | `N/A (INFRA)` | Commercial commitment — not a code task |
 | 55 | Customization (forms, workflows, hierarchy) | `IN PROGRESS` | Both | Categories, hierarchy, permissions and policies configurable in the Admin UI (Session 9). Custom form fields / workflow stages are not configurable |
-| 56 | Deployment (installation + commissioning) | `IN PROGRESS` | Infra+Docs | README deployment guide done; full install guide §27.5 planned. TEC demo hosting decided: Render + Supabase, plan in `server/docs/installation-guide/demo-hosting-render-supabase.md` (DOUBT-010) |
+| 56 | Deployment (installation + commissioning) | `IN PROGRESS` | Infra+Docs | README deployment guide done; full install guide §27.5 planned. TEC demo hosting: Render + Supabase (DOUBT-010). Built and tested locally in Session 12 (`render.yaml`, SPA served by the API, S3 driver, Supabase access SQL, step-by-step guide in `server/docs/installation-guide/demo-hosting-render-supabase.md`); not deployed yet |
 | 57 | Acceptance Testing (UAT) | `NOT STARTED` | Docs | Test case document + UAT run planned §29 |
 | 58 | Future Expansion (GIS, mobile, surveillance) | `FRONTEND DONE` | Both | Leaflet GIS done; modular architecture supports expansion |
 

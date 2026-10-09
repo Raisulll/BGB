@@ -35,8 +35,10 @@ describe('workflow e-mail (spec #23)', () => {
       expect(r.status).toBe('pending');
     }
 
-    const result = await processOutbox();
-    expect(result.sent).toBeGreaterThanOrEqual(rows.length);
+    // One call sends one batch (oldest first), and other test files leave mail pending too: drain the queue
+    let sent = 0;
+    for (let r = await processOutbox(); r.sent > 0; r = await processOutbox()) sent += r.sent;
+    expect(sent).toBeGreaterThanOrEqual(rows.length);
     const after = await prisma.emailOutbox.findMany({ where: { incidentId: created.body.id } });
     expect(after.every((r) => r.status === 'sent' && r.sentAt && r.attempts === 1)).toBe(true);
   });

@@ -36,7 +36,7 @@ Development uses a project-local PostgreSQL 18 cluster (`server/.pgdata`, port 5
 | `dev` | Run with tsx, reload on change |
 | `build` / `start` | Compile to `dist/` and run the compiled server |
 | `typecheck` | `tsc --noEmit` |
-| `keys` | Generate the JWT RS256 key pair (`-- --force` to replace; ends all sessions) |
+| `keys` | Generate the JWT RS256 key pair (`-- --force` to replace, which ends all sessions; `-- --out <dir>` for another host's keys) |
 | `db:migrate` | `prisma migrate dev` (create + apply a migration during development) |
 | `db:deploy` | `prisma migrate deploy` (production) |
 | `db:seed` | Seed demo data |
@@ -122,7 +122,7 @@ Rules (enforced in `incidents.service.ts`; see DOUBT-008):
 - **Limits**: `EVIDENCE_MAX_FILE_MB` (50), `EVIDENCE_MAX_INCIDENT_MB` (500), `EVIDENCE_MAX_FILES_PER_UPLOAD` (10).
 - **Metadata (spec #11)**: SHA-256, detected and declared type, the client's last-modified time, and for JPEG/PNG the camera EXIF fields and GPS position, stored in `evidence.file_metadata`.
 - **Virus scanning**: `scanner.ts` is the hook. No engine is configured yet, so every file is recorded as `scan.status: "not_scanned"`.
-- **Storage**: the `local` driver writes under `EVIDENCE_DIR` (atomic write-then-rename; keys are server-generated UUIDs). An S3/MinIO driver plugs into the same `StorageDriver` interface in `src/config/storage.ts` but is **not written yet**.
+- **Storage**: `STORAGE_DRIVER=local` writes under `EVIDENCE_DIR` (atomic write-then-rename; keys are server-generated UUIDs). `STORAGE_DRIVER=s3` stores objects in any S3-compatible bucket (MinIO, AWS S3, Supabase Storage; `S3_*` settings, private bucket). Both sit behind the `StorageDriver` interface in `src/config/storage.ts`, and both are wrapped by the encryption layer.
 - Every upload, download, verification, rejection and removal is written to the audit log.
 
 ## Users API (`/api/v1/users`, admin only)
@@ -187,7 +187,8 @@ All analytics use the incidents list filters, cover filed incidents only (no dra
 
 The SPA (`../BGB`, `src/api/client.js`) relies on these behaviours:
 
-- It calls `/api/v1` on its **own origin** (Vite dev proxy, Nginx in production), so the refresh cookie stays first-party.
+- It calls `/api/v1` on its **own origin** (Vite dev proxy, Nginx in production, or this server itself with `SERVE_SPA_DIR`), so the refresh cookie stays first-party.
+- `SERVE_SPA_DIR=../BGB/dist` makes the API serve the built SPA (single-service hosting; the TEC demo on Render, see `docs/installation-guide/demo-hosting-render-supabase.md`). Client routes get `index.html`; `/api/*` and missing files stay JSON 404s. The SPA's CSP allows only its own origin plus OpenStreetMap tiles and Google Fonts.
 - The access token is kept in memory only. On `401 TOKEN_INVALID` it refreshes once (one refresh at a time, serialised across tabs with the Web Locks API) and retries; any other 401 ends the session in the UI.
 - On page load it calls `/auth/refresh` only if a non-secret `birds.session_hint` flag is set in `localStorage` (set at login, cleared at logout or session end).
 - Workflow buttons and the Edit link come from each incident's `actions` / `canEdit`; the SPA holds no copy of the workflow table.

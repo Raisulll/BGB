@@ -1,10 +1,11 @@
 // Generates the RS256 key pair used to sign access tokens (spec #28, §20).
-// Usage: npm run keys [-- --force]
+// Usage: npm run keys [-- --force] [-- --out <dir>]   (default dir: keys/; e.g. --out keys/render for the demo host)
 import { generateKeyPairSync } from 'node:crypto';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
-const dir = path.resolve('keys');
+const outIndex = process.argv.indexOf('--out');
+const dir = path.resolve((outIndex > -1 && process.argv[outIndex + 1]) || 'keys');
 const privatePath = path.join(dir, 'jwt-private.pem');
 const publicPath = path.join(dir, 'jwt-public.pem');
 

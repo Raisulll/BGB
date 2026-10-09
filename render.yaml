@@ -1,0 +1,76 @@
+# Render Blueprint: BIRDS TEC demo (DOUBT-010). One web service runs the API and serves the built
+# SPA, so the browser sees a single origin. Database and evidence storage are on Supabase.
+# Setup guide: server/docs/installation-guide/demo-hosting-render-supabase.md
+# Demo data only. Production runs on BGB-hosted servers behind Nginx (CLAUDE.md §15).
+services:
+  - type: web
+    name: birds-demo
+    runtime: node
+    region: singapore
+    plan: starter # always on; the free plan sleeps after 15 min idle and stops the mail/archive timers
+    autoDeploy: false # deploy deliberately from the dashboard, never mid-demo
+    # NODE_ENV=production is set at build time too, so devDependencies (Vite, TypeScript, Prisma CLI)
+    # must be requested explicitly. The server's postinstall runs `prisma generate`.
+    buildCommand: >-
+      cd BGB && npm ci --include=dev && npm run build &&
+      cd ../server && npm ci --include=dev && npm run build
+    startCommand: cd server && npm start
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      # Relative to server/, where the start command runs
+      - key: SERVE_SPA_DIR
+        value: ../BGB/dist
+      # Render's load balancer is the one proxy in front of the app: req.ip = real client (audit log, rate limits)
+      - key: TRUST_PROXY
+        value: "1"
+      # Supabase session pooler string for the non-superuser "birds" role, with TLS verification:
+      # postgresql://birds.<ref>:<pw>@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres?sslmode=verify-full&sslrootcert=/etc/secrets/supabase-ca.crt
+      - key: DATABASE_URL
+        sync: false
+      # Small pool: the Supabase pooler limits client connections per project
+      - key: DB_POOL_MAX
+        value: "5"
+      # https://<service>.onrender.com (or the custom domain), no trailing slash
+      - key: APP_BASE_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      # Secret Files (Render dashboard → Environment → Secret Files)
+      - key: JWT_PRIVATE_KEY_PATH
+        value: /etc/secrets/jwt-private.pem
+      - key: JWT_PUBLIC_KEY_PATH
+        value: /etc/secrets/jwt-public.pem
+      # AES-256-GCM evidence key (`npm run keys:evidence`). Keep an offline copy: without it evidence is unreadable
+      - key: EVIDENCE_ENCRYPTION_KEY
+        sync: false
+      # Evidence in a private Supabase Storage bucket over the S3 protocol (spec #33)
+      - key: STORAGE_DRIVER
+        value: s3
+      - key: S3_ENDPOINT # https://<ref>.storage.supabase.co/storage/v1/s3
+        sync: false
+      - key: S3_REGION
+        value: ap-southeast-1
+      - key: S3_BUCKET
+        value: evidence
+      - key: S3_FORCE_PATH_STYLE
+        value: "true"
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+      # Supabase's free plan caps stored objects at 50 MB and encryption adds 36 bytes per file
+      - key: EVIDENCE_MAX_FILE_MB
+        value: "49"
+      # No SMTP for the demo; in-app notifications still work (spec #23)
+      - key: MAIL_TRANSPORT
+        value: none
+      # Swagger UI at /api/docs for the TEC (specs #31, #52)
+      - key: API_DOCS
+        value: "true"
+      # Build-time: show the demo-account buttons on the login page
+      - key: VITE_SHOW_DEMO_ACCOUNTS
+        value: "true"

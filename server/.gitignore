@@ -6,3 +6,6 @@ logs/
 src/generated/
 .pgdata/
 storage/
+
+SupabaseDetails.txt
+CLAUDE.md

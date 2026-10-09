@@ -419,3 +419,44 @@ Added after the session summary: deferred items now appear in **Admin › Operat
 3. `render.yaml` + Supabase role/migration/seed steps; the user creates the accounts and enters secrets
 4. Deploy and verify (full workflow on the live URL, evidence survives a restart, real client IPs in the audit log)
 5. Then: flaky mail test, `BGB/README.md`, security docs, documentation set, UAT (items 1, 3–7 above)
+
+---
+## Session 12 — 2026-10-09 (+06:00)
+
+### What was done
+- Committed the hosting decision (`1f435aa`). Compared Vercel (frontend + serverless API) with Render for the user, who then chose **Render (app) + Supabase (DB + Storage)**. Reasons against Vercel: 4.5 MB request-body cap (evidence is 50 MB and encrypted server-side), no background timers (mail outbox, archive job), per-instance in-memory rate limits, Hobby plan non-commercial
+- **SPA served by the API** (`server/src/spa.ts`, env `SERVE_SPA_DIR`): hashed assets cached 1 year, `index.html` `no-cache`, client-route fallback; `/api/*` and missing files stay JSON 404s. Own CSP for the SPA: self + `*.tile.openstreetmap.org` + Google Fonts, no inline scripts
+- **S3 storage driver** (`STORAGE_DRIVER=s3`, `S3_ENDPOINT/REGION/BUCKET/ACCESS_KEY_ID/SECRET_ACCESS_KEY/FORCE_PATH_STYLE`) in `src/config/storage.ts`, wrapped by `EncryptedStorage`; `@aws-sdk/client-s3` 3.1141.0; CRC checksums only when required (S3-compatible stores)
+- `TRUST_PROXY` now accepts a hop count / true / false (Express would have read `"1"` as an IP address)
+- `render.yaml` (Blueprint: Singapore, Starter, `autoDeploy: false`, health check, env incl. secret files for JWT keys + Supabase CA; evidence limit 49 MB for Supabase free plan's 50 MB object cap)
+- `server/prisma/sql/supabase-demo-access.sql`: revokes Supabase `anon`/`authenticated` access to `public`, grants app role `birds` data-only privileges
+- `npm run keys -- --out <dir>` for separate demo JWT keys
+- Guide rewritten as step-by-step: `server/docs/installation-guide/demo-hosting-render-supabase.md`
+- **Fixed the flaky mail test**: `processOutbox()` sends one batch of 20 (oldest first) and other test files leave mail pending, so when vitest's file order put more than 20 rows ahead, the test's rows weren't in the batch. Test now drains the queue
+- Tests: `storage-s3.test.ts` (4), `spa-serving.test.ts` (4). **114/114 pass three runs in a row**; typecheck clean; `npm audit --omit=dev` 0
+- Verified locally: clean copy of the repo builds with the Blueprint build command under `NODE_ENV=production`; compiled server serves the SPA; headless Chrome (all pages, map tiles, fonts, deep-link reload, Swagger UI) shows no CSP violations or errors; `TRUST_PROXY=1` logs the forwarded client IP; the access SQL on a simulated Supabase DB: `birds` reads/writes, can't update `audit_log`, can't disable its triggers ("must be owner"), can't read `_prisma_migrations`; `anon` denied
+
+### Decisions & rationale
+- Migrations, seed and privilege script run as `postgres` from the developer PC; Render only runs the app as `birds`. Keeps the superuser password off Render and makes the audit triggers untouchable by the app login
+- Supabase Data API switched off **and** grants revoked: two locks, because the project's anon key is public by design
+- TLS to Supabase verified against its CA (secret file), not `no-verify`
+- `autoDeploy: false` so a push can't redeploy during the TEC session
+
+### Problems / notes
+- The local Postgres cluster was stuck (Windows "could not reserve shared memory region", error 487): it listened but reset every connection. A fast stop/start fixed it
+- Testing `TRUST_PROXY` wrote one `LOGIN_FAILED` audit entry for `auditor` (IP 203.0.113.7) in the **dev** DB; the account was reset with `demo:reset-user`
+- Not yet confirmed: whether `prisma migrate deploy` accepts `sslrootcert` in the URL (fallback noted in the guide); whether Render reaches Supabase's pooler without issues
+- A copy of `server/.env` was left in this session's scratchpad (`render-sim/server/.env`); a safety hook blocked deleting it. It's outside the repo; delete it by hand
+- Local `master` is 1 commit ahead of `origin`; Render deploys from GitHub, so it needs a push
+
+### Blockers / waiting on
+- User: Supabase project + Render account/service, secrets entered (guide steps 1–4)
+- Unchanged: SMTP, AD/LDAP (DOUBT-002), AV (DOUBT-009), user target (DOUBT-001), partial drafts (DOUBT-011), retention disposal (DOUBT-012)
+
+### Next session — TODO
+1. Deploy with the user (guide steps 1–5) and run the live verification checklist; mark the guide DEPLOYED
+2. `BGB/README.md`: Bangla + `i18n:check`, demo hosting pointer
+3. Security docs (#49/#50): OWASP assessment, `npm audit` evidence, ZAP scan (can run against the Render URL)
+4. Documentation set (#52): user manual, admin manual, DB schema/ERD; remaining OpenAPI examples
+5. UAT test cases (#57), training outline (#53)
+6. Re-date seed data; move Playwright e2e tests into the repo

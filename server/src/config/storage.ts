@@ -1,3 +1,4 @@
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { mkdir, rename, rm, stat, writeFile } from 'node:fs/promises';
@@ -17,12 +18,16 @@ export interface StorageDriver {
 
 const KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/;
 
+function checkKey(key: string) {
+  // Defence in depth against path traversal, even though keys are server-generated
+  if (!KEY_PATTERN.test(key) || key.includes('..')) throw new Error(`Invalid storage key: ${key}`);
+}
+
 class LocalDiskStorage implements StorageDriver {
   private readonly root = path.resolve(env.EVIDENCE_DIR);
 
   private resolve(key: string) {
-    // Defence in depth against path traversal, even though keys are server-generated
-    if (!KEY_PATTERN.test(key) || key.includes('..')) throw new Error(`Invalid storage key: ${key}`);
+    checkKey(key);
     const full = path.resolve(this.root, key);
     if (!full.startsWith(this.root + path.sep)) throw new Error(`Storage key escapes root: ${key}`);
     return full;
@@ -61,7 +66,74 @@ class LocalDiskStorage implements StorageDriver {
 }
 
 // ---------------------------------------------------------------------------
-// Spec #27 — encryption at rest. Wraps any driver (local disk now, S3/MinIO later).
+// Spec #33 — S3-compatible object storage (§21): MinIO, AWS S3, or Supabase Storage for the
+// Render demo. The bucket must be private; the API is the only reader and writer, and objects
+// are encrypted by EncryptedStorage before they leave the process.
+// ---------------------------------------------------------------------------
+
+/** The part of S3Client the driver uses (tests pass a fake). */
+export interface S3Sender {
+  send(command: PutObjectCommand | GetObjectCommand | DeleteObjectCommand): Promise<unknown>;
+}
+
+const isNotFound = (err: unknown) => {
+  const e = err as { name?: string; $metadata?: { httpStatusCode?: number } };
+  return e?.name === 'NoSuchKey' || e?.name === 'NotFound' || e?.$metadata?.httpStatusCode === 404;
+};
+
+export class S3Storage implements StorageDriver {
+  constructor(
+    private readonly client: S3Sender,
+    private readonly bucket: string,
+  ) {}
+
+  async put(key: string, data: Buffer) {
+    checkKey(key);
+    // A single PUT is atomic: the object appears complete or not at all
+    await this.client.send(
+      new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: data, ContentLength: data.length, ContentType: 'application/octet-stream' }),
+    );
+  }
+
+  async read(key: string) {
+    checkKey(key);
+    try {
+      const res = (await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }))) as {
+        Body?: { transformToByteArray(): Promise<Uint8Array> };
+      };
+      return res.Body ? Buffer.from(await res.Body.transformToByteArray()) : null;
+    } catch (err) {
+      if (isNotFound(err)) return null;
+      throw err;
+    }
+  }
+
+  async get(key: string) {
+    const data = await this.read(key);
+    return data ? Readable.from(data) : null;
+  }
+
+  async remove(key: string) {
+    checkKey(key);
+    await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
+  }
+}
+
+function s3FromEnv() {
+  const client = new S3Client({
+    region: env.S3_REGION,
+    endpoint: env.S3_ENDPOINT,
+    forcePathStyle: env.S3_FORCE_PATH_STYLE,
+    credentials: { accessKeyId: env.S3_ACCESS_KEY_ID!, secretAccessKey: env.S3_SECRET_ACCESS_KEY! },
+    // Newer SDKs add CRC checksums to every request; not all S3-compatible stores accept them
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+    responseChecksumValidation: 'WHEN_REQUIRED',
+  });
+  return new S3Storage(client, env.S3_BUCKET!);
+}
+
+// ---------------------------------------------------------------------------
+// Spec #27 — encryption at rest. Wraps any driver (local disk or S3).
 // Format: "BIRDSEV1" | iv (12) | GCM tag (16) | ciphertext. The storage key is authenticated as
 // additional data, so a file copied onto another record's key fails to decrypt. Objects without
 // the header (stored before encryption was enabled) are returned as they are.
@@ -115,11 +187,11 @@ export class EncryptedStorage implements StorageDriver {
   }
 }
 
-const local = new LocalDiskStorage();
+const driver: StorageDriver = env.STORAGE_DRIVER === 's3' ? s3FromEnv() : new LocalDiskStorage();
 export const storageEncrypted = Boolean(env.EVIDENCE_ENCRYPTION_KEY);
 export const storage: StorageDriver = env.EVIDENCE_ENCRYPTION_KEY
-  ? new EncryptedStorage(local, Buffer.from(env.EVIDENCE_ENCRYPTION_KEY, 'base64'))
-  : local;
+  ? new EncryptedStorage(driver, Buffer.from(env.EVIDENCE_ENCRYPTION_KEY, 'base64'))
+  : driver;
 /**
  * Reads an evidence object and reports whether it was stored encrypted. Throws when an encrypted
  * object fails authentication (altered on disk).
@@ -131,4 +203,4 @@ export async function readObject(key: string): Promise<{ data: Buffer; encrypted
 }
 
 /** Raw driver, for tests and diagnostics only (reads files exactly as stored). */
-export const rawStorage: StorageDriver = local;
+export const rawStorage: StorageDriver = driver;

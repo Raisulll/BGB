@@ -16,12 +16,13 @@ import { incidentsRouter } from './modules/incidents/incidents.router.js';
 import { notificationsRouter } from './modules/notifications/notifications.router.js';
 import { reportsRouter } from './modules/reports/reports.router.js';
 import { usersRouter } from './modules/users/users.router.js';
+import { spaRouter } from './spa.js';
 
 export function createApp() {
   const app = express();
 
   app.disable('x-powered-by');
-  // Behind Nginx (§15) so req.ip / secure cookies reflect the real client
+  // Behind Nginx (§15) or a hosting load balancer, so req.ip / secure cookies reflect the real client
   app.set('trust proxy', env.TRUST_PROXY);
 
   // Spec #49 — security headers. HSTS is only meaningful over HTTPS; Nginx terminates TLS (spec #27).
@@ -65,6 +66,7 @@ export function createApp() {
 
   app.use('/api/v1', api);
   if (env.API_DOCS) app.use('/api/docs', swaggerUiRouter());
+  if (env.SERVE_SPA_DIR) app.use(spaRouter(env.SERVE_SPA_DIR));
   app.use(notFoundHandler);
   app.use(errorHandler);
 

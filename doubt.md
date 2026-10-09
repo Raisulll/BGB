@@ -258,7 +258,7 @@ The frontend no longer carries demo data; it needs the API and PostgreSQL behind
 None yet; nothing is deployed. Option A is recommended because it is also what production needs. The login page hides the demo-account shortcuts in production builds unless `VITE_SHOW_DEMO_ACCOUNTS=true`.
 
 ### Resolution (if resolved)
-2026-10-09, user decision (no VPS available): **Option D — Render web service (API + built SPA on one URL) + Supabase Postgres + Supabase Storage for evidence**, both in Singapore. Demo/seed data only; real BGB data never goes on these services, and production stays on BGB-hosted servers (Option A design). Not built yet; plan and findings in `server/docs/installation-guide/demo-hosting-render-supabase.md`.
+2026-10-09, user decision (no VPS available): **Option D — Render web service (API + built SPA on one URL) + Supabase Postgres + Supabase Storage for evidence**, both in Singapore. Demo/seed data only; real BGB data never goes on these services, and production stays on BGB-hosted servers (Option A design). Built 2026-10-09 (Session 12): `render.yaml`, `SERVE_SPA_DIR`, S3 storage driver, `prisma/sql/supabase-demo-access.sql`; step-by-step guide in `server/docs/installation-guide/demo-hosting-render-supabase.md`. Not deployed yet (accounts pending).
 
 ---
 ## DOUBT-011 — Must a Draft Incident Be Complete?
