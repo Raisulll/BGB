@@ -120,6 +120,10 @@ model Incident {
   createdBy       String   @map("created_by") @db.VarChar(10)
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  // Spec #45 — set when a Closed/Rejected incident is archived; archived records leave the default
+  // lists and statistics but are never deleted
+  archivedAt      DateTime? @map("archived_at") @db.Timestamptz
+  archivedBy      String?   @map("archived_by") @db.VarChar(10)
 
   creator       User               @relation(fields: [createdBy], references: [id])
   timeline      IncidentTimeline[]
@@ -132,6 +136,7 @@ model Incident {
   @@index([category], map: "idx_incidents_category")
   @@index([sector, status], map: "idx_incidents_sector_status")
   @@index([createdBy, status], map: "idx_incidents_creator_status")
+  @@index([archivedAt], map: "idx_incidents_archived")
   @@map("incidents")
 }
 
@@ -249,4 +254,25 @@ model RefreshToken {
   @@index([userId, revoked])
   @@index([previousTokenHash])
   @@map("refresh_tokens")
+}
+
+// Spec #23 — transactional outbox for workflow e-mails. Rows are written in the same transaction
+// as the workflow change and sent afterwards by the mail worker (src/modules/notifications/mailer.ts).
+model EmailOutbox {
+  id            Int       @id @default(autoincrement())
+  toUserId      String?   @map("to_user_id") @db.VarChar(10)
+  toEmail       String    @map("to_email") @db.VarChar(150)
+  subject       String    @db.VarChar(255)
+  bodyText      String    @map("body_text")
+  event         String    @db.VarChar(30)
+  incidentId    String?   @map("incident_id") @db.VarChar(30)
+  status        String    @default("pending") @db.VarChar(10) // pending | sent | failed
+  attempts      Int       @default(0)
+  lastError     String?   @map("last_error")
+  nextAttemptAt DateTime  @default(now()) @map("next_attempt_at") @db.Timestamptz
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  sentAt        DateTime? @map("sent_at") @db.Timestamptz
+
+  @@index([status, nextAttemptAt], map: "idx_email_outbox_due")
+  @@map("email_outbox")
 }

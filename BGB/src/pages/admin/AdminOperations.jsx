@@ -6,7 +6,8 @@ import { errorMessage } from '../../api/client';
 import { formatDateDisplay, todayISO } from '../../utils/helpers';
 import Card from '../../components/ui/Card';
 import { DemoBadge, DemoButton, DemoNotice, Sample } from '../../components/ui/Demo';
-import { ConfigRow } from './AdminSettings';
+import ConfigRow from './ConfigRow';
+import { useI18n } from '../../i18n/I18nContext';
 
 // Operations features deferred for the demo version (user decision 2026-10-09):
 // #34 backups, #35 disaster recovery, #36 high availability, #38–#40 load/performance/availability,
@@ -21,12 +22,13 @@ const daysAgo = (n) => {
 };
 
 function DemoCard({ title, icon, spec, children, actions }) {
+  const { t } = useI18n();
   return (
     <Card
       title={
         <span className="flex flex-wrap items-center gap-2">
           {title} <DemoBadge />
-          <span className="text-[10px] font-medium text-gray-400">Spec {spec}</span>
+          <span className="text-[10px] font-medium text-gray-400">{t('ops.spec', { n: spec })}</span>
         </span>
       }
       icon={icon}
@@ -52,6 +54,7 @@ const STATUS_DOT = { ok: 'bg-emerald-500', standby: 'bg-amber-400' };
 
 export default function AdminOperations({ config, onChange }) {
   const { showToast } = useToast();
+  const { t } = useI18n();
   const { refreshUser } = useApp();
   const [busy, setBusy] = useState(null);
   const backupRow = config.find((c) => c.key === 'backup.frequency_hours');
@@ -62,7 +65,7 @@ export default function AdminOperations({ config, onChange }) {
     try {
       onChange(await adminApi.updateConfig({ [key]: value }));
       refreshUser().catch(() => {});
-      showToast('Setting saved (no backup job runs in the demo version)', 'success');
+      showToast(t('set.savedNoBackup'), 'success');
     } catch (err) {
       showToast(errorMessage(err), 'error');
       revert?.();
@@ -74,55 +77,54 @@ export default function AdminOperations({ config, onChange }) {
   return (
     <div className="space-y-4 sm:space-y-6">
       <DemoNotice>
-        <p className="font-bold">Demo version: operations features are shown for evaluation only.</p>
+        <p className="font-bold">{t('ops.noticeTitle')}</p>
         <p className="mt-0.5">
-          Backups, disaster recovery, high availability, load testing and log management are part of the production deployment. On this tab the buttons do not
-          perform any action, and values marked <Sample>sample</Sample> are illustrative, not measurements.
+          {t('ops.noticeBody')} <Sample>{t('ops.noticeSample')}</Sample> {t('ops.noticeEnd')}
         </p>
       </DemoNotice>
 
       <div className="grid grid-cols-1 items-start gap-4 sm:gap-6 lg:grid-cols-2">
         {/* #34 Backup */}
         <DemoCard
-          title="Backup & Restore"
+          title={t('ops.backupTitle')}
           icon="fa-database"
           spec="#34"
           actions={
             <>
-              <DemoButton icon="fa-play" feature="Manual backup">Run Backup Now</DemoButton>
-              <DemoButton icon="fa-undo" feature="Restore from backup">Restore</DemoButton>
-              <DemoButton icon="fa-check-double" feature="Backup verification">Verify Latest</DemoButton>
+              <DemoButton icon="fa-play">{t('ops.runBackup')}</DemoButton>
+              <DemoButton icon="fa-undo">{t('ops.restore')}</DemoButton>
+              <DemoButton icon="fa-check-double">{t('ops.verifyLatest')}</DemoButton>
             </>
           }
         >
           {backupRow && (
             <ConfigRow
               key={`backup:${backupRow.value}`}
-              item={{ key: backupRow.key, label: 'Backup Interval (hours)', hint: 'Stored policy value used by the production backup job', icon: 'fa-calendar-alt', demo: true }}
+              item={{ key: backupRow.key, icon: 'fa-calendar-alt', demo: true }}
               row={backupRow}
               onSave={save}
               busy={busy}
             />
           )}
-          <KV label="Method">pg_dump, compressed, AES-256 encrypted, copied off-site</KV>
-          <KV label="Evidence files">Included in each backup</KV>
+          <KV label={t('ops.method')}>{t('ops.methodValue')}</KV>
+          <KV label={t('ops.evidenceFiles')}>{t('ops.evidenceIncluded')}</KV>
           <div className="overflow-x-auto rounded-lg border border-gray-200">
             <table className="w-full text-left text-xs">
               <thead className="bg-gray-50 text-gray-500">
                 <tr>
-                  <th className="px-3 py-2">Date</th>
-                  <th className="px-3 py-2">Type</th>
-                  <th className="px-3 py-2">Size</th>
-                  <th className="px-3 py-2">Checksum</th>
+                  <th className="px-3 py-2">{t('common.date')}</th>
+                  <th className="px-3 py-2">{t('ops.thType')}</th>
+                  <th className="px-3 py-2">{t('ops.thSize')}</th>
+                  <th className="px-3 py-2">{t('ops.thChecksum')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {[0, 1, 2].map((n) => (
                   <tr key={n}>
                     <td className="px-3 py-2"><Sample>{daysAgo(n)} 02:00</Sample></td>
-                    <td className="px-3 py-2"><Sample>Full</Sample></td>
+                    <td className="px-3 py-2"><Sample>{t('ops.full')}</Sample></td>
                     <td className="px-3 py-2"><Sample>{(48.6 - n * 0.4).toFixed(1)} MB</Sample></td>
-                    <td className="px-3 py-2"><Sample>Verified</Sample></td>
+                    <td className="px-3 py-2"><Sample>{t('ops.verified')}</Sample></td>
                   </tr>
                 ))}
               </tbody>
@@ -131,48 +133,51 @@ export default function AdminOperations({ config, onChange }) {
         </DemoCard>
 
         {/* #35 DR */}
-        <DemoCard title="Disaster Recovery" icon="fa-building-shield" spec="#35" actions={<DemoButton icon="fa-random" feature="Failover drill">Run Failover Drill</DemoButton>}>
-          <KV label="Primary site"><Sample>HQ Data Centre, Pilkhana</Sample></KV>
-          <KV label="DR site"><Sample>Secondary data centre</Sample></KV>
-          <KV label="Replication">PostgreSQL streaming replication + evidence storage sync</KV>
-          <KV label="Replication lag"><Sample>2 s</Sample></KV>
-          <KV label="Recovery point objective (RPO)"><Sample>24 hours</Sample></KV>
-          <KV label="Recovery time objective (RTO)"><Sample>4 hours</Sample></KV>
+        <DemoCard title={t('ops.drTitle')} icon="fa-building-shield" spec="#35" actions={<DemoButton icon="fa-random">{t('ops.drill')}</DemoButton>}>
+          <KV label={t('ops.primary')}><Sample>HQ Data Centre, Pilkhana</Sample></KV>
+          <KV label={t('ops.drSite')}><Sample>Secondary data centre</Sample></KV>
+          <KV label={t('ops.replication')}>{t('ops.replicationValue')}</KV>
+          <KV label={t('ops.lag')}><Sample>2 s</Sample></KV>
+          <KV label={t('ops.rpo')}><Sample>{t('ops.hours', { n: 24 })}</Sample></KV>
+          <KV label={t('ops.rto')}><Sample>{t('ops.hours', { n: 4 })}</Sample></KV>
         </DemoCard>
 
         {/* #36 HA */}
-        <DemoCard title="High Availability" icon="fa-server" spec="#36">
+        <DemoCard title={t('ops.haTitle')} icon="fa-server" spec="#36">
           <div className="space-y-2">
             {[
-              ['Load balancer', 'Nginx (TLS termination)', 'ok'],
-              ['Application node 1', 'PM2 cluster, 4 workers', 'ok'],
-              ['Application node 2', 'PM2 cluster, 4 workers', 'ok'],
-              ['Database primary', 'PostgreSQL', 'ok'],
-              ['Database replica', 'PostgreSQL hot standby', 'standby'],
+              ['ops.node.lb', 'Nginx (TLS termination)', 'ok'],
+              ['ops.node.app1', 'PM2 cluster, 4 workers', 'ok'],
+              ['ops.node.app2', 'PM2 cluster, 4 workers', 'ok'],
+              ['ops.node.dbPrimary', 'PostgreSQL', 'ok'],
+              ['ops.node.dbReplica', 'PostgreSQL hot standby', 'standby'],
             ].map(([name, detail, st]) => (
               <div key={name} className="flex items-center justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2 text-xs">
                 <span className="flex items-center gap-2 font-semibold text-gray-800">
                   <span className={`h-2 w-2 rounded-full ${STATUS_DOT[st]}`} />
-                  {name}
+                  {t(name)}
                 </span>
-                <Sample>{detail}{st === 'standby' ? ' (standby)' : ''}</Sample>
+                <Sample>
+                  {detail}
+                  {st === 'standby' ? ` (${t('ops.standby')})` : ''}
+                </Sample>
               </div>
             ))}
           </div>
         </DemoCard>
 
         {/* #38–#40 Performance */}
-        <DemoCard title="Performance & Availability" icon="fa-tachometer-alt" spec="#38–#40" actions={<DemoButton icon="fa-vial" feature="Load test">Run Load Test</DemoButton>}>
-          <KV label="Concurrent users target">100 / 250 / 500 (DOUBT-001)</KV>
-          <KV label="Response time target">under 3 seconds</KV>
-          <KV label="Availability target">99.5%</KV>
+        <DemoCard title={t('ops.perfTitle')} icon="fa-tachometer-alt" spec="#38–#40" actions={<DemoButton icon="fa-vial">{t('ops.loadTest')}</DemoButton>}>
+          <KV label={t('ops.usersTarget')}>100 / 250 / 500 (DOUBT-001)</KV>
+          <KV label={t('ops.responseTarget')}>{t('ops.responseValue')}</KV>
+          <KV label={t('ops.availabilityTarget')}>99.5%</KV>
           <div className="overflow-x-auto rounded-lg border border-gray-200">
             <table className="w-full text-left text-xs">
               <thead className="bg-gray-50 text-gray-500">
                 <tr>
-                  <th className="px-3 py-2">Virtual users</th>
-                  <th className="px-3 py-2">p95 response</th>
-                  <th className="px-3 py-2">Errors</th>
+                  <th className="px-3 py-2">{t('ops.thVu')}</th>
+                  <th className="px-3 py-2">{t('ops.thP95')}</th>
+                  <th className="px-3 py-2">{t('ops.thErrors')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -190,33 +195,33 @@ export default function AdminOperations({ config, onChange }) {
               </tbody>
             </table>
           </div>
-          <KV label="Uptime, last 30 days"><Sample>99.9%</Sample></KV>
+          <KV label={t('ops.uptime')}><Sample>99.9%</Sample></KV>
         </DemoCard>
 
         {/* #48 Logs */}
         <DemoCard
-          title="Logs & Monitoring"
+          title={t('ops.logsTitle')}
           icon="fa-file-alt"
           spec="#48"
           actions={
             <>
-              <DemoButton icon="fa-download" feature="Log download">Download Logs</DemoButton>
-              <DemoButton icon="fa-share-square" feature="SIEM forwarding">Forward to SIEM</DemoButton>
+              <DemoButton icon="fa-download">{t('ops.downloadLogs')}</DemoButton>
+              <DemoButton icon="fa-share-square">{t('ops.siem')}</DemoButton>
             </>
           }
         >
-          <KV label="Log streams">Application, error, security, HTTP access (recorded now)</KV>
-          <KV label="Rotation">Daily, kept 90 days</KV>
-          <p className="pt-1 text-[11px] font-bold uppercase tracking-wider text-gray-500">Last 24 hours</p>
+          <KV label={t('ops.streams')}>{t('ops.streamsValue')}</KV>
+          <KV label={t('ops.rotation')}>{t('ops.rotationValue')}</KV>
+          <p className="pt-1 text-[11px] font-bold uppercase tracking-wider text-gray-500">{t('ops.last24')}</p>
           <div className="grid grid-cols-3 gap-2 text-center">
             {[
-              ['Errors', '0'],
-              ['Failed logins', '3'],
-              ['Active sessions', '7'],
+              ['ops.errors', '0'],
+              ['ops.failedLogins', '3'],
+              ['ops.activeSessions', '7'],
             ].map(([label, v]) => (
               <div key={label} className="rounded-lg bg-gray-50 p-2">
                 <Sample>{v}</Sample>
-                <p className="mt-1 text-[10px] text-gray-500">{label}</p>
+                <p className="mt-1 text-[10px] text-gray-500">{t(label)}</p>
               </div>
             ))}
           </div>

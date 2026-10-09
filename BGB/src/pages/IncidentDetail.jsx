@@ -13,44 +13,47 @@ import Card from '../components/ui/Card';
 import ErrorState from '../components/ui/ErrorState';
 import ReasonDialog from '../components/ui/ReasonDialog';
 import Spinner from '../components/ui/Spinner';
+import { useI18n } from '../i18n/I18nContext';
 
 function Detail({ label, value }) {
+  const { t } = useI18n();
   return (
     <div className="min-w-0">
       <dt className="text-xs text-gray-500">{label}</dt>
-      <dd className="mt-0.5 break-words text-sm font-medium text-gray-800">{value || 'N/A'}</dd>
+      <dd className="mt-0.5 break-words text-sm font-medium text-gray-800">{value || t('common.na')}</dd>
     </div>
   );
 }
 
 const ACTION_BTN = {
-  return: { label: 'Return', icon: 'fa-undo', cls: 'bg-pink-50 text-pink-600 hover:bg-pink-100' },
-  review: { label: 'Review', icon: 'fa-search', cls: 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100' },
-  verify: { label: 'Verify', icon: 'fa-check', cls: 'bg-green-50 text-green-600 hover:bg-green-100' },
-  reject: { label: 'Reject', icon: 'fa-times', cls: 'bg-red-50 text-red-600 hover:bg-red-100' },
-  approve: { label: 'Approve', icon: 'fa-thumbs-up', cls: 'bg-green-50 text-green-700 hover:bg-green-100' },
-  close: { label: 'Close', icon: 'fa-lock', cls: 'bg-gray-100 text-gray-700 hover:bg-gray-200' },
+  return: { icon: 'fa-undo', cls: 'bg-pink-50 text-pink-600 hover:bg-pink-100' },
+  review: { icon: 'fa-search', cls: 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100' },
+  verify: { icon: 'fa-check', cls: 'bg-green-50 text-green-600 hover:bg-green-100' },
+  reject: { icon: 'fa-times', cls: 'bg-red-50 text-red-600 hover:bg-red-100' },
+  approve: { icon: 'fa-thumbs-up', cls: 'bg-green-50 text-green-700 hover:bg-green-100' },
+  close: { icon: 'fa-lock', cls: 'bg-gray-100 text-gray-700 hover:bg-gray-200' },
 };
-// The server rejects these without a reason (spec #14)
-const NEEDS_REASON = { return: 'Return for corrections', reject: 'Reject incident' };
+// The server rejects these without a reason (spec #14); value = dialog title key
+const NEEDS_REASON = { return: 'detail.returnTitle', reject: 'detail.rejectTitle' };
 
 // Spec #11 — a one-line summary of the preserved media metadata
-function metadataSummary(ev) {
+function metadataSummary(ev, t) {
   const m = ev.metadata || {};
   if (m.source) return m.source;
   const parts = [];
   const camera = [m.exif?.Make, m.exif?.Model].filter(Boolean).join(' ');
   if (camera) parts.push(camera);
-  if (m.exif?.DateTimeOriginal) parts.push(`captured ${formatDateTime(m.exif.DateTimeOriginal)}`);
+  if (m.exif?.DateTimeOriginal) parts.push(t('detail.captured', { date: formatDateTime(m.exif.DateTimeOriginal) }));
   if (m.gps) parts.push(`GPS ${m.gps.latitude.toFixed(5)}, ${m.gps.longitude.toFixed(5)}`);
   if (ev.sha256) parts.push(`SHA-256 ${ev.sha256.slice(0, 12)}…`);
-  return parts.join(' • ') || 'No embedded metadata';
+  return parts.join(' • ') || t('detail.noMetadata');
 }
 
 export default function IncidentDetail() {
   const { id } = useParams();
   const { currentUser } = useApp();
   const { showToast } = useToast();
+  const { t, tv } = useI18n();
   const { data: inc, error, message, reload, setData } = useApi((signal) => incidentsApi.get(id, signal), [id]);
   const [busy, setBusy] = useState(null);
   const [dialog, setDialog] = useState(null); // { kind: 'workflow', action } | { kind: 'evidence', ev }
@@ -61,7 +64,7 @@ export default function IncidentDetail() {
       const updated = await incidentsApi.workflow(inc.id, action, notes);
       setData(updated);
       setDialog(null);
-      showToast(`${inc.id} ${updated.status.toLowerCase()}`, 'success');
+      showToast(t('incidents.actionDone', { id: inc.id, status: tv('status', updated.status) }), 'success');
     } catch (err) {
       showToast(errorMessage(err), 'error');
       // 409: someone else acted first; show the current state
@@ -86,8 +89,8 @@ export default function IncidentDetail() {
     setBusy(`vf-${ev.id}`);
     try {
       const r = await incidentsApi.verifyEvidence(inc.id, ev.id);
-      if (r.intact) showToast(`${ev.name}: integrity verified (SHA-256 matches upload)`, 'success');
-      else showToast(`${ev.name}: ${r.fileFound ? 'HASH MISMATCH — file has been altered' : 'stored file is missing'}`, 'error');
+      if (r.intact) showToast(t('detail.intact', { name: ev.name }), 'success');
+      else showToast(t(r.fileFound ? 'detail.mismatch' : 'detail.missing', { name: ev.name }), 'error');
     } catch (err) {
       showToast(errorMessage(err), 'error');
     } finally {
@@ -101,7 +104,7 @@ export default function IncidentDetail() {
       try {
         await incidentsApi.removeEvidence(inc.id, ev.id, reason);
         setDialog(null);
-        showToast(`${ev.name} removed`, 'success');
+        showToast(t('detail.removed', { name: ev.name }), 'success');
         reload();
       } catch (err) {
         showToast(errorMessage(err), 'error');
@@ -109,8 +112,35 @@ export default function IncidentDetail() {
         setBusy(null);
       }
     },
-    [inc, reload, showToast],
+    [inc, reload, showToast, t],
   );
+
+  // Spec #45 — archive a final record / restore it (HQ administrators)
+  const archive = async () => {
+    if (!window.confirm(t('detail.archiveConfirm', { id: inc.id }))) return;
+    setBusy('archive');
+    try {
+      setData(await incidentsApi.archive(inc.id));
+      showToast(t('detail.archived', { id: inc.id }), 'success');
+    } catch (err) {
+      showToast(errorMessage(err), 'error');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const restore = async (reason) => {
+    setBusy('restore');
+    try {
+      setData(await incidentsApi.restore(inc.id, reason));
+      setDialog(null);
+      showToast(t('detail.restored', { id: inc.id }), 'success');
+    } catch (err) {
+      showToast(errorMessage(err), 'error');
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const closeDialog = useCallback(() => setDialog(null), []);
 
@@ -118,10 +148,10 @@ export default function IncidentDetail() {
     return (
       <div className="mx-auto max-w-6xl space-y-4">
         <Link to="/incidents" className="inline-flex items-center gap-2 text-sm font-medium text-bgb-600 hover:text-bgb-800">
-          <i className="fas fa-arrow-left" /> Back to Incidents
+          <i className="fas fa-arrow-left" /> {t('detail.back')}
         </Link>
         <Card>
-          <ErrorState message={error.status === 404 ? `Incident ${id} was not found or is outside your area of responsibility.` : message} onRetry={error.status === 404 ? undefined : reload} />
+          <ErrorState message={error.status === 404 ? t('detail.notFound', { id }) : message} onRetry={error.status === 404 ? undefined : reload} />
         </Card>
       </div>
     );
@@ -138,7 +168,7 @@ export default function IncidentDetail() {
   return (
     <div className="mx-auto max-w-6xl space-y-4 sm:space-y-6">
       <Link to="/incidents" className="inline-flex items-center gap-2 text-sm font-medium text-bgb-600 hover:text-bgb-800">
-        <i className="fas fa-arrow-left" /> Back to Incidents
+        <i className="fas fa-arrow-left" /> {t('detail.back')}
       </Link>
 
       {/* Header */}
@@ -155,11 +185,11 @@ export default function IncidentDetail() {
               {inc.category} {inc.subcategory && <><i className="fas fa-angle-right mx-1 text-xs" /> {inc.subcategory}</>}
             </p>
           </div>
-          {(inc.canEdit || actions.length > 0) && (
+          {(inc.canEdit || actions.length > 0 || inc.canArchive || inc.canRestore) && (
             <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
               {inc.canEdit && (
                 <Link to={`/incidents/${inc.id}/edit`} className="btn bg-blue-50 text-blue-600 hover:bg-blue-100">
-                  <i className="fas fa-edit" /> Edit
+                  <i className="fas fa-edit" /> {t('common.edit')}
                 </Link>
               )}
               {actions.map((a) => (
@@ -169,38 +199,54 @@ export default function IncidentDetail() {
                   onClick={() => (NEEDS_REASON[a] ? setDialog({ kind: 'workflow', action: a }) : run(a))}
                   className={`btn ${ACTION_BTN[a].cls}`}
                 >
-                  <i className={`fas ${busy === a ? 'fa-spinner fa-spin' : ACTION_BTN[a].icon}`} /> {ACTION_BTN[a].label}
+                  <i className={`fas ${busy === a ? 'fa-spinner fa-spin' : ACTION_BTN[a].icon}`} /> {tv('action', a)}
                 </button>
               ))}
+              {inc.canArchive && (
+                <button disabled={Boolean(busy)} onClick={archive} className="btn bg-navy-50 text-navy-700 hover:bg-navy-100">
+                  <i className={`fas ${busy === 'archive' ? 'fa-spinner fa-spin' : 'fa-box-archive'}`} /> {t('detail.archive')}
+                </button>
+              )}
+              {inc.canRestore && (
+                <button disabled={Boolean(busy)} onClick={() => setDialog({ kind: 'restore' })} className="btn bg-navy-50 text-navy-700 hover:bg-navy-100">
+                  <i className="fas fa-box-open" /> {t('detail.restore')}
+                </button>
+              )}
             </div>
           )}
         </div>
+        {inc.archivedAt && (
+          <div className="mt-4 flex items-start gap-2 rounded-lg border border-navy-200 bg-navy-50 p-3 text-xs text-navy-800">
+            <i className="fas fa-box-archive mt-0.5" />
+            <span>{t('detail.archivedBanner', { date: formatDateTime(inc.archivedAt) })}</span>
+          </div>
+        )}
       </Card>
 
       <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-3">
         {/* Main column */}
         <div className="space-y-4 sm:space-y-6 lg:col-span-2">
-          <Card title="Incident Details" icon="fa-info-circle">
+          <Card title={t('detail.details')} icon="fa-info-circle">
             <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-              <Detail label="Date & Time" value={`${formatDateDisplay(inc.date)} ${inc.time}`} />
-              <Detail label="Location" value={inc.location} />
-              <Detail label="Sector" value={inc.sector} />
-              <Detail label="Battalion" value={inc.battalion} />
-              <Detail label="BOP" value={inc.bop} />
-              <Detail label="GPS" value={inc.lat != null ? `${inc.lat}, ${inc.lng}` : null} />
+              <Detail label={t('detail.dateTime')} value={`${formatDateDisplay(inc.date)} ${inc.time}`} />
+              <Detail label={t('common.location')} value={inc.location} />
+              <Detail label={t('common.sector')} value={inc.sector} />
+              <Detail label={t('common.battalion')} value={inc.battalion} />
+              <Detail label={t('common.bop')} value={inc.bop} />
+              <Detail label={t('detail.gps')} value={inc.lat != null ? `${inc.lat}, ${inc.lng}` : null} />
             </dl>
             <div className="mt-4 border-t border-gray-100 pt-4">
-              <p className="mb-1 text-xs text-gray-500">Description</p>
-              <p className="whitespace-pre-line text-sm leading-relaxed text-gray-700">{inc.description || 'N/A'}</p>
+              <p className="mb-1 text-xs text-gray-500">{t('detail.description')}</p>
+              <p className="whitespace-pre-line text-sm leading-relaxed text-gray-700">{inc.description || t('common.na')}</p>
             </div>
             <dl className="mt-4 grid grid-cols-1 gap-4 border-t border-gray-100 pt-4 sm:grid-cols-3">
-              <Detail label="Persons Involved" value={inc.personsInvolved} />
-              <Detail label="Action Taken" value={inc.actionTaken} />
-              <Detail label="Outcome" value={inc.outcome} />
+              <Detail label={t('detail.persons')} value={inc.personsInvolved} />
+              <Detail label={t('detail.actionTaken')} value={inc.actionTaken} />
+              <Detail label={t('detail.outcome')} value={inc.outcome} />
             </dl>
           </Card>
 
-          <Card title={`Evidence (${evidence.length})`} icon="fa-paperclip">
+          <Card title={t('detail.evidence', { n: evidence.length })} icon="fa-paperclip">
             {evidence.length ? (
               <ul className="space-y-2 sm:space-y-3">
                 {evidence.map((ev) => {
@@ -217,28 +263,28 @@ export default function IncidentDetail() {
                         </p>
                         <p className="truncate text-[11px] text-gray-400" title={ev.sha256 ? `SHA-256 ${ev.sha256}` : undefined}>
                           <i className="fas fa-info-circle mr-1" />
-                          {metadataSummary(ev)}
+                          {metadataSummary(ev, t)}
                         </p>
                       </div>
                       {ev.available ? (
                         <div className="flex shrink-0 items-center">
                           {ev.sha256 && (
-                            <button onClick={() => verify(ev)} disabled={Boolean(busy)} className="btn btn-ghost px-3 text-emerald-700" title="Verify integrity" aria-label={`Verify integrity of ${ev.name}`}>
+                            <button onClick={() => verify(ev)} disabled={Boolean(busy)} className="btn btn-ghost px-3 text-emerald-700" title={t('detail.verifyIntegrity')} aria-label={t('detail.verifyAria', { name: ev.name })}>
                               <i className={`fas ${busy === `vf-${ev.id}` ? 'fa-spinner fa-spin' : 'fa-shield-alt'}`} />
                             </button>
                           )}
-                          <button onClick={() => download(ev)} disabled={Boolean(busy)} className="btn btn-ghost px-3 text-bgb-600" title="Download" aria-label={`Download ${ev.name}`}>
+                          <button onClick={() => download(ev)} disabled={Boolean(busy)} className="btn btn-ghost px-3 text-bgb-600" title={t('common.download')} aria-label={t('detail.downloadAria', { name: ev.name })}>
                             <i className={`fas ${busy === `dl-${ev.id}` ? 'fa-spinner fa-spin' : 'fa-download'}`} />
                           </button>
                           {canRemoveEvidence && (
-                            <button onClick={() => setDialog({ kind: 'evidence', ev })} disabled={Boolean(busy)} className="btn btn-ghost px-3 text-red-600" title="Remove" aria-label={`Remove ${ev.name}`}>
+                            <button onClick={() => setDialog({ kind: 'evidence', ev })} disabled={Boolean(busy)} className="btn btn-ghost px-3 text-red-600" title={t('common.remove')} aria-label={t('detail.removeAria', { name: ev.name })}>
                               <i className="fas fa-trash-alt" />
                             </button>
                           )}
                         </div>
                       ) : (
-                        <span className="shrink-0 text-[11px] text-gray-400" title="Seed record: metadata only, no stored file">
-                          Metadata only
+                        <span className="shrink-0 text-[11px] text-gray-400" title={t('detail.metadataOnlyTitle')}>
+                          {t('detail.metadataOnly')}
                         </span>
                       )}
                     </li>
@@ -246,17 +292,17 @@ export default function IncidentDetail() {
                 })}
               </ul>
             ) : (
-              <p className="text-sm text-gray-400">No evidence attached</p>
+              <p className="text-sm text-gray-400">{t('detail.noEvidence')}</p>
             )}
             {inc.canEdit && (
               <Link to={`/incidents/${inc.id}/edit?step=3`} className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-bgb-600 hover:text-bgb-800">
-                <i className="fas fa-plus" /> Attach evidence
+                <i className="fas fa-plus" /> {t('detail.attach')}
               </Link>
             )}
           </Card>
 
           {inc.lat != null && inc.lng != null && (
-            <Card title="Location" icon="fa-map-marker-alt" bodyClassName="p-2 sm:p-4">
+            <Card title={t('detail.location')} icon="fa-map-marker-alt" bodyClassName="p-2 sm:p-4">
               <div className="h-64 overflow-hidden rounded-lg sm:h-80">
                 <MapContainer center={[inc.lat, inc.lng]} zoom={13} scrollWheelZoom={false} className="h-full w-full">
                   <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
@@ -275,9 +321,9 @@ export default function IncidentDetail() {
 
         {/* Side column */}
         <div className="space-y-4 sm:space-y-6">
-          <Card title="Timeline" icon="fa-history">
+          <Card title={t('detail.timeline')} icon="fa-history">
             <ol className="relative space-y-4">
-              {timeline.map((t, i) => {
+              {timeline.map((ev, i) => {
                 const last = i === timeline.length - 1;
                 return (
                   <li key={i} className="relative flex gap-3">
@@ -286,10 +332,10 @@ export default function IncidentDetail() {
                       <span className={`h-2 w-2 rounded-full ${last ? 'bg-white' : 'bg-bgb-500'}`} />
                     </span>
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-800">{t.action}</p>
-                      <p className="text-xs text-gray-500">{t.user}</p>
-                      <p className="text-xs text-gray-400">{formatDateTime(t.date)}</p>
-                      {t.notes && <p className="mt-1 whitespace-pre-line rounded bg-gray-50 px-2 py-1 text-xs italic text-gray-600">{t.notes}</p>}
+                      <p className="text-sm font-medium text-gray-800">{tv('timeline', ev.action)}</p>
+                      <p className="text-xs text-gray-500">{ev.user}</p>
+                      <p className="text-xs text-gray-400">{formatDateTime(ev.date)}</p>
+                      {ev.notes && <p className="mt-1 whitespace-pre-line rounded bg-gray-50 px-2 py-1 text-xs italic text-gray-600">{ev.notes}</p>}
                     </div>
                   </li>
                 );
@@ -297,13 +343,13 @@ export default function IncidentDetail() {
             </ol>
           </Card>
 
-          <Card title="Report Info" icon="fa-user-shield">
+          <Card title={t('detail.reportInfo')} icon="fa-user-shield">
             <dl className="space-y-2 text-sm">
               {[
-                ['Created By', inc.createdByName || inc.createdBy],
-                ['Created', formatDateTime(inc.createdAt)],
-                ['Last Updated', formatDateTime(lastUpdate)],
-                ['Attachments', evidence.length],
+                [t('detail.createdBy'), inc.createdByName || inc.createdBy],
+                [t('detail.created'), formatDateTime(inc.createdAt)],
+                [t('detail.lastUpdated'), formatDateTime(lastUpdate)],
+                [t('detail.attachments'), evidence.length],
               ].map(([k, v]) => (
                 <div key={k} className="flex justify-between gap-4">
                   <dt className="text-gray-500">{k}</dt>
@@ -317,20 +363,29 @@ export default function IncidentDetail() {
 
       <ReasonDialog
         open={dialog?.kind === 'workflow'}
-        title={dialog?.kind === 'workflow' ? `${NEEDS_REASON[dialog.action]}: ${inc.id}` : ''}
-        label="Reason (recorded in the timeline and audit log)"
-        confirmLabel={dialog?.kind === 'workflow' ? ACTION_BTN[dialog.action].label : ''}
+        title={dialog?.kind === 'workflow' ? t(NEEDS_REASON[dialog.action], { id: inc.id }) : ''}
+        label={t('common.reasonRecorded')}
+        confirmLabel={dialog?.kind === 'workflow' ? tv('action', dialog.action) : ''}
         confirmClass="btn-danger"
         busy={Boolean(busy)}
         onCancel={closeDialog}
         onConfirm={(reason) => run(dialog.action, reason)}
       />
       <ReasonDialog
+        open={dialog?.kind === 'restore'}
+        title={t('detail.restoreTitle', { id: inc.id })}
+        label={t('common.reasonRecorded')}
+        confirmLabel={t('detail.restore')}
+        busy={Boolean(busy)}
+        onCancel={closeDialog}
+        onConfirm={restore}
+      />
+      <ReasonDialog
         open={dialog?.kind === 'evidence'}
-        title={dialog?.kind === 'evidence' ? `Remove ${dialog.ev.name}` : ''}
-        label={inc.canEdit ? 'Reason (optional)' : 'Reason (recorded in the timeline and audit log)'}
+        title={dialog?.kind === 'evidence' ? t('detail.removeTitle', { name: dialog.ev.name }) : ''}
+        label={inc.canEdit ? t('common.reasonOptional') : t('common.reasonRecorded')}
         required={!inc.canEdit}
-        confirmLabel="Remove"
+        confirmLabel={t('common.remove')}
         confirmClass="btn-danger"
         busy={Boolean(busy)}
         onCancel={closeDialog}

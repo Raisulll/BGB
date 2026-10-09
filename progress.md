@@ -331,3 +331,52 @@ Deferred for the demo version (user decision 2026-10-09): scheduled backups (#34
 4. Bangla i18n framework (DOUBT-003)
 
 Added after the session summary: deferred items now appear in **Admin › Operations** with DEMO badges (`components/ui/Demo.jsx`: `DemoBadge`, `Sample`, `DemoNotice`, `DemoButton`). Buttons only show "not active in the demo version"; illustrative values are marked SAMPLE. The backup interval setting moved there from Security & System.
+
+---
+## Session 10 — 2026-10-09 (+06:00)
+
+> Continuation of Session 9 after the user added a git repo (one commit, "in progress"). Everything below is **uncommitted** working-tree changes; nothing was committed (the user hasn't asked).
+
+### What was done
+- **Bangla localization (spec #43)** — complete for the whole UI
+  - `BGB/src/i18n/`: `I18nContext.jsx` (`useI18n()` → `t(key, vars)`, `tv(group, value)` for status/severity/role/action/timeline/audit-action values), `en.js` + `bn.js` (865 keys, same keys + same `{placeholders}`), language switch EN/বাং in the header and on the login page (`components/layout/LanguageSwitcher.jsx`, choice kept in `localStorage` `birds.lang`)
+  - Bengali font bundled offline: `@fontsource/noto-sans-bengali` 5.2.8 (Bengali subset only, loads on demand)
+  - API error messages translated by error code in Bangla mode (`setErrorTranslator` in `api/client.js`); English keeps the server's message
+  - `npm run i18n:check` (`BGB/scripts/check-i18n.mjs`): both dictionaries in sync, placeholders match, every `t('key')` in `src/` exists. **From now on edit `en.js`/`bn.js` directly** (they were generated this session from scratch fragments that no longer exist)
+  - Fixed while translating: clock showed local time labelled "BDT" (now Asia/Dhaka, "BST"); fake "Security Level: Level 4" in the user menu; "TLS 1.3 Active" badge now only on HTTPS; "Encrypted Logs" claim → "Tamper-evident log"; incident form's server-validation mapping (Zod `fieldErrors`) was broken; KPI labels wrap instead of truncating
+- **Spec #4 / #32**: local username/password sign-in is the active method (user decision: AD/LDAP details not provided). Admin › Security & System has a **DEMO** "Directory Sign-in (AD/LDAP)" card (`AdminDirectory.jsx`) with sample settings
+- **Specs #41/#42 verified**: no horizontal overflow or console errors at phone (390px) / tablet / desktop in **Chrome, Edge and Firefox**; full workflow test passes in Chrome and Firefox
+- **E-mail notifications (spec #23)**: transactional outbox (`email_outbox` table) + worker (`server/src/modules/notifications/mailer.ts`, Nodemailer 10.0.10). Mail for submitted/approved/rejected/returned to the in-app recipients; messages carry reference + link only (no title/notes). Claims rows with `FOR UPDATE SKIP LOCKED`, retries with back-off, max 5 attempts. Config `SMTP_HOST/PORT/SECURE/USER/PASSWORD`, `MAIL_FROM`, `APP_BASE_URL`, `MAIL_TRANSPORT` (smtp|json|none; default none without SMTP_HOST). `GET /admin/mail`, `POST /admin/mail/test`. UI card in Admin › Security & System (`AdminMail.jsx`) shows "Not configured" until SMTP is set
+- **Archiving + retention (specs #44, #45)**: `incidents.archived_at/archived_by` + DB CHECK (only Closed/Rejected), setting `archive.after_days` (default 365). Admin archive/restore (`POST /incidents/:id/archive|unarchive`, restore needs a reason), daily job + `POST /admin/archive/run` under an advisory lock, `GET /admin/archive` summary (active / archived / due / past retention). Lists exclude archived by default (`archived=exclude|include|only`), statistics include them. Timeline + audit (`ARCHIVE_INCIDENT`, `UNARCHIVE_INCIDENT`, `ARCHIVE_RUN`). UI: archive filter on Incidents, archived banner + Archive/Restore on detail, "Archiving & Retention" card in Admin. Nothing is ever deleted automatically (DOUBT-012)
+- **Evidence encryption at rest (spec #27)**: `EncryptedStorage` wrapper in `server/src/config/storage.ts` (AES-256-GCM, storage key as AAD, header `BIRDSEV1`). `EVIDENCE_ENCRYPTION_KEY` (base64, 32 bytes; `npm run keys:evidence`) — **required in production**, set in the local `.env`. Tampered files → download 409 `EVIDENCE_TAMPERED` + audit; swapped-in plaintext refused unless it matches the upload hash; pre-encryption files still readable
+- `API_RATE_LIMIT_PER_MINUTE` env (default 100; local `.env` = 1000 because dev StrictMode + browser tests exceed 100)
+- `getConfig` now lists settings that have no DB row yet (shows their default)
+- Migration `20261009011145_email_outbox_and_archiving` (applied to the dev DB)
+- Tests: `mail-archive.test.ts` (8), `encryption.test.ts` (5) → **103/103 pass**; server typecheck clean; frontend build clean; `npm audit` 0 in both
+- **OpenAPI 3.1 spec — IN PROGRESS, NOT VALID YET**: `server/docs/api/openapi.yaml` written (all routes, schemas, errors, auth/rate-limit docs). Validation with `@apidevtools/swagger-parser` still fails: plain YAML values inside `{ … }` flow mappings that contain commas (e.g. the `Q` parameter `description: Reference number, title, …`) must be quoted. Swagger UI is not wired yet
+
+### Decisions & rationale
+- Self-made i18n (context + JSON-like dictionaries) instead of a library: ~865 strings, no plural rules needed, no new runtime dependency
+- Data entered by users (titles, categories, unit names) is never translated; only interface text and fixed values
+- E-mail via outbox so rolled-back actions never send mail and SMTP outages don't lose messages; minimal content because mail may leave BGB's network
+- Archived = out of working lists, still in statistics and readable; retention only flags records (deletion of evidential records needs a human decision)
+- Encryption wraps the storage interface so the future S3/MinIO driver gets it for free
+
+### Problems / notes
+- Seed incidents and timelines carry **future dates** (e.g. 25-10-2026 while today is 09-10-2026); new timeline entries therefore sort *before* seeded ones and the dashboard trend peaks in October. Consider re-dating the seed relative to "today"
+- Dev DB now has extra test incidents BIRDS-2026-1021 … 1028 from browser test runs
+- The browser test scripts (Playwright, in this session's scratchpad) are not in the repo; worth adding an `e2e/` folder later
+- Uncommitted: all of Session 10's changes — commit when the user asks
+
+### Blockers / waiting on
+- SMTP details (to switch e-mail on), AD/LDAP details (DOUBT-002), hosting decision (DOUBT-010), partial drafts (DOUBT-011), retention disposal rule (DOUBT-012), AV product (DOUBT-009), user target (DOUBT-001)
+
+### Next session — TODO
+1. **Fix `server/docs/api/openapi.yaml` validation** (quote comma-containing values inside flow mappings), then serve it: `GET /api/v1/openapi.json` + Swagger UI at `/api/docs` in development (§27.3). Validate with `npx @apidevtools/swagger-parser`-style check
+2. Update `server/README.md` (mail, archiving, encryption, rate-limit env, OpenAPI) and `BGB/README.md` (Bangla, `i18n:check`)
+3. Deployment pack (spec #56/#27): Nginx config with TLS + `/api` proxy, PM2 ecosystem review, installation guide (`server/docs/installation-guide/`)
+4. Security docs (specs #49/#50): `docs/security/owasp-assessment.md`, `npm audit` evidence; ZAP scan if a tool is available
+5. Documentation set (spec #52): user manual (per role), admin manual, DB schema/ERD
+6. UAT test cases (spec #57, `docs/uat/test-cases.xlsx`), training material outline (spec #53)
+7. S3/MinIO storage driver (spec #33) when an instance is available; customization of form fields (spec #55) if wanted
+8. Consider re-dating seed data; add the Playwright e2e tests to the repo

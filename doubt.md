@@ -35,7 +35,7 @@ The value is written in brackets with three options separated by slashes. This i
 
 **TEC Spec**: #32 — AD/LDAP Integration  
 **Raised on**: 2026-10-08  
-**Status**: OPEN
+**Status**: ASSUMED
 
 ### The ambiguity
 Spec #32 says the system shall be *"capable of integrating with existing BGB Active Directory/LDAP infrastructure."* It is unclear:
@@ -55,13 +55,15 @@ Spec #32 says the system shall be *"capable of integrating with existing BGB Act
 ### Resolution (if resolved)
 *Not yet resolved. Client must provide LDAP server details (URL, base DN, bind credentials) before LDAP integration can be completed and tested.*
 
+**Update 2026-10-09 (Session 10):** Per the user, BGB has not provided directory details yet, so local username/password accounts are the sign-in method (spec #4 marked DONE on that basis). AD/LDAP (spec #32) is deferred and shown in Admin › Security & System as a DEMO card with sample settings. Revisit when BGB supplies the server, bind account and group mapping.
+
 ---
 
 ## DOUBT-003 — Bangla Localization Depth Unclear
 
 **TEC Spec**: #43 — Localization  
 **Raised on**: 2026-10-08  
-**Status**: OPEN
+**Status**: ASSUMED
 
 ### The ambiguity
 Spec #43 reads: *"Interface shall support English and shall be capable of supporting Bangla labels/content where required."*
@@ -82,6 +84,8 @@ The phrase *"where required"* and *"capable of supporting"* is ambiguous:
 
 ### Resolution (if resolved)
 *Not yet resolved. Client must clarify whether a full Bangla UI translation is expected or just Unicode support.*
+
+**Update 2026-10-09 (Session 10):** Implemented: the whole interface (labels, messages, fixed values such as status/severity/role) in English and Bangla with a switcher; data entered by users is shown as entered; exports and e-mails remain English; digits stay Latin. Bangla wording was drafted by the developer and **must be reviewed by a fluent BGB officer** before the TEC demonstration (`BGB/src/i18n/bn.js`).
 
 ---
 
@@ -275,3 +279,24 @@ Option A. The wizard asks for the same fields on "Save as Draft" (sub-category a
 
 ### Resolution (if resolved)
 *Ask BGB whether partial drafts are needed by field units.*
+
+---
+## DOUBT-012 — Retention Period: Flag or Dispose?
+
+**TEC Spec**: #44 — Data Retention; #45 — Data Archiving
+**Raised on**: 2026-10-09
+**Status**: ASSUMED
+
+### The ambiguity
+Spec #44 asks for a "configurable data retention policy" but doesn't say what happens when a record passes its retention period. Incident records and evidence may be legal evidence; deleting them automatically could breach BGB's records rules.
+
+### Options considered
+1. Option A — Flag only: count/list archived records past `data.retention_days` for human review; never delete automatically.
+2. Option B — Automatic disposal after retention, with an audit entry.
+3. Option C — Disposal on request, by an HQ Administrator (two-person approval), with a disposal certificate in the audit log.
+
+### Assumption made (if proceeding)
+Option A. Closed/Rejected incidents are archived after `archive.after_days` (default 365); archived records past `data.retention_days` (default 3650) are counted as "Past retention" in Admin › Security & System. Nothing is deleted. Option C can be added if BGB wants disposal.
+
+### Resolution (if resolved)
+*Ask BGB which records rules apply and who may authorise disposal.*

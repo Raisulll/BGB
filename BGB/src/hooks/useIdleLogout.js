@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
+import { useI18n } from '../i18n/I18nContext';
 import { lastActivityAt, markActivity } from '../utils/activity';
 
 const ACTIVITY_EVENTS = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'wheel'];
@@ -15,6 +16,7 @@ const CHECK_INTERVAL_MS = 15000;
 export default function useIdleLogout() {
   const { currentUser, policy, logout } = useApp();
   const { showToast } = useToast();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const timeoutMin = Number(policy.sessionTimeoutMinutes);
 
@@ -36,7 +38,7 @@ export default function useIdleLogout() {
       if (Date.now() - lastActivityAt() < limitMs) return;
       clearInterval(timer);
       logout('timeout');
-      showToast(`Session expired after ${timeoutMin} minutes of inactivity`, 'warning');
+      showToast(t('session.idle', { n: timeoutMin }), 'warning');
       navigate('/login', { replace: true });
     };
 
@@ -46,5 +48,5 @@ export default function useIdleLogout() {
       ACTIVITY_EVENTS.forEach((e) => window.removeEventListener(e, touch));
       clearInterval(timer);
     };
-  }, [currentUser, timeoutMin, logout, showToast, navigate]);
+  }, [currentUser, timeoutMin, logout, showToast, navigate, t]);
 }

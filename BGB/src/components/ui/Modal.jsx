@@ -1,7 +1,9 @@
 import { useEffect } from 'react';
+import { useI18n } from '../../i18n/I18nContext';
 
 /** Centered dialog (bottom sheet on phones). Escape or a backdrop click closes it unless `busy`. */
 export default function Modal({ open, title, icon, onClose, busy = false, children, maxWidth = 'max-w-md' }) {
+  const { t } = useI18n();
   useEffect(() => {
     if (!open) return;
     const onKey = (e) => e.key === 'Escape' && !busy && onClose();
@@ -18,7 +20,7 @@ export default function Modal({ open, title, icon, onClose, busy = false, childr
             {icon && <i className={`fas ${icon} text-bgb-600`} />}
             {title}
           </h3>
-          <button type="button" onClick={onClose} disabled={busy} className="text-gray-400 hover:text-gray-600" aria-label="Close">
+          <button type="button" onClick={onClose} disabled={busy} className="text-gray-400 hover:text-gray-600" aria-label={t('common.close')}>
             <i className="fas fa-times" />
           </button>
         </div>
@@ -30,19 +32,20 @@ export default function Modal({ open, title, icon, onClose, busy = false, childr
 
 /** Shows a one-time secret (temporary password) with a copy button. */
 export function OneTimeSecret({ label, value }) {
+  const { t } = useI18n();
   const copy = () => navigator.clipboard?.writeText(value).catch(() => {});
   return (
     <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
       <p className="mb-1 text-xs font-bold text-amber-800">{label}</p>
       <div className="flex items-center gap-2">
         <code className="flex-1 break-all rounded bg-white px-2 py-1.5 font-mono text-sm text-gray-900 border border-amber-200">{value}</code>
-        <button type="button" onClick={copy} className="btn btn-secondary px-3 text-xs" aria-label="Copy to clipboard">
+        <button type="button" onClick={copy} className="btn btn-secondary px-3 text-xs" aria-label={t('common.copy')}>
           <i className="fas fa-copy" />
         </button>
       </div>
       <p className="mt-2 text-[11px] text-amber-700">
         <i className="fas fa-exclamation-triangle mr-1" />
-        Shown once. Hand it to the user through a secure channel; they must change it at first sign-in.
+        {t('ui.secretOnce')}
       </p>
     </div>
   );

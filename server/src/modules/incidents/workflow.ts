@@ -28,6 +28,10 @@ export const WORKFLOW_ACTIONS = Object.keys(WORKFLOW) as WorkflowAction[];
 export const EDITABLE_STATUSES = ['Draft', 'Returned'] as const;
 export const isEditableStatus = (status: string) => (EDITABLE_STATUSES as readonly string[]).includes(status);
 
+/** Final statuses; only these can be archived (spec #45, DB CHECK incidents_archive_final_check). */
+export const ARCHIVABLE_STATUSES = ['Closed', 'Rejected'] as const;
+export const isArchivableStatus = (status: string) => (ARCHIVABLE_STATUSES as readonly string[]).includes(status);
+
 export const SEVERITIES = ['Low', 'Medium', 'High', 'Critical'] as const;
 export const STATUSES = ['Draft', 'Submitted', 'Reviewed', 'Verified', 'Approved', 'Closed', 'Returned', 'Rejected'] as const;
 

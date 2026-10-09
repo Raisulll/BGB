@@ -25,12 +25,12 @@ export const SEVERITY_HEX = { Low: '#22c55e', Medium: '#eab308', High: '#f97316'
 // decided by the server, which returns `actions` / `canEdit` on each incident.
 export const isAdmin = (user) => user?.role === 'HQ Administrator';
 
-/** Spec #29 — returns an error message, or null if the password satisfies the policy. */
-export const validatePassword = (pwd, policy) => {
-  if (pwd.length < policy.minLength) return `Password must be at least ${policy.minLength} characters`;
-  if (policy.requireUppercase && !/[A-Z]/.test(pwd)) return 'Password must include an uppercase letter';
-  if (policy.requireNumber && !/[0-9]/.test(pwd)) return 'Password must include a number';
-  if (policy.requireSpecial && !/[^A-Za-z0-9]/.test(pwd)) return 'Password must include a special character';
+/** Spec #29 — returns a (translated) error message, or null if the password satisfies the policy. */
+export const validatePassword = (pwd, policy, t) => {
+  if (pwd.length < policy.minLength) return t('password.tooShort', { n: policy.minLength });
+  if (policy.requireUppercase && !/[A-Z]/.test(pwd)) return t('password.needUpper');
+  if (policy.requireNumber && !/[0-9]/.test(pwd)) return t('password.needNumber');
+  if (policy.requireSpecial && !/[^A-Za-z0-9]/.test(pwd)) return t('password.needSpecial');
   return null;
 };
 
@@ -62,17 +62,17 @@ export function formatDateTime(value, { withSeconds = false } = {}) {
   return `${p.day}-${p.month}-${p.year} ${p.hour}:${p.minute}${withSeconds ? `:${p.second}` : ''}`;
 }
 
-/** Short relative time for feeds ("5 min ago"), falling back to the full date. */
-export function timeAgo(value) {
-  const t = new Date(value).getTime();
-  if (isNaN(t)) return '';
-  const mins = Math.round((Date.now() - t) / 60000);
-  if (mins < 1) return 'Just now';
-  if (mins < 60) return `${mins} min ago`;
+/** Short relative time for feeds ("5 min ago"), falling back to the full date. Pass the i18n `t`. */
+export function timeAgo(value, t) {
+  const ts = new Date(value).getTime();
+  if (isNaN(ts)) return '';
+  const mins = Math.round((Date.now() - ts) / 60000);
+  if (mins < 1) return t('common.justNow');
+  if (mins < 60) return t('common.minAgo', { n: mins });
   const hrs = Math.round(mins / 60);
-  if (hrs < 24) return `${hrs} hour${hrs === 1 ? '' : 's'} ago`;
+  if (hrs < 24) return t('common.hoursAgo', { n: hrs });
   const days = Math.round(hrs / 24);
-  if (days < 7) return `${days} day${days === 1 ? '' : 's'} ago`;
+  if (days < 7) return t('common.daysAgo', { n: days });
   return formatDateTime(value);
 }
 

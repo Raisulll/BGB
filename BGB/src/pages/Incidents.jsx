@@ -7,13 +7,15 @@ import Card from '../components/ui/Card';
 import ErrorState from '../components/ui/ErrorState';
 import IncidentList from '../components/incidents/IncidentList';
 import Spinner from '../components/ui/Spinner';
+import { useI18n } from '../i18n/I18nContext';
 
 // Specs #15, #16 — search by reference number and filter; the server filters, scopes and paginates.
-const EMPTY_FILTERS = { q: '', status: '', category: '', severity: '', date: '' };
+const EMPTY_FILTERS = { q: '', status: '', category: '', severity: '', date: '', archived: '' };
 const PAGE_SIZE = 25;
 
 export default function Incidents() {
   const { meta, hasPermission } = useApp();
+  const { t, tv } = useI18n();
   const [params] = useSearchParams();
   // Links from the dashboard and notifications can pre-set filters (?category=…&status=…)
   const [filters, setFilters] = useState(() => {
@@ -39,10 +41,11 @@ export default function Incidents() {
       severity: filters.severity,
       dateFrom: filters.date,
       dateTo: filters.date,
+      archived: filters.archived, // '' = active records only (spec #45)
       page,
       pageSize: PAGE_SIZE,
     }),
-    [q, filters.status, filters.category, filters.severity, filters.date, page],
+    [q, filters.status, filters.category, filters.severity, filters.date, filters.archived, page],
   );
   const { data, loading, error, message, reload, setData } = useApi((signal) => incidentsApi.list(query, signal), [query]);
 
@@ -65,7 +68,7 @@ export default function Incidents() {
               type="search"
               value={filters.q}
               onChange={set('q')}
-              placeholder="Search by reference, title, description or location…"
+              placeholder={t('incidents.searchPh')}
               className="form-input pl-10"
             />
           </div>
@@ -76,25 +79,38 @@ export default function Incidents() {
             aria-controls="incident-filters"
           >
             <i className="fas fa-sliders-h" />
-            <span className="hidden sm:inline">Filters</span>
+            <span className="hidden sm:inline">{t('incidents.filters')}</span>
             {activeCount > (filters.q ? 1 : 0) && <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-bgb-500" />}
           </button>
         </div>
 
-        <div id="incident-filters" className={`${showMore ? 'grid' : 'hidden'} mt-3 grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3 lg:grid lg:grid-cols-5`}>
-          <select id="filter-status" value={filters.status} onChange={set('status')} className="form-input" aria-label="Status">
-            <option value="">All Status</option>
-            {(meta?.statuses || []).map((s) => <option key={s}>{s}</option>)}
+        <div id="incident-filters" className={`${showMore ? 'grid' : 'hidden'} mt-3 grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3 lg:grid lg:grid-cols-6`}>
+          <select id="filter-status" value={filters.status} onChange={set('status')} className="form-input" aria-label={t('common.status')}>
+            <option value="">{t('common.allStatus')}</option>
+            {(meta?.statuses || []).map((s) => (
+              <option key={s} value={s}>
+                {tv('status', s)}
+              </option>
+            ))}
           </select>
-          <select id="filter-category" value={filters.category} onChange={set('category')} className="form-input" aria-label="Category">
-            <option value="">All Categories</option>
+          <select id="filter-category" value={filters.category} onChange={set('category')} className="form-input" aria-label={t('common.category')}>
+            <option value="">{t('common.allCategories')}</option>
             {(meta?.categories || []).map((c) => <option key={c.id}>{c.name}</option>)}
           </select>
-          <select id="filter-severity" value={filters.severity} onChange={set('severity')} className="form-input" aria-label="Severity">
-            <option value="">All Severity</option>
-            {(meta?.severities || []).map((s) => <option key={s}>{s}</option>)}
+          <select id="filter-severity" value={filters.severity} onChange={set('severity')} className="form-input" aria-label={t('common.severity')}>
+            <option value="">{t('common.allSeverity')}</option>
+            {(meta?.severities || []).map((s) => (
+              <option key={s} value={s}>
+                {tv('severity', s)}
+              </option>
+            ))}
           </select>
-          <input id="filter-date" type="date" value={filters.date} onChange={set('date')} className="form-input" aria-label="Date" />
+          <select id="filter-archived" value={filters.archived} onChange={set('archived')} className="form-input" aria-label={t('incidents.archiveFilter')}>
+            <option value="">{t('incidents.activeOnly')}</option>
+            <option value="only">{t('incidents.archivedOnly')}</option>
+            <option value="include">{t('incidents.allRecords')}</option>
+          </select>
+          <input id="filter-date" type="date" value={filters.date} onChange={set('date')} className="form-input" aria-label={t('incidents.dateFilter')} />
           <button
             onClick={() => {
               setFilters(EMPTY_FILTERS);
@@ -103,19 +119,19 @@ export default function Incidents() {
             disabled={!activeCount}
             className="btn btn-secondary"
           >
-            <i className="fas fa-times" /> Clear
+            <i className="fas fa-times" /> {t('common.clear')}
           </button>
         </div>
       </Card>
 
       {/* List */}
       <Card
-        title={`Incidents (${total})`}
+        title={t('incidents.listTitle', { n: total })}
         bodyClassName=""
         actions={
           hasPermission(null, 'create') && (
             <Link to="/incidents/new" className="btn btn-primary w-full sm:w-auto">
-              <i className="fas fa-plus" /> New Incident
+              <i className="fas fa-plus" /> {t('incidents.new')}
             </Link>
           )
         }
@@ -131,15 +147,13 @@ export default function Incidents() {
         )}
 
         {data && totalPages > 1 && (
-          <nav className="flex items-center justify-between gap-2 border-t border-gray-100 px-4 py-3 text-sm" aria-label="Pagination">
-            <span className="text-gray-500">
-              Page {page} of {totalPages}
-            </span>
+          <nav className="flex items-center justify-between gap-2 border-t border-gray-100 px-4 py-3 text-sm" aria-label={t('common.pagination')}>
+            <span className="text-gray-500">{t('common.pageOf', { page, total: totalPages })}</span>
             <div className="flex gap-2">
-              <button onClick={() => setPage((p) => p - 1)} disabled={page <= 1 || loading} className="btn btn-secondary px-3" aria-label="Previous page">
+              <button onClick={() => setPage((p) => p - 1)} disabled={page <= 1 || loading} className="btn btn-secondary px-3" aria-label={t('common.prevPage')}>
                 <i className="fas fa-chevron-left" />
               </button>
-              <button onClick={() => setPage((p) => p + 1)} disabled={page >= totalPages || loading} className="btn btn-secondary px-3" aria-label="Next page">
+              <button onClick={() => setPage((p) => p + 1)} disabled={page >= totalPages || loading} className="btn btn-secondary px-3" aria-label={t('common.nextPage')}>
                 <i className="fas fa-chevron-right" />
               </button>
             </div>

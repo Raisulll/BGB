@@ -7,9 +7,11 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "i18n:check": "node scripts/check-i18n.mjs"
   },
   "dependencies": {
+    "@fontsource/noto-sans-bengali": "^5.2.8",
     "@fortawesome/fontawesome-free": "^6.7.2",
     "chart.js": "^4.5.1",
     "leaflet": "^1.9.4",

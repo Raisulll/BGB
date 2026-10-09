@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
+import { useI18n } from '../../i18n/I18nContext';
 
 /**
  * Modal that asks for a written reason before an action (return / reject an incident, remove
  * evidence). The reason is stored in the incident timeline and the audit log (specs #12, #24).
  */
-export default function ReasonDialog({ open, title, label = 'Reason', confirmLabel = 'Confirm', confirmClass = 'btn-primary', required = true, busy = false, onConfirm, onCancel }) {
+export default function ReasonDialog({ open, title, label, confirmLabel, confirmClass = 'btn-primary', required = true, busy = false, onConfirm, onCancel }) {
+  const { t } = useI18n();
   const [reason, setReason] = useState('');
   const ref = useRef(null);
 
@@ -34,16 +36,16 @@ export default function ReasonDialog({ open, title, label = 'Reason', confirmLab
           }}
         >
           <label htmlFor="reason-dialog-text" className="form-label">
-            {label}
+            {label || t('common.reason')}
             {required && <span className="text-red-500"> *</span>}
           </label>
           <textarea id="reason-dialog-text" ref={ref} rows={4} maxLength={2000} value={reason} onChange={(e) => setReason(e.target.value)} className="form-input" />
           <div className="mt-4 flex justify-end gap-2">
             <button type="button" onClick={onCancel} disabled={busy} className="btn btn-secondary">
-              Cancel
+              {t('common.cancel')}
             </button>
             <button type="submit" disabled={busy || (required && !trimmed)} className={`btn ${confirmClass}`}>
-              {busy && <i className="fas fa-spinner fa-spin" />} {confirmLabel}
+              {busy && <i className="fas fa-spinner fa-spin" />} {confirmLabel || t('ui.confirm')}
             </button>
           </div>
         </form>

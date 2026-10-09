@@ -63,6 +63,8 @@ export const listIncidentsSchema = paginationSchema.extend({
   dateFrom: isoDate.optional(),
   dateTo: isoDate.optional(),
   createdBy: trimmed(10).optional(), // user id, or "me"
+  // Spec #45 — archived records: lists exclude them unless asked; statistics include them
+  archived: z.enum(['exclude', 'include', 'only']).optional(),
   sort: z.enum(['createdAt', 'incidentDate', 'id']).default('createdAt'),
   order: z.enum(['asc', 'desc']).default('desc'),
 });

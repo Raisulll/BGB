@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
+import { Readable } from 'node:stream';
 import { env } from '../../config/env.js';
 import { logger } from '../../config/logger.js';
-import { storage } from '../../config/storage.js';
+import { readObject, storage, storageEncrypted } from '../../config/storage.js';
 import { prisma } from '../../db.js';
 import { AppError, badRequest, forbidden, notFound } from '../../utils/errors.js';
 import type { RequestContext } from '../../utils/requestContext.js';
@@ -187,8 +188,28 @@ const INLINE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'applicati
 
 export async function openEvidence(user: AuthUser, incidentId: string, evidenceId: number, inline: boolean, ctx: RequestContext) {
   const { ev } = await loadEvidence(user, incidentId, evidenceId);
-  const stream = await storage.get(ev.storagePath);
-  if (!stream) throw new AppError(404, 'FILE_UNAVAILABLE', 'The file for this evidence record is not in storage');
+  let object: Awaited<ReturnType<typeof readObject>> = null;
+  let tampered = false;
+  try {
+    object = await readObject(ev.storagePath);
+    // With encryption on, a plaintext object is accepted only as a pre-encryption file whose
+    // content still matches its upload hash; otherwise it may have been swapped in on disk.
+    if (object && storageEncrypted && !object.encrypted && ev.sha256 && sha256(object.data) !== ev.sha256) tampered = true;
+  } catch {
+    tampered = true; // encrypted object failed authentication
+  }
+  if (tampered) {
+    await writeAudit({
+      action: 'EVIDENCE_INTEGRITY_FAILURE',
+      username: user.username,
+      userId: user.id,
+      details: `${incidentId}: ${ev.originalName} (#${ev.id}) failed its integrity check on download; not served`,
+      ctx,
+    });
+    throw new AppError(409, 'EVIDENCE_TAMPERED', 'This evidence file failed its integrity check and cannot be downloaded');
+  }
+  if (!object) throw new AppError(404, 'FILE_UNAVAILABLE', 'The file for this evidence record is not in storage');
+  const stream = Readable.from(object.data);
 
   await writeAudit({
     action: 'DOWNLOAD_EVIDENCE',
@@ -210,7 +231,14 @@ export async function openEvidence(user: AuthUser, incidentId: string, evidenceI
 /** Chain of custody: recompute the stored file's SHA-256 and compare with the upload-time hash. */
 export async function verifyEvidence(user: AuthUser, incidentId: string, evidenceId: number, ctx: RequestContext) {
   const { ev } = await loadEvidence(user, incidentId, evidenceId);
-  const data = await storage.read(ev.storagePath);
+  let data: Buffer | null;
+  let tampered = false;
+  try {
+    data = (await readObject(ev.storagePath))?.data ?? null;
+  } catch {
+    data = null; // encrypted file failed authentication (altered on disk)
+    tampered = true;
+  }
   const actual = data ? sha256(data) : null;
   const intact = !!data && actual === ev.sha256 && data.length === Number(ev.fileSize);
 
@@ -218,10 +246,10 @@ export async function verifyEvidence(user: AuthUser, incidentId: string, evidenc
     action: intact ? 'VERIFY_EVIDENCE' : 'EVIDENCE_INTEGRITY_FAILURE',
     username: user.username,
     userId: user.id,
-    details: `${incidentId}: ${ev.originalName} (#${ev.id}) ${intact ? 'hash verified' : data ? 'HASH MISMATCH' : 'file missing'}`,
+    details: `${incidentId}: ${ev.originalName} (#${ev.id}) ${intact ? 'hash verified' : tampered ? 'DECRYPTION FAILED (tampered)' : data ? 'HASH MISMATCH' : 'file missing'}`,
     ctx,
   });
-  return { id: ev.id, name: ev.originalName, intact, fileFound: !!data, expectedSha256: ev.sha256, actualSha256: actual };
+  return { id: ev.id, name: ev.originalName, intact, fileFound: !!data || tampered, expectedSha256: ev.sha256, actualSha256: actual };
 }
 
 // ---------------------------------------------------------------------------

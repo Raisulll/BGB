@@ -21,6 +21,7 @@ export const CONFIG_DEFAULTS: Record<string, ConfigSpec> = {
   'session.timeout_minutes': { value: '30', description: 'Idle session timeout (minutes)', type: 'int', min: 5, max: 480 },
   'session.single_session': { value: 'true', description: 'A new login ends the user\'s other sessions', type: 'bool' },
   'data.retention_days': { value: '3650', description: '10-year retention policy', type: 'int', min: 365, max: 36500 },
+  'archive.after_days': { value: '365', description: 'Archive Closed/Rejected incidents not updated for this many days', type: 'int', min: 30, max: 3650 },
   'backup.frequency_hours': { value: '24', description: 'Automated backup interval (hours)', type: 'int', min: 1, max: 168 },
   // Incident reference counters are per year: 'incident.next_id.<YYYY>' (created on first use; see
   // allocateIncidentId). They are read-only through the API.

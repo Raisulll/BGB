@@ -2,20 +2,24 @@ import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
+import { useI18n } from '../i18n/I18nContext';
+import LanguageSwitcher from '../components/layout/LanguageSwitcher';
 
 const DEMO_ACCOUNTS = [
-  { label: 'HQ Admin', username: 'hq_admin', password: 'Admin@123', role: 'HQ Administrator' },
-  { label: 'Sector Officer', username: 'sector_off', password: 'Sector@123', role: 'Sector-7 HQ' },
-  { label: 'Battalion Op', username: 'batt_op', password: 'Batt@123', role: '17 BGB Unit' },
-  { label: 'Verifier', username: 'verifier', password: 'Verify@123', role: 'Approver' },
-  { label: 'Auditor', username: 'auditor', password: 'Audit@123', role: 'Audit Log' },
+  { key: 'admin', username: 'hq_admin', password: 'Admin@123' },
+  { key: 'sector', username: 'sector_off', password: 'Sector@123' },
+  { key: 'operator', username: 'batt_op', password: 'Batt@123' },
+  { key: 'verifier', username: 'verifier', password: 'Verify@123' },
+  { key: 'auditor', username: 'auditor', password: 'Audit@123' },
 ];
 // Demo shortcuts never ship to production unless explicitly enabled for a TEC demonstration (spec #49)
 const SHOW_DEMO_ACCOUNTS = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEMO_ACCOUNTS === 'true';
+const IS_HTTPS = typeof window !== 'undefined' && window.location.protocol === 'https:';
 
 export default function Login() {
   const { login } = useApp();
   const { showToast } = useToast();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -29,7 +33,7 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!username || !password) {
-      showToast('Please enter username and password.', 'error');
+      showToast(t('login.missing'), 'error');
       return;
     }
     setSubmitting(true);
@@ -37,7 +41,7 @@ export default function Login() {
     setSubmitting(false);
     if (user) {
       setPassword('');
-      showToast(`Welcome back, ${user.name}!`, 'success');
+      showToast(t('login.welcome', { name: user.name }), 'success');
       navigate(user.mustChangePassword ? '/change-password' : location.state?.from?.pathname || '/', { replace: true });
     } else {
       showToast(error, 'error');
@@ -47,7 +51,7 @@ export default function Login() {
   const fillDemo = (acc) => {
     setUsername(acc.username);
     setPassword(acc.password);
-    showToast(`Loaded ${acc.label} credentials`, 'info');
+    showToast(t('login.demoLoaded', { label: t(`login.demo.${acc.key}`) }), 'info');
   };
 
   return (
@@ -74,19 +78,20 @@ export default function Login() {
                   <h1 className="text-lg sm:text-2xl font-black tracking-widest text-white uppercase">BIRDS</h1>
                   <span className="rounded-md bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300 ring-1 ring-emerald-400/30">v2.4 HQ</span>
                 </div>
-                <p className="text-[11px] sm:text-sm font-semibold text-bgb-200 tracking-wide">Border Guard Bangladesh</p>
+                <p className="text-[11px] sm:text-sm font-semibold text-bgb-200 tracking-wide">{t('login.org')}</p>
               </div>
             </div>
 
             {/* Mobile / Tablet Controls */}
             <div className="flex items-center gap-2">
+              <LanguageSwitcher tone="dark" />
               <button
                 type="button"
                 onClick={() => setShowBannerInfo((prev) => !prev)}
                 className="md:hidden flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-900/60 px-3 py-1 text-[11px] font-bold text-emerald-200 hover:bg-emerald-800/60 transition-all shadow-sm"
               >
                 <i className="fas fa-info-circle text-emerald-400" />
-                <span>{showBannerInfo ? 'Hide Overview' : 'Overview'}</span>
+                <span>{showBannerInfo ? t('login.hideOverview') : t('login.overview')}</span>
                 <i className={`fas fa-chevron-${showBannerInfo ? 'up' : 'down'} text-[9px]`} />
               </button>
 
@@ -95,7 +100,7 @@ export default function Login() {
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
                 </span>
-                <span>COMMAND PORTAL</span>
+                <span>{t('login.portal')}</span>
               </div>
             </div>
           </div>
@@ -104,17 +109,17 @@ export default function Login() {
           <div className="my-3 md:my-auto space-y-2 sm:space-y-4 max-w-xl">
             <div className="hidden md:inline-flex items-center gap-2 rounded-full border border-bgb-300/30 bg-white/10 px-3.5 py-1 text-xs font-bold text-bgb-200 backdrop-blur-md tracking-wider">
               <i className="fas fa-shield-alt text-emerald-400 text-xs" />
-              NATIONAL OPERATIONAL SURVEILLANCE & LOGGING
+              {t('login.tagline')}
             </div>
 
             <h2 className="text-base sm:text-2xl md:text-4xl lg:text-5xl font-extrabold leading-snug sm:leading-tight text-white">
-              Border Incident Reporting &amp; Documentation System
+              {t('login.systemName')}
             </h2>
 
             {/* Collapsible Overview & Feature Badges on Mobile/Tablet */}
             <div className={`space-y-3 transition-all duration-300 ${showBannerInfo ? 'block' : 'hidden md:block'}`}>
               <p className="text-xs sm:text-sm leading-relaxed text-bgb-100/90 font-medium pt-1">
-                Integrated Command Network for real-time incident logging, GIS spatial tracking, and multi-tier approval workflows across Headquarters &amp; Sector Posts.
+                {t('login.intro')}
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
@@ -123,8 +128,8 @@ export default function Login() {
                     <i className="fas fa-map-marked-alt" />
                   </div>
                   <div className="min-w-0">
-                    <div className="text-[11px] font-bold text-white">GIS Tracking</div>
-                    <div className="text-[9px] text-emerald-200/70 font-mono truncate">Real-time Map</div>
+                    <div className="text-[11px] font-bold text-white">{t('login.featGis')}</div>
+                    <div className="text-[9px] text-emerald-200/70 font-mono truncate">{t('login.featGisSub')}</div>
                   </div>
                 </div>
 
@@ -133,8 +138,8 @@ export default function Login() {
                     <i className="fas fa-tasks" />
                   </div>
                   <div className="min-w-0">
-                    <div className="text-[11px] font-bold text-white">Multi-Tier Approvals</div>
-                    <div className="text-[9px] text-emerald-200/70 font-mono truncate">HQ &amp; Sector</div>
+                    <div className="text-[11px] font-bold text-white">{t('login.featApproval')}</div>
+                    <div className="text-[9px] text-emerald-200/70 font-mono truncate">{t('login.featApprovalSub')}</div>
                   </div>
                 </div>
 
@@ -143,8 +148,8 @@ export default function Login() {
                     <i className="fas fa-user-shield" />
                   </div>
                   <div className="min-w-0">
-                    <div className="text-[11px] font-bold text-white">Audit Security</div>
-                    <div className="text-[9px] text-emerald-200/70 font-mono truncate">Encrypted Logs</div>
+                    <div className="text-[11px] font-bold text-white">{t('login.featAudit')}</div>
+                    <div className="text-[9px] text-emerald-200/70 font-mono truncate">{t('login.featAuditSub')}</div>
                   </div>
                 </div>
               </div>
@@ -153,9 +158,9 @@ export default function Login() {
 
           {/* Bottom Footer Information (Desktop only) */}
           <div className="hidden md:flex items-center justify-between border-t border-emerald-500/20 pt-3 text-xs text-bgb-200/70 font-medium">
-            <span>&copy; {new Date().getFullYear()} Headquarters BGB</span>
+            <span>&copy; {new Date().getFullYear()} {t('login.copyright')}</span>
             <span className="flex items-center gap-1.5 text-emerald-300 font-mono text-[10px]">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" /> SYSTEM READY
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" /> {t('login.ready')}
             </span>
           </div>
         </div>
@@ -170,18 +175,20 @@ export default function Login() {
                   <img src="/bgb.png" alt="BGB Emblem" className="h-5 w-auto" />
                 </div>
                 <span className="text-xs font-extrabold tracking-wider text-bgb-900 uppercase">
-                  BGB Portal Sign In
+                  {t('login.signInTitle')}
                 </span>
               </div>
-              <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200/70 flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> TLS 1.3 Active
-              </span>
+              {IS_HTTPS && (
+                <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200/70 flex items-center gap-1">
+                  <i className="fas fa-lock text-[9px]" /> {t('login.secure')}
+                </span>
+              )}
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label htmlFor="login-username" className="form-label text-xs font-bold text-gray-700 mb-1">
-                  Username / Service ID
+                  {t('login.username')}
                 </label>
                 <div className="relative">
                   <i className="fas fa-user pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-bgb-600 text-xs" />
@@ -189,7 +196,7 @@ export default function Login() {
                     id="login-username"
                     type="text"
                     className="form-input pl-10 text-sm border-gray-300 focus:border-bgb-600 focus:ring-4 focus:ring-bgb-600/15"
-                    placeholder="Enter username (e.g. hq_admin)"
+                    placeholder={t('login.usernamePh')}
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     required
@@ -200,17 +207,17 @@ export default function Login() {
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label htmlFor="login-password" className="form-label text-xs font-bold text-gray-700">
-                    Account Password
+                    {t('login.password')}
                   </label>
                   <a
                     href="#"
                     onClick={(e) => {
                       e.preventDefault();
-                      showToast('Contact HQ Administrator for password reset.', 'info');
+                      showToast(t('login.forgotHint'), 'info');
                     }}
                     className="text-xs font-bold text-bgb-700 hover:text-bgb-900 hover:underline"
                   >
-                    Forgot?
+                    {t('login.forgot')}
                   </a>
                 </div>
                 <div className="relative">
@@ -219,7 +226,7 @@ export default function Login() {
                     id="login-password"
                     type={showPassword ? 'text' : 'password'}
                     className="form-input pl-10 pr-10 text-sm border-gray-300 focus:border-bgb-600 focus:ring-4 focus:ring-bgb-600/15"
-                    placeholder="Enter account password"
+                    placeholder={t('login.passwordPh')}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -227,6 +234,7 @@ export default function Login() {
                   <button
                     type="button"
                     onClick={() => setShowPassword((s) => !s)}
+                    aria-label={showPassword ? t('login.hidePassword') : t('login.showPassword')}
                     className="absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center text-gray-400 hover:text-gray-600 transition-colors"
                   >
                     <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'} text-xs`} />
@@ -242,11 +250,11 @@ export default function Login() {
               >
                 {submitting ? (
                   <>
-                    <i className="fas fa-spinner fa-spin mr-1 text-xs" /> Verifying…
+                    <i className="fas fa-spinner fa-spin mr-1 text-xs" /> {t('login.verifying')}
                   </>
                 ) : (
                   <>
-                    Sign In to System <i className="fas fa-arrow-right ml-1 text-xs" />
+                    {t('login.submit')} <i className="fas fa-arrow-right ml-1 text-xs" />
                   </>
                 )}
               </button>
@@ -261,7 +269,7 @@ export default function Login() {
                 className="flex w-full items-center justify-between text-xs font-bold text-gray-600 hover:text-bgb-800 transition-colors"
               >
                 <span className="flex items-center gap-1.5">
-                  <i className="fas fa-key text-bgb-600 text-xs" /> Quick Demo Accounts
+                  <i className="fas fa-key text-bgb-600 text-xs" /> {t('login.demoAccounts')}
                 </span>
                 <i className={`fas fa-chevron-${showDemo ? 'up' : 'down'} text-[10px] text-gray-400`} />
               </button>
@@ -275,7 +283,7 @@ export default function Login() {
                       onClick={() => fillDemo(acc)}
                       className="rounded-xl border border-bgb-200/80 bg-bgb-50/60 p-2.5 text-left text-[11px] transition-all hover:bg-bgb-100/80 hover:border-bgb-300"
                     >
-                      <span className="font-bold block text-bgb-900">{acc.label}</span>
+                      <span className="font-bold block text-bgb-900">{t(`login.demo.${acc.key}`)}</span>
                       <span className="text-gray-500 font-mono text-[10px] truncate block">{acc.username}</span>
                     </button>
                   ))}
@@ -289,7 +297,7 @@ export default function Login() {
                       onClick={() => fillDemo(acc)}
                       className="rounded-lg bg-bgb-50 px-2.5 py-1 text-[11px] font-semibold text-bgb-800 border border-bgb-200/60 hover:bg-bgb-100 hover:border-bgb-300 transition-all"
                     >
-                      {acc.label}
+                      {t(`login.demo.${acc.key}`)}
                     </button>
                   ))}
                 </div>

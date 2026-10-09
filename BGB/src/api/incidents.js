@@ -35,3 +35,7 @@ export const removeEvidence = (id, eid, reason) =>
 
 // ---- GIS (§19.9) ----
 export const gis = (query) => api('/gis/incidents', { query });
+
+// ---- Archiving (spec #45, HQ administrators) ----
+export const archive = (id) => api(`/incidents/${encodeURIComponent(id)}/archive`, { method: 'POST' });
+export const restore = (id, notes) => api(`/incidents/${encodeURIComponent(id)}/unarchive`, { method: 'POST', body: { notes } });

@@ -4,6 +4,7 @@ import { Doughnut } from 'react-chartjs-2';
 import { legendPosition, PALETTE } from '../../lib/chart';
 import useMediaQuery from '../../hooks/useMediaQuery';
 import Card from '../ui/Card';
+import { useI18n } from '../../i18n/I18nContext';
 
 const CATEGORY_META = {
   'Smuggling': { icon: 'fa-box-open', color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200' },
@@ -21,6 +22,7 @@ export default function DashboardCategoryCard({ categories = [] }) {
   const [activeCategory, setActiveCategory] = useState(null);
   const isNarrow = useMediaQuery('(max-width: 639px)');
   const navigate = useNavigate();
+  const { t } = useI18n();
   const fontSize = isNarrow ? 10 : 12;
 
   const categoryStats = useMemo(() => {
@@ -78,7 +80,7 @@ export default function DashboardCategoryCard({ categories = [] }) {
 
   return (
     <Card
-      title="Incidents by Category"
+      title={t('dash.catTitle')}
       icon="fa-chart-pie"
       actions={
         <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-xs font-semibold">
@@ -88,7 +90,7 @@ export default function DashboardCategoryCard({ categories = [] }) {
               viewMode === 'chart' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'
             }`}
           >
-            <i className="fas fa-chart-pie mr-1 text-[10px]" /> Chart
+            <i className="fas fa-chart-pie mr-1 text-[10px]" /> {t('dash.chart')}
           </button>
           <button
             onClick={() => setViewMode('list')}
@@ -96,7 +98,7 @@ export default function DashboardCategoryCard({ categories = [] }) {
               viewMode === 'list' ? 'bg-white font-bold text-emerald-700 shadow-xs' : 'text-slate-500 hover:text-slate-800'
             }`}
           >
-            <i className="fas fa-list-ul mr-1 text-[10px]" /> Breakdown
+            <i className="fas fa-list-ul mr-1 text-[10px]" /> {t('dash.breakdown')}
           </button>
         </div>
       }
@@ -112,16 +114,16 @@ export default function DashboardCategoryCard({ categories = [] }) {
             <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 shadow-xs animate-fade-in">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-xs text-slate-900">{activeCategory} Breakdown:</span>
+                  <span className="font-bold text-xs text-slate-900">{t('dash.catBreakdown', { name: activeCategory })}</span>
                   <span className="text-[11px] text-slate-600">
-                    {categoryStats.map[activeCategory].count} incidents
+                    {t('dash.nIncidents', { n: categoryStats.map[activeCategory].count })}
                   </span>
                 </div>
                 <button
                   onClick={() => navigate(`/incidents?category=${encodeURIComponent(activeCategory)}`)}
                   className="text-[11px] font-bold text-emerald-700 hover:underline flex items-center gap-1"
                 >
-                  View Directory <i className="fas fa-arrow-right text-[9px]" />
+                  {t('dash.viewDirectory')} <i className="fas fa-arrow-right text-[9px]" />
                 </button>
               </div>
 
@@ -161,7 +163,7 @@ export default function DashboardCategoryCard({ categories = [] }) {
                         <p className="truncate text-xs font-bold text-slate-900">{cat.name}</p>
                         {cat.criticalCount > 0 && (
                           <span className="rounded bg-red-100 px-1.5 py-0.2 text-[9px] font-bold text-red-700">
-                            {cat.criticalCount} Urgent
+                            {t('dash.urgent', { n: cat.criticalCount })}
                           </span>
                         )}
                       </div>
@@ -184,12 +186,12 @@ export default function DashboardCategoryCard({ categories = [] }) {
                 {isExpanded && (
                   <div className="mt-2.5 border-t border-slate-200/80 pt-2 space-y-1.5 animate-fade-in">
                     <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                      <span>Subcategories</span>
+                      <span>{t('dash.subcategories')}</span>
                       <button
                         onClick={() => navigate(`/incidents?category=${encodeURIComponent(cat.name)}`)}
                         className="text-emerald-700 hover:underline capitalize"
                       >
-                        Filter list &rarr;
+                        {t('dash.filterList')} &rarr;
                       </button>
                     </div>
                     {Object.entries(cat.subcategories).map(([sub, count]) => {

@@ -8,6 +8,7 @@ import Card from '../../components/ui/Card';
 import ErrorState from '../../components/ui/ErrorState';
 import Modal from '../../components/ui/Modal';
 import Spinner from '../../components/ui/Spinner';
+import { useI18n } from '../../i18n/I18nContext';
 
 const splitList = (text) => [...new Set(text.split(/[\n,]/).map((s) => s.trim()).filter(Boolean))];
 
@@ -17,6 +18,7 @@ const splitList = (text) => [...new Set(text.split(/[\n,]/).map((s) => s.trim())
 export default function AdminCategories() {
   const { reloadMeta } = useApp();
   const { showToast } = useToast();
+  const { t } = useI18n();
   const { data, error, message, reload } = useApi(() => adminApi.getCategories(), []);
   const [dialog, setDialog] = useState(null); // { mode: 'new' } | { mode: 'edit', cat }
   const [name, setName] = useState('');
@@ -59,13 +61,13 @@ export default function AdminCategories() {
     const list = splitList(subs);
     let ok;
     if (dialog.mode === 'new') {
-      ok = await run('save', () => adminApi.createCategory({ name: name.trim(), subcategories: list }), `Category "${name.trim()}" created`);
+      ok = await run('save', () => adminApi.createCategory({ name: name.trim(), subcategories: list }), t('cat.created', { name: name.trim() }));
     } else {
       const patch = {};
       if (name.trim() !== dialog.cat.name) patch.name = name.trim();
       if (list.length) patch.addSubcategories = list;
       if (!Object.keys(patch).length) return setDialog(null);
-      ok = await run('save', () => adminApi.updateCategory(dialog.cat.id, patch), `Category "${name.trim()}" updated`);
+      ok = await run('save', () => adminApi.updateCategory(dialog.cat.id, patch), t('cat.updated', { name: name.trim() }));
     }
     if (ok) setDialog(null);
   };
@@ -75,11 +77,11 @@ export default function AdminCategories() {
 
   return (
     <Card
-      title="Incident Categories & Classifications"
+      title={t('cat.title')}
       icon="fa-tags"
       actions={
         <button onClick={openNew} className="btn btn-primary">
-          <i className="fas fa-plus" /> Add Category
+          <i className="fas fa-plus" /> {t('cat.add')}
         </button>
       }
     >
@@ -90,22 +92,22 @@ export default function AdminCategories() {
               <h4 className="flex min-w-0 items-center gap-2 text-sm font-bold text-gray-800 sm:text-base">
                 <span className={`h-2 w-2 shrink-0 rounded-full ${cat.isActive ? 'bg-bgb-600' : 'bg-gray-400'}`} />
                 <span className="truncate">{cat.name}</span>
-                {!cat.isActive && <span className="rounded bg-gray-200 px-1.5 py-0.5 text-[9px] font-bold text-gray-600">INACTIVE</span>}
+                {!cat.isActive && <span className="rounded bg-gray-200 px-1.5 py-0.5 text-[9px] font-bold text-gray-600">{t('cat.inactive')}</span>}
               </h4>
               <div className="flex shrink-0 items-center gap-1.5">
-                <span className="rounded border border-gray-200 bg-white px-2 py-0.5 font-mono text-xs font-semibold text-gray-500" title="Incidents using this category">
+                <span className="rounded border border-gray-200 bg-white px-2 py-0.5 font-mono text-xs font-semibold text-gray-500" title={t('cat.usage')}>
                   {cat.id} &bull; {cat.incidentCount}
                 </span>
-                <button type="button" onClick={() => openEdit(cat)} className="flex h-6 w-6 items-center justify-center rounded border border-gray-200 bg-white text-gray-400 transition-colors hover:bg-bgb-50 hover:text-bgb-600" title="Edit category" aria-label={`Edit category ${cat.name}`}>
+                <button type="button" onClick={() => openEdit(cat)} className="flex h-6 w-6 items-center justify-center rounded border border-gray-200 bg-white text-gray-400 transition-colors hover:bg-bgb-50 hover:text-bgb-600" title={t('cat.edit')} aria-label={t('cat.editAria', { name: cat.name })}>
                   <i className="fas fa-edit text-xs" />
                 </button>
                 <button
                   type="button"
                   disabled={Boolean(busy)}
-                  onClick={() => run(`cat-${cat.id}`, () => adminApi.updateCategory(cat.id, { isActive: !cat.isActive }), `${cat.name} ${cat.isActive ? 'deactivated' : 'reactivated'}`)}
+                  onClick={() => run(`cat-${cat.id}`, () => adminApi.updateCategory(cat.id, { isActive: !cat.isActive }), t(cat.isActive ? 'cat.deactivated' : 'cat.reactivated', { name: cat.name }))}
                   className={`flex h-6 w-6 items-center justify-center rounded border bg-white transition-colors ${cat.isActive ? 'border-gray-200 text-gray-400 hover:bg-red-50 hover:text-red-600' : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'}`}
-                  title={cat.isActive ? 'Deactivate (hide from new reports)' : 'Reactivate'}
-                  aria-label={`${cat.isActive ? 'Deactivate' : 'Reactivate'} ${cat.name}`}
+                  title={cat.isActive ? t('cat.deactivateTitle') : t('cat.reactivateTitle')}
+                  aria-label={t('cat.toggleAria', { action: cat.isActive ? t('users.deactivate') : t('users.reactivate'), name: cat.name })}
                 >
                   <i className={`fas ${busy === `cat-${cat.id}` ? 'fa-spinner fa-spin' : cat.isActive ? 'fa-eye-slash' : 'fa-eye'} text-xs`} />
                 </button>
@@ -118,10 +120,10 @@ export default function AdminCategories() {
                   type="button"
                   disabled={Boolean(busy)}
                   onClick={() =>
-                    run(`sub-${cat.id}-${sub.name}`, () => adminApi.updateCategory(cat.id, { subcategoryStatus: [{ name: sub.name, isActive: !sub.isActive }] }), `${sub.name} ${sub.isActive ? 'deactivated' : 'reactivated'}`)
+                    run(`sub-${cat.id}-${sub.name}`, () => adminApi.updateCategory(cat.id, { subcategoryStatus: [{ name: sub.name, isActive: !sub.isActive }] }), t(sub.isActive ? 'cat.deactivated' : 'cat.reactivated', { name: sub.name }))
                   }
                   className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition-colors ${sub.isActive ? 'border-gray-200 bg-white text-gray-700 hover:border-red-200 hover:text-red-700' : 'border-dashed border-gray-300 bg-gray-100 text-gray-400 line-through hover:text-emerald-700'}`}
-                  title={sub.isActive ? 'Click to deactivate' : 'Click to reactivate'}
+                  title={sub.isActive ? t('cat.subDeactivate') : t('cat.subReactivate')}
                 >
                   {sub.name}
                   <i className={`fas ${sub.isActive ? 'fa-times' : 'fa-undo'} text-[9px]`} />
@@ -132,10 +134,10 @@ export default function AdminCategories() {
         ))}
       </div>
 
-      <Modal open={Boolean(dialog)} title={dialog?.mode === 'new' ? 'Add Category' : `Edit ${dialog?.cat?.name || ''}`} icon="fa-tags" onClose={() => setDialog(null)} busy={busy === 'save'}>
+      <Modal open={Boolean(dialog)} title={dialog?.mode === 'new' ? t('cat.add') : t('cat.editTitle', { name: dialog?.cat?.name || '' })} icon="fa-tags" onClose={() => setDialog(null)} busy={busy === 'save'}>
         <form onSubmit={submit} className="space-y-3">
           <div>
-            <label htmlFor="cat-name" className="form-label">Category name *</label>
+            <label htmlFor="cat-name" className="form-label">{t('cat.name')} *</label>
             <input
               id="cat-name"
               required
@@ -145,19 +147,19 @@ export default function AdminCategories() {
               className="form-input"
             />
             {dialog?.mode === 'edit' && dialog.cat.incidentCount > 0 && (
-              <p className="mt-1 text-[11px] text-gray-500">Used by {dialog.cat.incidentCount} incident(s), so it can't be renamed. Deactivate it and create a new one instead.</p>
+              <p className="mt-1 text-[11px] text-gray-500">{t('cat.inUse', { n: dialog.cat.incidentCount })}</p>
             )}
           </div>
           <div>
-            <label htmlFor="cat-subs" className="form-label">{dialog?.mode === 'new' ? 'Subcategories' : 'Add subcategories'}</label>
-            <textarea id="cat-subs" rows={3} value={subs} onChange={(e) => setSubs(e.target.value)} placeholder="One per line, or comma-separated" className="form-input" />
+            <label htmlFor="cat-subs" className="form-label">{dialog?.mode === 'new' ? t('cat.subcategories') : t('cat.addSubcategories')}</label>
+            <textarea id="cat-subs" rows={3} value={subs} onChange={(e) => setSubs(e.target.value)} placeholder={t('cat.subsPh')} className="form-input" />
           </div>
           <div className="flex justify-end gap-2 border-t border-gray-100 pt-3">
             <button type="button" onClick={() => setDialog(null)} className="btn btn-secondary">
-              Cancel
+              {t('common.cancel')}
             </button>
             <button type="submit" disabled={busy === 'save'} className="btn btn-primary">
-              {busy === 'save' && <i className="fas fa-spinner fa-spin" />} Save
+              {busy === 'save' && <i className="fas fa-spinner fa-spin" />} {t('common.save')}
             </button>
           </div>
         </form>

@@ -1,7 +1,8 @@
+import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { mkdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { Readable } from 'node:stream';
+import { Readable } from 'node:stream';
 import { env } from './env.js';
 
 // Spec #33 — evidence storage behind one interface so the backend can move from local disk
@@ -59,4 +60,75 @@ class LocalDiskStorage implements StorageDriver {
   }
 }
 
-export const storage: StorageDriver = new LocalDiskStorage();
+// ---------------------------------------------------------------------------
+// Spec #27 — encryption at rest. Wraps any driver (local disk now, S3/MinIO later).
+// Format: "BIRDSEV1" | iv (12) | GCM tag (16) | ciphertext. The storage key is authenticated as
+// additional data, so a file copied onto another record's key fails to decrypt. Objects without
+// the header (stored before encryption was enabled) are returned as they are.
+// ---------------------------------------------------------------------------
+const MAGIC = Buffer.from('BIRDSEV1');
+const IV_LEN = 12;
+const TAG_LEN = 16;
+
+export class EncryptedStorage implements StorageDriver {
+  constructor(
+    private readonly inner: StorageDriver,
+    private readonly key: Buffer,
+  ) {
+    if (key.length !== 32) throw new Error('Evidence encryption key must be 32 bytes');
+  }
+
+  async put(key: string, data: Buffer) {
+    const iv = randomBytes(IV_LEN);
+    const cipher = createCipheriv('aes-256-gcm', this.key, iv);
+    cipher.setAAD(Buffer.from(key));
+    const body = Buffer.concat([cipher.update(data), cipher.final()]);
+    await this.inner.put(key, Buffer.concat([MAGIC, iv, cipher.getAuthTag(), body]));
+  }
+
+  async read(key: string) {
+    return (await this.readDetailed(key))?.data ?? null;
+  }
+
+  /** Like read(), and says whether the object was stored encrypted (false = legacy plaintext). */
+  async readDetailed(key: string): Promise<{ data: Buffer; encrypted: boolean } | null> {
+    const raw = await this.inner.read(key);
+    if (!raw) return null;
+    if (raw.length < MAGIC.length + IV_LEN + TAG_LEN || !raw.subarray(0, MAGIC.length).equals(MAGIC)) return { data: raw, encrypted: false };
+    const iv = raw.subarray(MAGIC.length, MAGIC.length + IV_LEN);
+    const tag = raw.subarray(MAGIC.length + IV_LEN, MAGIC.length + IV_LEN + TAG_LEN);
+    const decipher = createDecipheriv('aes-256-gcm', this.key, iv);
+    decipher.setAAD(Buffer.from(key));
+    decipher.setAuthTag(tag);
+    // Throws if the file or tag was altered: tampering is never served as evidence
+    return { data: Buffer.concat([decipher.update(raw.subarray(MAGIC.length + IV_LEN + TAG_LEN)), decipher.final()]), encrypted: true };
+  }
+
+  async get(key: string) {
+    // GCM is verified at the end of the data, so decrypt fully before streaming anything (≤ 50 MB per file)
+    const data = await this.read(key);
+    return data ? Readable.from(data) : null;
+  }
+
+  remove(key: string) {
+    return this.inner.remove(key);
+  }
+}
+
+const local = new LocalDiskStorage();
+export const storageEncrypted = Boolean(env.EVIDENCE_ENCRYPTION_KEY);
+export const storage: StorageDriver = env.EVIDENCE_ENCRYPTION_KEY
+  ? new EncryptedStorage(local, Buffer.from(env.EVIDENCE_ENCRYPTION_KEY, 'base64'))
+  : local;
+/**
+ * Reads an evidence object and reports whether it was stored encrypted. Throws when an encrypted
+ * object fails authentication (altered on disk).
+ */
+export async function readObject(key: string): Promise<{ data: Buffer; encrypted: boolean } | null> {
+  if (storage instanceof EncryptedStorage) return storage.readDetailed(key);
+  const data = await storage.read(key);
+  return data ? { data, encrypted: false } : null;
+}
+
+/** Raw driver, for tests and diagnostics only (reads files exactly as stored). */
+export const rawStorage: StorageDriver = local;

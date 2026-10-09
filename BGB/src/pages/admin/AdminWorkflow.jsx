@@ -1,36 +1,46 @@
 import Card from '../../components/ui/Card';
+import { useI18n } from '../../i18n/I18nContext';
 
 // Specs #13, #14 — reference view of the workflow the server enforces
 // (server/src/modules/incidents/workflow.ts). The stages are fixed; see DOUBT-008 for the
 // scoping and separation-of-duties rules.
 const STAGES = [
-  { name: 'Draft', icon: 'fa-file-alt', color: 'bg-blue-600', desc: 'Created by the filing officer; visible only to them' },
-  { name: 'Submitted', icon: 'fa-paper-plane', color: 'bg-amber-500', desc: 'Filed for supervisory review' },
-  { name: 'Reviewed', icon: 'fa-search', color: 'bg-indigo-600', desc: 'Facts cross-checked by a reviewer' },
-  { name: 'Verified', icon: 'fa-check-circle', color: 'bg-emerald-600', desc: 'Evidence and intelligence confirmed' },
-  { name: 'Approved', icon: 'fa-thumbs-up', color: 'bg-bgb-600', desc: 'Officially approved for command reporting' },
-  { name: 'Closed', icon: 'fa-lock', color: 'bg-gray-700', desc: 'Case completed; the record is locked' },
+  { name: 'Draft', icon: 'fa-file-alt', color: 'bg-blue-600' },
+  { name: 'Submitted', icon: 'fa-paper-plane', color: 'bg-amber-500' },
+  { name: 'Reviewed', icon: 'fa-search', color: 'bg-indigo-600' },
+  { name: 'Verified', icon: 'fa-check-circle', color: 'bg-emerald-600' },
+  { name: 'Approved', icon: 'fa-thumbs-up', color: 'bg-bgb-600' },
+  { name: 'Closed', icon: 'fa-lock', color: 'bg-gray-700' },
 ];
 
 const REVIEWERS = ['Sector Officer', 'Verifier/Approver', 'HQ Administrator'];
 const APPROVERS = ['Verifier/Approver', 'HQ Administrator'];
 
+// from: a status, or a wf.from.* key; roles: role names, or null for "filing officer only"
 const RULES = [
-  { from: 'Draft / Returned', to: 'Submitted', icon: 'fa-file-import', border: 'border-l-blue-500', badge: 'bg-blue-50 text-blue-700 border-blue-200', roles: ['Filing officer only'], desc: 'Only the officer who created the report can edit and submit it, and only while it is a Draft or Returned.' },
-  { from: 'Submitted', to: 'Reviewed', icon: 'fa-clipboard-check', border: 'border-l-amber-500', badge: 'bg-amber-50 text-amber-700 border-amber-200', roles: REVIEWERS, desc: 'Preliminary cross-check of the reported facts by Sector HQ or higher.' },
-  { from: 'Reviewed', to: 'Verified', icon: 'fa-user-check', border: 'border-l-indigo-500', badge: 'bg-indigo-50 text-indigo-700 border-indigo-200', roles: APPROVERS, desc: 'Formal confirmation of evidence and intelligence.' },
-  { from: 'Verified', to: 'Approved', icon: 'fa-award', border: 'border-l-emerald-500', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200', roles: APPROVERS, desc: 'Final approval for inclusion in national command reporting.' },
-  { from: 'Approved', to: 'Closed', icon: 'fa-lock', border: 'border-l-navy-700', badge: 'bg-navy-50 text-navy-800 border-navy-200', roles: ['HQ Administrator'], desc: 'Permanent closure. Closed records cannot be modified.' },
-  { from: 'Submitted / Reviewed / Verified', to: 'Returned', icon: 'fa-undo-alt', border: 'border-l-pink-500', badge: 'bg-pink-50 text-pink-700 border-pink-200', roles: REVIEWERS, desc: 'Sent back to the filing officer for correction. A reason is mandatory and is shown in the timeline.' },
-  { from: 'Submitted / Reviewed / Verified', to: 'Rejected', icon: 'fa-times-circle', border: 'border-l-red-500', badge: 'bg-red-50 text-red-700 border-red-200', roles: REVIEWERS, desc: 'Rejected as invalid or unfounded. A reason is mandatory; the record is kept.' },
+  { id: 'submit', from: 'wf.from.draftReturned', to: 'Submitted', icon: 'fa-file-import', border: 'border-l-blue-500', badge: 'bg-blue-50 text-blue-700 border-blue-200', roles: null },
+  { id: 'review', from: 'Submitted', to: 'Reviewed', icon: 'fa-clipboard-check', border: 'border-l-amber-500', badge: 'bg-amber-50 text-amber-700 border-amber-200', roles: REVIEWERS },
+  { id: 'verify', from: 'Reviewed', to: 'Verified', icon: 'fa-user-check', border: 'border-l-indigo-500', badge: 'bg-indigo-50 text-indigo-700 border-indigo-200', roles: APPROVERS },
+  { id: 'approve', from: 'Verified', to: 'Approved', icon: 'fa-award', border: 'border-l-emerald-500', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200', roles: APPROVERS },
+  { id: 'close', from: 'Approved', to: 'Closed', icon: 'fa-lock', border: 'border-l-navy-700', badge: 'bg-navy-50 text-navy-800 border-navy-200', roles: ['HQ Administrator'] },
+  { id: 'return', from: 'wf.from.anyReview', to: 'Returned', icon: 'fa-undo-alt', border: 'border-l-pink-500', badge: 'bg-pink-50 text-pink-700 border-pink-200', roles: REVIEWERS },
+  { id: 'reject', from: 'wf.from.anyReview', to: 'Rejected', icon: 'fa-times-circle', border: 'border-l-red-500', badge: 'bg-red-50 text-red-700 border-red-200', roles: REVIEWERS },
+];
+
+const NOTES = [
+  ['fa-user-slash', 'wf.sod', 'wf.sodText'],
+  ['fa-sitemap', 'wf.aor', 'wf.aorText'],
+  ['fa-random', 'wf.concurrent', 'wf.concurrentText'],
 ];
 
 export default function AdminWorkflow() {
+  const { t, tv } = useI18n();
+  const fromLabel = (from) => (from.startsWith('wf.') ? t(from) : tv('status', from));
   return (
-    <Card title="Workflow Pipeline & Authorization Matrix" icon="fa-sitemap" bodyClassName="space-y-6">
+    <Card title={t('wf.title')} icon="fa-sitemap" bodyClassName="space-y-6">
       <div>
         <h4 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500">
-          <i className="fas fa-stream text-bgb-600" /> Incident Progression Lifecycle
+          <i className="fas fa-stream text-bgb-600" /> {t('wf.lifecycle')}
         </h4>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
           {STAGES.map((stage, i) => (
@@ -42,8 +52,8 @@ export default function AdminWorkflow() {
                     <i className={`fas ${stage.icon} text-xs`} />
                   </div>
                 </div>
-                <h5 className="text-sm font-bold text-gray-900">{stage.name}</h5>
-                <p className="mt-1 text-xs leading-snug text-gray-500">{stage.desc}</p>
+                <h5 className="text-sm font-bold text-gray-900">{tv('status', stage.name)}</h5>
+                <p className="mt-1 text-xs leading-snug text-gray-500">{t(`wf.stage.${stage.name}`)}</p>
               </div>
             </div>
           ))}
@@ -52,24 +62,24 @@ export default function AdminWorkflow() {
 
       <div>
         <h4 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500">
-          <i className="fas fa-shield-alt text-bgb-600" /> State Transition Authorization Rules
+          <i className="fas fa-shield-alt text-bgb-600" /> {t('wf.rules')}
         </h4>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {RULES.map((rule) => (
-            <div key={rule.from + rule.to} className={`flex flex-col justify-between space-y-3 rounded-xl border border-l-4 border-gray-200 bg-white p-4 transition-all hover:border-bgb-400 hover:shadow-md ${rule.border}`}>
+            <div key={rule.id} className={`flex flex-col justify-between space-y-3 rounded-xl border border-l-4 border-gray-200 bg-white p-4 transition-all hover:border-bgb-400 hover:shadow-md ${rule.border}`}>
               <div>
                 <span className={`mb-2 inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-bold ${rule.badge}`}>
                   <i className={`fas ${rule.icon} text-[10px]`} />
-                  {rule.from} &rarr; {rule.to}
+                  {fromLabel(rule.from)} &rarr; {tv('status', rule.to)}
                 </span>
-                <p className="text-xs leading-relaxed text-gray-600">{rule.desc}</p>
+                <p className="text-xs leading-relaxed text-gray-600">{t(`wf.rule.${rule.id}`)}</p>
               </div>
               <div className="border-t border-gray-100 pt-2">
-                <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-gray-400">Authorized Roles</span>
+                <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-gray-400">{t('wf.authorized')}</span>
                 <div className="flex flex-wrap gap-1">
-                  {rule.roles.map((r) => (
+                  {(rule.roles || [t('wf.filerOnly')]).map((r) => (
                     <span key={r} className="rounded border border-gray-200 bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-700">
-                      {r}
+                      {rule.roles ? tv('role', r) : r}
                     </span>
                   ))}
                 </div>
@@ -80,17 +90,13 @@ export default function AdminWorkflow() {
       </div>
 
       <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-3">
-        {[
-          ['fa-user-slash', 'Separation of duties', 'Nobody can review, verify, approve, close, return or reject an incident they filed themselves.'],
-          ['fa-sitemap', 'Area of responsibility', 'Users act only on incidents at or below their own unit (HQ, sector, battalion or BOP).'],
-          ['fa-random', 'Concurrent actions', 'If two officers act on the same record at once, exactly one succeeds; the other is told the record changed.'],
-        ].map(([icon, title, text]) => (
+        {NOTES.map(([icon, title, text]) => (
           <div key={title} className="rounded-xl border border-bgb-100 bg-bgb-50/60 p-3">
             <p className="mb-1 font-bold text-bgb-900">
               <i className={`fas ${icon} mr-1.5 text-bgb-600`} />
-              {title}
+              {t(title)}
             </p>
-            <p className="text-gray-600">{text}</p>
+            <p className="text-gray-600">{t(text)}</p>
           </div>
         ))}
       </div>

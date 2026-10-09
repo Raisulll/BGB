@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
+import { useI18n } from '../i18n/I18nContext';
 
 const ToastContext = createContext(null);
 
@@ -11,6 +12,7 @@ const STYLES = {
 
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
+  const { t: tr } = useI18n();
   const idRef = useRef(0);
 
   const dismiss = useCallback((id) => setToasts((t) => t.filter((x) => x.id !== id)), []);
@@ -43,7 +45,7 @@ export function ToastProvider({ children }) {
             >
               <i className={`fas ${s.icon}`} />
               <span className="flex-1">{t.message}</span>
-              <button onClick={() => dismiss(t.id)} className="opacity-70 hover:opacity-100" aria-label="Dismiss">
+              <button onClick={() => dismiss(t.id)} className="opacity-70 hover:opacity-100" aria-label={tr('ui.dismiss')}>
                 <i className="fas fa-times text-xs" />
               </button>
             </div>

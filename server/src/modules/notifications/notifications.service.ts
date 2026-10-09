@@ -1,6 +1,7 @@
 import type { Prisma } from '../../generated/prisma/client.js';
 import { canApprove, canReview, ROLES } from '../../utils/roles.js';
 import { inScope, resolveScope } from '../../utils/scope.js';
+import { enqueueWorkflowEmails, type EmailEvent } from './mailer.js';
 
 // Spec #23 — workflow events notify the next responsible group (§23). Recipients must also
 // have the incident inside their access scope. The actor never notifies themself.
@@ -51,4 +52,10 @@ export async function notifyWorkflow(tx: Tx, incident: IncidentRef, event: Workf
   await tx.notification.createMany({
     data: [...recipients].map((userId) => ({ userId, title: route.title, message, type: route.type, incidentId: incident.id })),
   });
+  // §23 — e-mail for new submission, approval, rejection and return
+  if ((EMAIL_EVENTS as string[]).includes(event)) {
+    await enqueueWorkflowEmails(tx, [...recipients], incident.id, event as EmailEvent, actor.name);
+  }
 }
+
+const EMAIL_EVENTS: EmailEvent[] = ['submitted', 'approved', 'rejected', 'returned'];

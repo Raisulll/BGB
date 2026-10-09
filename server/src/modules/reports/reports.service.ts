@@ -34,7 +34,8 @@ function applyType(f: IncidentFilters, type: ReportType): IncidentFilters {
   return { ...f, severity: severity.length ? severity : ['Critical'] };
 }
 
-const where = (user: AuthUser, f: IncidentFilters) => incidentWhere(user, f, true);
+// Statistics cover filed incidents, archived ones included (spec #45: archiving never removes history)
+const where = (user: AuthUser, f: IncidentFilters) => incidentWhere(user, f, true, 'include');
 
 // ---------------------------------------------------------------------------
 // Summary / KPIs (spec #17)

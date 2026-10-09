@@ -12,17 +12,18 @@ import AdminOrg from './AdminOrg';
 import AdminWorkflow from './AdminWorkflow';
 import AdminSettings from './AdminSettings';
 import AdminOperations from './AdminOperations';
+import { useI18n } from '../../i18n/I18nContext';
 
 // Spec #46 — administrative module. Every change goes through /api/v1/admin or /api/v1/users,
 // is validated and audited by the server.
 const TABS = [
-  { id: 'users', label: 'Users & Roles', icon: 'fa-users' },
-  { id: 'permissions', label: 'Permissions Matrix', icon: 'fa-shield-alt' },
-  { id: 'categories', label: 'Categories', icon: 'fa-tags' },
-  { id: 'org', label: 'Org Hierarchy', icon: 'fa-sitemap' },
-  { id: 'workflow', label: 'Workflow', icon: 'fa-project-diagram' },
-  { id: 'settings', label: 'Security & System', icon: 'fa-lock' },
-  { id: 'operations', label: 'Operations', icon: 'fa-server', demo: true },
+  { id: 'users', icon: 'fa-users' },
+  { id: 'permissions', icon: 'fa-shield-alt' },
+  { id: 'categories', icon: 'fa-tags' },
+  { id: 'org', icon: 'fa-sitemap' },
+  { id: 'workflow', icon: 'fa-project-diagram' },
+  { id: 'settings', icon: 'fa-lock' },
+  { id: 'operations', icon: 'fa-server', demo: true },
 ];
 
 async function loadAdmin() {
@@ -32,6 +33,7 @@ async function loadAdmin() {
 
 export default function Admin() {
   const [tab, setTab] = useState('users');
+  const { t } = useI18n();
   const { data, error, message, reload, setData } = useApi(loadAdmin, []);
 
   if (error) return <Card><ErrorState message={message} onRetry={reload} /></Card>;
@@ -45,10 +47,10 @@ export default function Admin() {
     <div className="space-y-4 sm:space-y-6">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          ['System Roles', permissions.roles.length, 'text-bgb-700'],
-          ['Module Grants', `${grants} / ${permissions.roles.length * permissions.pageIds.length}`, 'text-blue-600'],
-          ['Organizational Units', `${Object.keys(org.hierarchy).length} sectors · ${org.units.length} BOPs`, 'text-navy-800'],
-          ['Idle Timeout', `${config.find((c) => c.key === 'session.timeout_minutes')?.value ?? '–'} min`, 'text-emerald-700'],
+          [t('admin.kpi.roles'), permissions.roles.length, 'text-bgb-700'],
+          [t('admin.kpi.grants'), `${grants} / ${permissions.roles.length * permissions.pageIds.length}`, 'text-blue-600'],
+          [t('admin.kpi.units'), t('admin.kpi.unitsValue', { s: Object.keys(org.hierarchy).length, b: org.units.length }), 'text-navy-800'],
+          [t('admin.kpi.timeout'), t('admin.kpi.minutes', { n: config.find((c) => c.key === 'session.timeout_minutes')?.value ?? '–' }), 'text-emerald-700'],
         ].map(([label, value, cls]) => (
           <div key={label} className="rounded-xl border border-gray-100 bg-white p-3 shadow-sm sm:p-4">
             <p className="text-xs text-gray-500">{label}</p>
@@ -58,19 +60,19 @@ export default function Admin() {
       </div>
 
       <div className="flex gap-2 overflow-x-auto border-b border-gray-200 pb-2 scrollbar-none" role="tablist">
-        {TABS.map((t) => (
+        {TABS.map((item) => (
           <button
-            key={t.id}
+            key={item.id}
             role="tab"
-            aria-selected={tab === t.id}
-            onClick={() => setTab(t.id)}
+            aria-selected={tab === item.id}
+            onClick={() => setTab(item.id)}
             className={`flex items-center gap-2 whitespace-nowrap rounded-lg px-4 py-2.5 text-xs font-bold transition-all sm:text-sm ${
-              tab === t.id ? 'bg-bgb-600 text-white shadow-md' : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              tab === item.id ? 'bg-bgb-600 text-white shadow-md' : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 hover:text-gray-900'
             }`}
           >
-            <i className={`fas ${t.icon} text-xs`} />
-            {t.label}
-            {t.demo && <DemoBadge />}
+            <i className={`fas ${item.icon} text-xs`} />
+            {t(`admin.tab.${item.id}`)}
+            {item.demo && <DemoBadge />}
           </button>
         ))}
       </div>

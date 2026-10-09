@@ -1,20 +1,22 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { cn } from '../../utils/helpers';
+import { useI18n } from '../../i18n/I18nContext';
 
 const NAV_ITEMS = [
-  { id: 'dashboard', to: '/', icon: 'fa-tachometer-alt', label: 'Dashboard', match: (p) => p === '/' },
-  { id: 'incidents', to: '/incidents', icon: 'fa-shield-alt', label: 'Incidents', match: (p) => p.startsWith('/incidents') && p !== '/incidents/new' },
-  { id: 'create', to: '/incidents/new', icon: 'fa-plus-circle', label: 'New Incident', match: (p) => p === '/incidents/new', tag: 'NEW' },
-  { id: 'map', to: '/map', icon: 'fa-map-marked-alt', label: 'GIS Map View', tag: 'LIVE' },
-  { id: 'analytics', to: '/analytics', icon: 'fa-chart-bar', label: 'Analytics' },
-  { id: 'reports', to: '/reports', icon: 'fa-file-export', label: 'Reports' },
-  { id: 'audit', to: '/audit', icon: 'fa-clipboard-list', label: 'Audit Trail' },
-  { id: 'admin', to: '/admin', icon: 'fa-cogs', label: 'Administration' },
+  { id: 'dashboard', to: '/', icon: 'fa-tachometer-alt', match: (p) => p === '/' },
+  { id: 'incidents', to: '/incidents', icon: 'fa-shield-alt', match: (p) => p.startsWith('/incidents') && p !== '/incidents/new' },
+  { id: 'create', to: '/incidents/new', icon: 'fa-plus-circle', match: (p) => p === '/incidents/new', tag: 'New' },
+  { id: 'map', to: '/map', icon: 'fa-map-marked-alt', tag: 'Live' },
+  { id: 'analytics', to: '/analytics', icon: 'fa-chart-bar' },
+  { id: 'reports', to: '/reports', icon: 'fa-file-export' },
+  { id: 'audit', to: '/audit', icon: 'fa-clipboard-list' },
+  { id: 'admin', to: '/admin', icon: 'fa-cogs' },
 ];
 
 export default function Sidebar({ mobileOpen, collapsed, onClose, onToggleCollapse }) {
   const { currentUser, hasPermission } = useApp();
+  const { t, tv } = useI18n();
   const { pathname } = useLocation();
   const hideOnDesktop = collapsed ? 'md:hidden' : '';
 
@@ -24,7 +26,7 @@ export default function Sidebar({ mobileOpen, collapsed, onClose, onToggleCollap
   return (
     <aside
       id="sidebar"
-      aria-label="Main navigation"
+      aria-label={t('nav.mainNav')}
       className={cn(
         'fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r border-slate-200/80 bg-white text-slate-800 shadow-xl transition-all duration-300',
         'md:static md:z-auto md:max-w-none md:translate-x-0 md:shadow-none print:hidden',
@@ -39,7 +41,7 @@ export default function Sidebar({ mobileOpen, collapsed, onClose, onToggleCollap
           collapsed && 'md:px-2 md:justify-center md:gap-1.5',
         )}
       >
-        <Link to="/" className="flex items-center gap-2 min-w-0" title="BGB BIRDS System">
+        <Link to="/" className="flex items-center gap-2 min-w-0" title={t('page.default.title')}>
           <div
             className={cn(
               'relative flex shrink-0 items-center justify-center rounded-xl bg-emerald-50/80 shadow-sm border border-emerald-200/80 transition-all',
@@ -59,7 +61,7 @@ export default function Sidebar({ mobileOpen, collapsed, onClose, onToggleCollap
                 v2.4
               </span>
             </div>
-            <p className="truncate text-[11px] font-medium text-slate-500">Border Recon & Incidents</p>
+            <p className="truncate text-[11px] font-medium text-slate-500">{t('nav.brandSub')}</p>
           </div>
         </Link>
 
@@ -71,8 +73,8 @@ export default function Sidebar({ mobileOpen, collapsed, onClose, onToggleCollap
               'hidden md:flex shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 transition-all duration-200 border border-slate-200/80 shadow-xs',
               collapsed ? 'h-7 w-7 text-[10px]' : 'h-8 w-8 text-xs',
             )}
-            title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={collapsed ? t('header.expandSidebar') : t('header.collapseSidebar')}
+            aria-label={collapsed ? t('header.expandSidebar') : t('header.collapseSidebar')}
           >
             <i className={cn('fas transition-transform duration-200', collapsed ? 'fa-chevron-right' : 'fa-chevron-left')} />
           </button>
@@ -82,7 +84,7 @@ export default function Sidebar({ mobileOpen, collapsed, onClose, onToggleCollap
         <button
           onClick={onClose}
           className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 md:hidden"
-          aria-label="Close menu"
+          aria-label={t('nav.closeMenu')}
         >
           <i className="fas fa-times text-base" />
         </button>
@@ -91,7 +93,7 @@ export default function Sidebar({ mobileOpen, collapsed, onClose, onToggleCollap
       {/* Navigation Links */}
       <nav className="flex-1 space-y-1.5 overflow-y-auto p-3 scrollbar-none">
         <div className={cn('px-2 py-1 text-[10px] font-bold tracking-wider text-slate-400 uppercase', hideOnDesktop)}>
-          Navigation Menu
+          {t('nav.menu')}
         </div>
         {allowedItems.map((item) => {
           const active = item.match ? item.match(pathname) : pathname.startsWith(item.to);
@@ -100,7 +102,7 @@ export default function Sidebar({ mobileOpen, collapsed, onClose, onToggleCollap
             <Link
               key={item.to}
               to={item.to}
-              title={collapsed ? item.label : undefined}
+              title={collapsed ? t(`nav.${item.id}`) : undefined}
               aria-current={active ? 'page' : undefined}
               className={cn(
                 'group relative flex min-h-11 items-center gap-3.5 rounded-xl px-3 text-sm font-medium transition-all duration-200 md:min-h-10',
@@ -123,7 +125,7 @@ export default function Sidebar({ mobileOpen, collapsed, onClose, onToggleCollap
               />
 
               <span className={cn('truncate flex-1 font-semibold tracking-wide', hideOnDesktop)}>
-                {item.label}
+                {t(`nav.${item.id}`)}
               </span>
 
               {/* Badges / Tags */}
@@ -131,12 +133,12 @@ export default function Sidebar({ mobileOpen, collapsed, onClose, onToggleCollap
                 <span
                   className={cn(
                     'rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase ring-1',
-                    item.tag === 'LIVE'
+                    item.tag === 'Live'
                       ? 'bg-red-100 text-red-700 ring-red-300 animate-pulse'
                       : 'bg-emerald-100 text-emerald-800 ring-emerald-300',
                   )}
                 >
-                  {item.tag}
+                  {t(`nav.tag${item.tag}`)}
                 </span>
               )}
             </Link>
@@ -154,15 +156,15 @@ export default function Sidebar({ mobileOpen, collapsed, onClose, onToggleCollap
         >
           <div
             className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-600 font-bold text-white shadow ring-2 ring-emerald-200"
-            title={collapsed ? `${currentUser?.name || 'User'} (${currentUser?.role || ''})` : undefined}
+            title={collapsed ? `${currentUser?.name} (${tv('role', currentUser?.role)})` : undefined}
           >
             <i className="fas fa-user-shield text-sm" />
             <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
           </div>
 
           <div className={cn('min-w-0 flex-1', hideOnDesktop)}>
-            <p className="truncate text-xs font-bold text-slate-800">{currentUser?.name || 'Operator'}</p>
-            <p className="truncate text-[11px] font-medium text-emerald-700">{currentUser?.role || 'BGB HQ'}</p>
+            <p className="truncate text-xs font-bold text-slate-800">{currentUser?.name}</p>
+            <p className="truncate text-[11px] font-medium text-emerald-700">{tv('role', currentUser?.role)}</p>
           </div>
         </div>
       </div>

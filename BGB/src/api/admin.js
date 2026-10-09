@@ -18,3 +18,11 @@ export const addOrgUnit = (data) => api('/admin/org-hierarchy', { method: 'POST'
 
 /** Public liveness check: { status, database, time } */
 export const health = () => api('/health');
+
+// Spec #23 — e-mail delivery status / test message
+export const getMail = () => api('/admin/mail');
+export const sendTestMail = () => api('/admin/mail/test', { method: 'POST' });
+
+// Specs #44, #45 — archiving summary and on-demand run
+export const getArchive = () => api('/admin/archive');
+export const runArchive = () => api('/admin/archive/run', { method: 'POST' });

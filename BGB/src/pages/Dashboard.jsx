@@ -14,11 +14,11 @@ import Spinner from '../components/ui/Spinner';
 import StatCard from '../components/ui/StatCard';
 import IncidentList from '../components/incidents/IncidentList';
 import DashboardCategoryCard from '../components/dashboard/DashboardCategoryCard';
+import { useI18n } from '../i18n/I18nContext';
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const monthLabel = (period) => {
+const monthLabel = (period, t) => {
   const [y, m] = period.split('-');
-  return `${MONTHS[Number(m) - 1]} ${y.slice(2)}`;
+  return `${t(`month.${Number(m)}`)} ${y.slice(2)}`;
 };
 
 // Spec #17 — role-based dashboard. Every figure comes from the server and is limited to the
@@ -37,6 +37,7 @@ async function loadDashboard(canList) {
 
 export default function Dashboard() {
   const { currentUser, hasPermission } = useApp();
+  const { t, tv } = useI18n();
   const isNarrow = useMediaQuery('(max-width: 639px)');
   const fontSize = isNarrow ? 10 : 12;
   const canList = hasPermission(null, 'incidents');
@@ -48,12 +49,12 @@ export default function Dashboard() {
     const resolvedBy = new Map(data.resolved.series.map((p) => [p.period, p.count]));
     const last = series[series.length - 1];
     return {
-      labels: series.map((p) => monthLabel(p.period)),
-      currentMonthLabel: last ? monthLabel(last.period) : '',
+      labels: series.map((p) => monthLabel(p.period, t)),
+      currentMonthLabel: last ? monthLabel(last.period, t) : '',
       currentTotal: last?.count ?? 0,
       datasets: [
         {
-          label: 'Total Incidents',
+          label: t('dash.seriesTotal'),
           data: series.map((p) => p.count),
           borderColor: '#1e5e1e',
           backgroundColor: 'rgba(30, 94, 30, 0.1)',
@@ -64,7 +65,7 @@ export default function Dashboard() {
           pointRadius: 3.5,
         },
         {
-          label: 'Critical & High Threats',
+          label: t('dash.seriesHigh'),
           data: series.map((p) => p.bySeverity.High + p.bySeverity.Critical),
           borderColor: '#ef4444',
           backgroundColor: 'rgba(239, 68, 68, 0.05)',
@@ -76,7 +77,7 @@ export default function Dashboard() {
           pointRadius: 3,
         },
         {
-          label: 'Approved / Closed Operations',
+          label: t('dash.seriesResolved'),
           data: series.map((p) => resolvedBy.get(p.period) ?? 0),
           borderColor: '#3b82f6',
           backgroundColor: 'transparent',
@@ -88,7 +89,7 @@ export default function Dashboard() {
         },
       ],
     };
-  }, [data]);
+  }, [data, t]);
 
   if (error) return <Card><ErrorState message={message} onRetry={reload} /></Card>;
   if (!data) return <Spinner />;
@@ -123,21 +124,21 @@ export default function Dashboard() {
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-lg font-black tracking-wide text-white sm:text-2xl uppercase">
-                  Command Dashboard
+                  {t('dash.title')}
                 </h1>
                 <span className="rounded-md bg-emerald-500/25 px-2 py-0.5 text-[10px] font-extrabold text-emerald-300 ring-1 ring-emerald-400/30 uppercase tracking-widest">
-                  HQ Operational System
+                  {t('dash.badge')}
                 </span>
               </div>
               <p className="mt-0.5 text-xs sm:text-sm font-medium text-bgb-200">
-                Welcome back, <span className="font-bold text-white">{currentUser.name}</span> ({currentUser.role})
+                {t('dash.welcome', { name: currentUser.name, role: tv('role', currentUser.role) })}
               </p>
               <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-bgb-300 font-mono">
                 <span className="flex items-center gap-1">
                   <i className="fas fa-calendar-alt text-emerald-400" /> {formatDateDisplay(new Date())}
                 </span>
                 <span className="flex items-center gap-1 text-emerald-300">
-                  <i className="fas fa-sitemap text-emerald-400" /> Scope: {currentUser.scope}
+                  <i className="fas fa-sitemap text-emerald-400" /> {t('dash.scope', { scope: currentUser.scope })}
                 </span>
               </div>
             </div>
@@ -150,7 +151,7 @@ export default function Dashboard() {
               to="/incidents/new"
               className="btn bg-gradient-to-r from-bgb-500 to-emerald-600 hover:from-bgb-600 hover:to-emerald-700 text-white font-bold px-3.5 py-2 text-xs shadow-md rounded-xl transition-all border border-emerald-400/30"
             >
-              <i className="fas fa-plus-circle mr-1.5" /> Report Incident
+              <i className="fas fa-plus-circle mr-1.5" /> {t('dash.report')}
             </Link>
             )}
             {hasPermission(null, 'map') && (
@@ -158,7 +159,7 @@ export default function Dashboard() {
               to="/map"
               className="btn bg-white/15 hover:bg-white/25 text-white font-bold px-3.5 py-2 text-xs backdrop-blur-md rounded-xl transition-all border border-white/20"
             >
-              <i className="fas fa-map-marked-alt mr-1.5 text-emerald-300" /> GIS Live Map
+              <i className="fas fa-map-marked-alt mr-1.5 text-emerald-300" /> {t('dash.map')}
             </Link>
             )}
             {hasPermission(null, 'reports') && (
@@ -166,7 +167,7 @@ export default function Dashboard() {
               to="/reports"
               className="btn bg-white/10 hover:bg-white/20 text-white font-bold px-3.5 py-2 text-xs backdrop-blur-md rounded-xl transition-all border border-white/15"
             >
-              <i className="fas fa-file-export mr-1.5 text-bgb-300" /> Reports
+              <i className="fas fa-file-export mr-1.5 text-bgb-300" /> {t('dash.reports')}
             </Link>
             )}
           </div>
@@ -175,12 +176,12 @@ export default function Dashboard() {
 
       {/* Primary KPI Summary Grid */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 xl:grid-cols-5">
-        <StatCard label="Total Filed Incidents" value={stats.total} icon="fa-folder-open" color="blue" />
-        <StatCard label="Open Active Incidents" value={stats.open} icon="fa-exclamation-circle" color="orange" />
-        <StatCard label="Pending Review & Approval" value={stats.pending} icon="fa-clock" color="yellow" />
-        <StatCard label="Approved & Closed" value={stats.closed} icon="fa-check-circle" color="green" />
+        <StatCard label={t('dash.kpiTotal')} value={stats.total} icon="fa-folder-open" color="blue" />
+        <StatCard label={t('dash.kpiOpen')} value={stats.open} icon="fa-exclamation-circle" color="orange" />
+        <StatCard label={t('dash.kpiPending')} value={stats.pending} icon="fa-clock" color="yellow" />
+        <StatCard label={t('dash.kpiClosed')} value={stats.closed} icon="fa-check-circle" color="green" />
         <div className="col-span-2 sm:col-span-1">
-          <StatCard label="High & Critical Threats" value={stats.critical} icon="fa-exclamation-triangle" color="red" />
+          <StatCard label={t('dash.kpiCritical')} value={stats.critical} icon="fa-exclamation-triangle" color="red" />
         </div>
       </div>
 
@@ -189,15 +190,15 @@ export default function Dashboard() {
         <DashboardCategoryCard categories={data.categories} />
 
         <Card
-          title="Monthly Incident Trend & Operations"
+          title={t('dash.trendTitle')}
           icon="fa-chart-line"
           actions={
             <div className="hidden sm:flex items-center gap-2 text-xs">
               <span className="inline-flex items-center gap-1 font-semibold text-bgb-700 bg-bgb-50 px-2 py-0.5 rounded border border-bgb-200/60">
-                <i className="fas fa-calendar-check text-[10px]" /> Current: {monthlyTrendData.currentMonthLabel} ({monthlyTrendData.currentTotal})
+                <i className="fas fa-calendar-check text-[10px]" /> {t('dash.current', { month: monthlyTrendData.currentMonthLabel, n: monthlyTrendData.currentTotal })}
               </span>
               <span className="inline-flex items-center gap-1 font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200/60">
-                <i className="fas fa-history text-[10px]" /> 12-Month Window
+                <i className="fas fa-history text-[10px]" /> {t('dash.window')}
               </span>
             </div>
           }
@@ -230,9 +231,9 @@ export default function Dashboard() {
       {/* Sector Intelligence & Quick Operational Overview */}
       <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-3">
         <div className="lg:col-span-1">
-          <Card title="Sector Operational Activity" icon="fa-shield-alt">
+          <Card title={t('dash.sectorTitle')} icon="fa-shield-alt">
             <div className="space-y-3">
-              {sectorSummary.length === 0 && <p className="text-sm text-gray-400">No filed incidents in your area yet.</p>}
+              {sectorSummary.length === 0 && <p className="text-sm text-gray-400">{t('dash.noSector')}</p>}
               {sectorSummary.map((sec) => {
                 const totalInc = stats.total || 1;
                 const pct = Math.round((sec.count / totalInc) * 100);
@@ -242,16 +243,16 @@ export default function Dashboard() {
                       <span className="flex items-center gap-1.5">
                         <i className="fas fa-layer-group text-bgb-600 text-xs" /> {sec.name}
                       </span>
-                      <span className="font-mono text-bgb-700">{sec.count} Incidents</span>
+                      <span className="font-mono text-bgb-700">{t('dash.sectorCount', { n: sec.count })}</span>
                     </div>
                     <div className="mt-2 flex items-center justify-between text-[11px] text-gray-500">
-                      <span>Risk score: <strong className="text-gray-700 font-mono">{sec.riskScore}</strong></span>
+                      <span>{t('dash.riskScore')}: <strong className="text-gray-700 font-mono">{sec.riskScore}</strong></span>
                       {sec.critical > 0 ? (
                         <span className="font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded border border-red-200/60">
-                          {sec.critical} High Threats
+                          {t('dash.highThreats', { n: sec.critical })}
                         </span>
                       ) : (
-                        <span className="text-emerald-600 font-semibold">Normal Sector</span>
+                        <span className="text-emerald-600 font-semibold">{t('dash.normal')}</span>
                       )}
                     </div>
                     <div className="mt-2 h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
@@ -270,12 +271,12 @@ export default function Dashboard() {
         {canList && (
         <div className="lg:col-span-2">
           <Card
-            title="Recent Border Incidents"
+            title={t('dash.recent')}
             icon="fa-list-alt"
             bodyClassName=""
             actions={
               <Link to="/incidents" className="text-xs sm:text-sm font-bold text-bgb-600 hover:text-bgb-800 hover:underline flex items-center gap-1">
-                View All Master Logs <i className="fas fa-arrow-right text-xs" />
+                {t('dash.viewAll')} <i className="fas fa-arrow-right text-xs" />
               </Link>
             }
           >

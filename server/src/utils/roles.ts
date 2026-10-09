@@ -1,5 +1,5 @@
-// Mirrors BGB/src/utils/helpers.js and BGB/src/context/AppContext.jsx so the API and the
-// frontend agree on who may do what (spec #3). Keep both sides in sync.
+// Roles, default page permissions and capability groups (spec #3). The frontend has no copy: it
+// renders what the API returns (effective permissions, per-incident `actions` / `canEdit`).
 
 export const ROLES = {
   HQ_ADMIN: 'HQ Administrator',

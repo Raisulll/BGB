@@ -7,6 +7,7 @@ import { exportHandler } from '../reports/reports.router.js';
 import { requestContext } from '../../utils/requestContext.js';
 import { createIncidentSchema, listIncidentsSchema, updateIncidentSchema, workflowActionSchema } from './incidents.schema.js';
 import * as service from './incidents.service.js';
+import { archiveIncident, restoreIncident } from './archive.service.js';
 import { WORKFLOW_ACTIONS, type WorkflowAction } from './workflow.js';
 
 // §19.3 — /api/v1/incidents
@@ -52,6 +53,16 @@ incidentsRouter.patch('/:id', requirePermission('create'), async (req, res) => {
 
 incidentsRouter.post('/:id/submit', requirePermission('create'), async (req, res) => {
   res.json(await service.submitIncident(req.user!, incidentId(req), requestContext(req)));
+});
+
+// Spec #45 — archive a final incident / restore it (HQ administrators; reason required to restore)
+incidentsRouter.post('/:id/archive', requirePermission('admin'), async (req, res) => {
+  res.json(await archiveIncident(req.user!, incidentId(req), requestContext(req)));
+});
+
+incidentsRouter.post('/:id/unarchive', requirePermission('admin'), async (req, res) => {
+  const { notes } = workflowActionSchema.parse(req.body ?? {});
+  res.json(await restoreIncident(req.user!, incidentId(req), notes, requestContext(req)));
 });
 
 // review | verify | approve | close | return | reject — role checks live in the service

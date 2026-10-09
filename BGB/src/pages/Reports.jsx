@@ -9,6 +9,7 @@ import { SeverityBadge, StatusBadge } from '../components/ui/Badges';
 import Card from '../components/ui/Card';
 import ErrorState from '../components/ui/ErrorState';
 import Spinner from '../components/ui/Spinner';
+import { useI18n } from '../i18n/I18nContext';
 
 // Specs #21, #22 — configurable reports built by the server (scope, drafts excluded, report type
 // rules) and exported by the server with the classification banner; every export is audited.
@@ -17,6 +18,7 @@ const EMPTY = { dateFrom: '', dateTo: '', sector: '', battalion: '', category: '
 export default function Reports() {
   const { meta } = useApp();
   const { showToast } = useToast();
+  const { t, tv } = useI18n();
 
   const [reportType, setReportType] = useState('operational');
   const [form, setForm] = useState(EMPTY);
@@ -31,7 +33,7 @@ export default function Reports() {
 
   const handleGenerate = () => {
     if (form.dateFrom && form.dateTo && form.dateFrom > form.dateTo) {
-      showToast('"Date From" must not be after "Date To"', 'error');
+      showToast(t('rep.dateOrder'), 'error');
       return;
     }
     setApplied({ type: reportType, ...form });
@@ -40,14 +42,14 @@ export default function Reports() {
   const handleResetFilters = () => {
     setForm(EMPTY);
     setApplied({ type: reportType, ...EMPTY });
-    showToast('Report parameters reset to default', 'info');
+    showToast(t('rep.reset'), 'info');
   };
 
   const doExport = async (format) => {
     setExporting(format);
     try {
       const name = await reportsApi.exportReport(format, applied);
-      showToast(`Downloaded ${name}`, 'success');
+      showToast(t('common.downloaded', { name }), 'success');
     } catch (err) {
       showToast(errorMessage(err), 'error');
     } finally {
@@ -75,25 +77,26 @@ export default function Reports() {
   return (
     <div className="space-y-6">
       {/* Parameter Controls Panel */}
-      <Card title="Report Configuration Console" icon="fa-sliders-h" className="print:hidden">
+      <Card title={t('rep.console')} icon="fa-sliders-h" className="print:hidden">
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>
-              <label className="form-label text-xs font-bold text-gray-700 mb-1">Report Template</label>
+              <label className="form-label text-xs font-bold text-gray-700 mb-1">{t('rep.template')}</label>
               <select
                 value={reportType}
                 onChange={(e) => setReportType(e.target.value)}
                 className="form-input text-xs font-semibold"
               >
-                <option value="operational">Operational Log Report</option>
-                <option value="statistical">Statistical &amp; Threat Summary</option>
-                <option value="high-threat">High-Threat Alert Digest</option>
-                <option value="sector-audit">Sector Performance Report</option>
+                {['operational', 'statistical', 'high-threat', 'sector-audit'].map((type) => (
+                  <option key={type} value={type}>
+                    {t(`rep.type.${type}`)}
+                  </option>
+                ))}
               </select>
             </div>
 
             <div>
-              <label className="form-label text-xs font-bold text-gray-700 mb-1">Date From</label>
+              <label className="form-label text-xs font-bold text-gray-700 mb-1">{t('rep.dateFrom')}</label>
               <input
                 type="date"
                 value={form.dateFrom}
@@ -103,7 +106,7 @@ export default function Reports() {
             </div>
 
             <div>
-              <label className="form-label text-xs font-bold text-gray-700 mb-1">Date To</label>
+              <label className="form-label text-xs font-bold text-gray-700 mb-1">{t('rep.dateTo')}</label>
               <input
                 type="date"
                 value={form.dateTo}
@@ -113,16 +116,16 @@ export default function Reports() {
             </div>
 
             <div>
-              <label className="form-label text-xs font-bold text-gray-700 mb-1">Sector / Battalion</label>
+              <label className="form-label text-xs font-bold text-gray-700 mb-1">{t('rep.sectorBattalion')}</label>
               <div className="grid grid-cols-2 gap-2">
-                <select value={form.sector} onChange={set('sector')} className="form-input text-xs font-semibold" aria-label="Sector">
-                  <option value="">All Sectors</option>
+                <select value={form.sector} onChange={set('sector')} className="form-input text-xs font-semibold" aria-label={t('common.sector')}>
+                  <option value="">{t('common.allSectors')}</option>
                   {Object.keys(hierarchy).map((sec) => (
                     <option key={sec}>{sec}</option>
                   ))}
                 </select>
-                <select value={form.battalion} onChange={set('battalion')} className="form-input text-xs font-semibold" aria-label="Battalion">
-                  <option value="">All Battalions</option>
+                <select value={form.battalion} onChange={set('battalion')} className="form-input text-xs font-semibold" aria-label={t('common.battalion')}>
+                  <option value="">{t('common.allBattalions')}</option>
                   {battalions.map((b) => (
                     <option key={b}>{b}</option>
                   ))}
@@ -133,13 +136,13 @@ export default function Reports() {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-4 pt-2 border-t border-gray-100">
             <div>
-              <label className="form-label text-xs font-bold text-gray-700 mb-1">Incident Category</label>
+              <label className="form-label text-xs font-bold text-gray-700 mb-1">{t('rep.category')}</label>
               <select
                 value={form.category}
                 onChange={set('category')}
                 className="form-input text-xs font-semibold"
               >
-                <option value="">All Categories</option>
+                <option value="">{t('common.allCategories')}</option>
                 {(meta?.categories || []).map((c) => (
                   <option key={c.id} value={c.name}>
                     {c.name}
@@ -149,32 +152,32 @@ export default function Reports() {
             </div>
 
             <div>
-              <label className="form-label text-xs font-bold text-gray-700 mb-1">Threat Severity</label>
+              <label className="form-label text-xs font-bold text-gray-700 mb-1">{t('rep.severity')}</label>
               <select
                 value={form.severity}
                 onChange={set('severity')}
                 className="form-input text-xs font-semibold"
               >
-                <option value="">All Severities</option>
+                <option value="">{t('rep.allSeverities')}</option>
                 {(meta?.severities || []).map((s) => (
                   <option key={s} value={s}>
-                    {s}
+                    {tv('severity', s)}
                   </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label className="form-label text-xs font-bold text-gray-700 mb-1">Workflow Status</label>
+              <label className="form-label text-xs font-bold text-gray-700 mb-1">{t('rep.status')}</label>
               <select
                 value={form.status}
                 onChange={set('status')}
                 className="form-input text-xs font-semibold"
               >
-                <option value="">All Statuses</option>
+                <option value="">{t('rep.allStatuses')}</option>
                 {(meta?.statuses || []).filter((st) => st !== 'Draft').map((s) => (
                   <option key={s} value={s}>
-                    {s}
+                    {tv('status', s)}
                   </option>
                 ))}
               </select>
@@ -187,13 +190,13 @@ export default function Reports() {
                 disabled={loading}
                 className="btn btn-primary flex-1 py-2.5 text-xs font-bold shadow-md"
               >
-                <i className={`fas fa-sync-alt mr-1 text-xs ${loading ? 'fa-spin' : ''}`} /> Update Report
+                <i className={`fas fa-sync-alt mr-1 text-xs ${loading ? 'fa-spin' : ''}`} /> {t('rep.update')}
               </button>
               <button
                 type="button"
                 onClick={handleResetFilters}
                 className="btn btn-ghost px-3 py-2.5 text-xs font-semibold text-gray-600 hover:text-gray-900 border border-gray-200"
-                title="Reset All Parameters"
+                title={t('rep.resetTitle')}
               >
                 <i className="fas fa-undo text-xs" />
               </button>
@@ -224,10 +227,10 @@ export default function Reports() {
 
                   </div>
                   <h2 className="mt-1 text-xl font-black text-bgb-900 sm:text-2xl uppercase tracking-tight">
-                    Headquarters Border Guard Bangladesh
+                    {t('rep.hq')}
                   </h2>
                   <p className="text-xs font-bold text-bgb-700 tracking-wide">
-                    {report.meta.title}
+                    BIRDS {t(`rep.type.${report.meta.type}`)}
                   </p>
                 </div>
               </div>
@@ -239,7 +242,7 @@ export default function Reports() {
                   onClick={handlePrint}
                   className="btn bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-3.5 text-xs shadow-sm"
                 >
-                  <i className="fas fa-file-pdf mr-1" /> PDF / Print
+                  <i className="fas fa-file-pdf mr-1" /> {t('rep.print')}
                 </button>
                 <button
                   type="button"
@@ -247,7 +250,7 @@ export default function Reports() {
                   disabled={Boolean(exporting)}
                   className="btn bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-2 px-3.5 text-xs shadow-sm"
                 >
-                  <i className={`fas ${exporting === 'excel' ? 'fa-spinner fa-spin' : 'fa-file-excel'} mr-1`} /> Export Excel
+                  <i className={`fas ${exporting === 'excel' ? 'fa-spinner fa-spin' : 'fa-file-excel'} mr-1`} /> {t('rep.excel')}
                 </button>
                 <button
                   type="button"
@@ -255,7 +258,7 @@ export default function Reports() {
                   disabled={Boolean(exporting)}
                   className="btn bg-blue-700 hover:bg-blue-800 text-white font-bold py-2 px-3.5 text-xs shadow-sm"
                 >
-                  <i className={`fas ${exporting === 'csv' ? 'fa-spinner fa-spin' : 'fa-file-csv'} mr-1`} /> CSV
+                  <i className={`fas ${exporting === 'csv' ? 'fa-spinner fa-spin' : 'fa-file-csv'} mr-1`} /> {t('rep.csv')}
                 </button>
               </div>
             </div>
@@ -263,24 +266,24 @@ export default function Reports() {
             {/* Document Metadata Bar */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 bg-gray-50 rounded-xl p-3.5 border border-gray-200 text-xs text-gray-700">
               <div>
-                <span className="text-gray-400 block font-medium">Generated On:</span>
+                <span className="text-gray-400 block font-medium">{t('rep.generatedOn')}</span>
                 <span className="font-bold text-gray-900">{formatDateTime(report.meta.generatedAt)}</span>
               </div>
               <div>
-                <span className="text-gray-400 block font-medium">Prepared By:</span>
+                <span className="text-gray-400 block font-medium">{t('rep.preparedBy')}</span>
                 <span className="font-bold text-gray-900">
-                  {report.meta.generatedBy.name} ({report.meta.generatedBy.role}, {report.meta.generatedBy.scope})
+                  {report.meta.generatedBy.name} ({tv('role', report.meta.generatedBy.role)}, {report.meta.generatedBy.scope})
                 </span>
               </div>
               <div>
-                <span className="text-gray-400 block font-medium">Reporting Period:</span>
+                <span className="text-gray-400 block font-medium">{t('rep.period')}</span>
                 <span className="font-bold text-gray-900">
-                  {applied.dateFrom ? formatDateDisplay(applied.dateFrom) : 'All Time'} to {applied.dateTo ? formatDateDisplay(applied.dateTo) : 'Present'}
+                  {t('rep.periodRange', { from: applied.dateFrom ? formatDateDisplay(applied.dateFrom) : t('rep.allTime'), to: applied.dateTo ? formatDateDisplay(applied.dateTo) : t('rep.present') })}
                 </span>
               </div>
               <div>
-                <span className="text-gray-400 block font-medium">Filtered Records:</span>
-                <span className="font-bold text-bgb-700">{derived.total} Filed Incidents</span>
+                <span className="text-gray-400 block font-medium">{t('rep.records')}</span>
+                <span className="font-bold text-bgb-700">{t('rep.filedN', { n: derived.total })}</span>
               </div>
             </div>
 
@@ -288,19 +291,19 @@ export default function Reports() {
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
               <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-4 text-center">
                 <p className="text-2xl font-black text-blue-800 sm:text-3xl">{derived.total}</p>
-                <p className="text-xs font-bold text-blue-700 mt-1 uppercase tracking-wider">Total Included</p>
+                <p className="text-xs font-bold text-blue-700 mt-1 uppercase tracking-wider">{t('rep.totalIncluded')}</p>
               </div>
               <div className="rounded-xl border border-red-200 bg-red-50/70 p-4 text-center">
                 <p className="text-2xl font-black text-red-800 sm:text-3xl">{derived.critical}</p>
-                <p className="text-xs font-bold text-red-700 mt-1 uppercase tracking-wider">High &amp; Critical</p>
+                <p className="text-xs font-bold text-red-700 mt-1 uppercase tracking-wider">{t('rep.highCritical')}</p>
               </div>
               <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4 text-center">
                 <p className="text-2xl font-black text-amber-800 sm:text-3xl">{derived.pending}</p>
-                <p className="text-xs font-bold text-amber-700 mt-1 uppercase tracking-wider">Pending Action</p>
+                <p className="text-xs font-bold text-amber-700 mt-1 uppercase tracking-wider">{t('rep.pending')}</p>
               </div>
               <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 text-center">
                 <p className="text-2xl font-black text-emerald-800 sm:text-3xl">{derived.resolved}</p>
-                <p className="text-xs font-bold text-emerald-700 mt-1 uppercase tracking-wider">Approved / Closed</p>
+                <p className="text-xs font-bold text-emerald-700 mt-1 uppercase tracking-wider">{t('rep.resolved')}</p>
               </div>
             </div>
 
@@ -308,15 +311,15 @@ export default function Reports() {
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <div>
                 <h3 className="mb-2 text-xs font-extrabold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <i className="fas fa-chart-pie text-bgb-600" /> Category Distribution
+                  <i className="fas fa-chart-pie text-bgb-600" /> {t('rep.categoryDist')}
                 </h3>
                 <div className="overflow-hidden rounded-xl border border-gray-200">
                   <table className="w-full text-left text-xs sm:text-sm">
                     <thead className="bg-gray-100 text-xs font-extrabold text-gray-600 uppercase border-b border-gray-200">
                       <tr>
-                        <th className="py-2.5 px-4">Category</th>
-                        <th className="py-2.5 px-4">Count</th>
-                        <th className="py-2.5 px-4 text-right">Proportion</th>
+                        <th className="py-2.5 px-4">{t('common.category')}</th>
+                        <th className="py-2.5 px-4">{t('common.count')}</th>
+                        <th className="py-2.5 px-4 text-right">{t('common.proportion')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 font-medium">
@@ -344,15 +347,15 @@ export default function Reports() {
 
               <div>
                 <h3 className="mb-2 text-xs font-extrabold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <i className="fas fa-building text-bgb-600" /> Sector Distribution
+                  <i className="fas fa-building text-bgb-600" /> {t('rep.sectorDist')}
                 </h3>
                 <div className="overflow-hidden rounded-xl border border-gray-200">
                   <table className="w-full text-left text-xs sm:text-sm">
                     <thead className="bg-gray-100 text-xs font-extrabold text-gray-600 uppercase border-b border-gray-200">
                       <tr>
-                        <th className="py-2.5 px-4">Sector</th>
-                        <th className="py-2.5 px-4">Count</th>
-                        <th className="py-2.5 px-4 text-right">Proportion</th>
+                        <th className="py-2.5 px-4">{t('common.sector')}</th>
+                        <th className="py-2.5 px-4">{t('common.count')}</th>
+                        <th className="py-2.5 px-4 text-right">{t('common.proportion')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 font-medium">
@@ -383,22 +386,22 @@ export default function Reports() {
             <div>
               <div className="mb-2 flex items-center justify-between">
                 <h3 className="text-xs font-extrabold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <i className="fas fa-list text-bgb-600" /> Master Incident Records ({report.incidents.length}
-                  {report.meta.truncated ? ` of ${derived.total}; export for the full list` : ''})
+                  <i className="fas fa-list text-bgb-600" /> {t('rep.master', { n: derived.total })}
+                  {report.meta.truncated && <span className="font-medium normal-case text-amber-700"> · {t('rep.truncated', { n: report.incidents.length, total: derived.total })}</span>}
                 </h3>
-                <span className="text-[11px] font-semibold text-gray-500">Newest first</span>
+                <span className="text-[11px] font-semibold text-gray-500">{t('rep.newest')}</span>
               </div>
               <div className="overflow-x-auto rounded-xl border border-gray-200">
                 <table className="w-full text-left text-xs sm:text-sm">
                   <thead className="bg-gray-100 text-xs font-extrabold text-gray-600 uppercase border-b border-gray-200">
                     <tr>
-                      <th className="py-3 px-3">Reference</th>
-                      <th className="py-3 px-3">Title</th>
-                      <th className="py-3 px-3">Battalion / BOP</th>
-                      <th className="py-3 px-3">Category</th>
-                      <th className="py-3 px-3">Severity</th>
-                      <th className="py-3 px-3">Status</th>
-                      <th className="py-3 px-3">Date (DD-MM-YYYY)</th>
+                      <th className="py-3 px-3">{t('common.reference')}</th>
+                      <th className="py-3 px-3">{t('common.title')}</th>
+                      <th className="py-3 px-3">{t('rep.bnBop')}</th>
+                      <th className="py-3 px-3">{t('common.category')}</th>
+                      <th className="py-3 px-3">{t('common.severity')}</th>
+                      <th className="py-3 px-3">{t('common.status')}</th>
+                      <th className="py-3 px-3">{t('rep.dateCol')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 font-medium text-gray-800">
@@ -427,12 +430,12 @@ export default function Reports() {
             {/* Official Signatures Block for Printing */}
             <div className="hidden print:grid grid-cols-2 gap-8 pt-12 text-center text-xs font-bold">
               <div>
-                <div className="border-b border-black pb-1 mb-1">Prepared By: {report.meta.generatedBy.name}</div>
-                <div>Duty Officer, Headquarters BGB</div>
+                <div className="border-b border-black pb-1 mb-1">{t('rep.preparedBy')} {report.meta.generatedBy.name}</div>
+                <div>{t('rep.dutyOfficer')}</div>
               </div>
               <div>
-                <div className="border-b border-black pb-1 mb-1">Approved By: Command Authority</div>
-                <div>Headquarters Border Guard Bangladesh</div>
+                <div className="border-b border-black pb-1 mb-1">{t('rep.approvedBy')}</div>
+                <div>{t('rep.hq')}</div>
               </div>
             </div>
           </div>

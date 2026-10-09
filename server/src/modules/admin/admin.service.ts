@@ -15,7 +15,12 @@ const audit = (admin: AuthUser, action: string, details: string, ctx: RequestCon
 // System configuration (spec #47) — typed and range-checked; incident counters are read-only
 // ---------------------------------------------------------------------------
 export async function getConfig() {
-  const rows = await prisma.systemConfig.findMany({ orderBy: { key: 'asc' }, include: { updater: { select: { username: true } } } });
+  const stored = await prisma.systemConfig.findMany({ orderBy: { key: 'asc' }, include: { updater: { select: { username: true } } } });
+  // Settings added after the database was seeded have no row yet: show their default
+  const missing = Object.entries(CONFIG_DEFAULTS)
+    .filter(([key]) => !stored.some((r) => r.key === key))
+    .map(([key, spec]) => ({ key, value: spec.value, description: spec.description, updater: null, updatedAt: new Date(0) }));
+  const rows = [...stored, ...missing].sort((a, b) => a.key.localeCompare(b.key));
   return rows.map((r) => {
     const spec = CONFIG_DEFAULTS[r.key];
     return {

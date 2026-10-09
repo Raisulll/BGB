@@ -185,13 +185,25 @@ export async function downloadFrom(path, options) {
   return filename;
 }
 
-/** User-facing message for any error thrown by this module. */
-export const errorMessage = (err, fallback = 'Something went wrong. Please try again.') => {
-  if (err instanceof ApiError) {
-    if (err.status === 0 || err.code === 'NETWORK') return 'Cannot reach the BIRDS server.';
-    return err.message || fallback;
-  }
+// Spec #43 — set by I18nProvider. `lookup(key)` returns the current language's text or undefined;
+// `preferLocal` is true for languages other than English, whose server messages are English only.
+let i18n = { lookup: () => undefined, preferLocal: false };
+export const setErrorTranslator = (next) => {
+  i18n = next;
+};
+const local = (key, english) => i18n.lookup(key) ?? english;
+
+/** User-facing message for any error thrown by this module, in the interface language where known. */
+export const errorMessage = (err, fallback) => {
+  const generic = fallback || local('error.generic', 'Something went wrong. Please try again.');
   if (err?.name === 'AbortError') return '';
-  if (err instanceof TypeError) return 'Cannot reach the BIRDS server.';
-  return err?.message || fallback;
+  const network = local('error.network', 'Cannot reach the BIRDS server.');
+  if (err instanceof ApiError) {
+    if (err.status === 0 || err.code === 'NETWORK') return network;
+    // English: the server's message is the most specific. Other languages: translate the code if known.
+    const byCode = i18n.preferLocal ? i18n.lookup(`apiError.${err.code}`) : undefined;
+    return byCode || err.message || generic;
+  }
+  if (err instanceof TypeError) return network;
+  return err?.message || generic;
 };

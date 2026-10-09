@@ -1,6 +1,8 @@
 import { SEVERITY_STYLES, STATUS_STYLES, cn } from '../../utils/helpers';
+import { useI18n } from '../../i18n/I18nContext';
 
 export function StatusBadge({ status }) {
+  const { tv } = useI18n();
   return (
     <span
       className={cn(
@@ -8,12 +10,13 @@ export function StatusBadge({ status }) {
         STATUS_STYLES[status] || STATUS_STYLES.Draft,
       )}
     >
-      {status}
+      {tv('status', status)}
     </span>
   );
 }
 
 export function SeverityBadge({ severity }) {
+  const { tv } = useI18n();
   return (
     <span
       className={cn(
@@ -21,7 +24,7 @@ export function SeverityBadge({ severity }) {
         SEVERITY_STYLES[severity] || 'bg-gray-50 text-gray-600',
       )}
     >
-      {severity}
+      {tv('severity', severity)}
     </span>
   );
 }

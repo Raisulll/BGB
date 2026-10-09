@@ -5,16 +5,17 @@ import * as adminApi from '../../api/admin';
 import { errorMessage } from '../../api/client';
 import Card from '../../components/ui/Card';
 import Toggle from '../../components/ui/Toggle';
+import { useI18n } from '../../i18n/I18nContext';
 
 export const MODULES = [
-  { id: 'dashboard', label: 'Dashboard', icon: 'fa-tachometer-alt', description: 'Overview statistics, charts, and recent incidents' },
-  { id: 'incidents', label: 'Incident List', icon: 'fa-file-alt', description: 'Browse, search and open incident records' },
-  { id: 'create', label: 'Create / Edit Incident', icon: 'fa-plus-circle', description: 'File new incident reports and edit own drafts' },
-  { id: 'map', label: 'GIS Map View', icon: 'fa-map-marked-alt', description: 'Interactive spatial map with GPS markers' },
-  { id: 'analytics', label: 'Analytics & Charts', icon: 'fa-chart-bar', description: 'Trends, severity and sector analytics' },
-  { id: 'reports', label: 'Exportable Reports', icon: 'fa-file-export', description: 'Report generator and PDF/Excel/CSV export' },
-  { id: 'audit', label: 'System Audit Trail', icon: 'fa-clipboard-list', description: 'Tamper-evident log of all user activity' },
-  { id: 'admin', label: 'Administration Console', icon: 'fa-cogs', description: 'Users, permissions, categories and system settings' },
+  { id: 'dashboard', icon: 'fa-tachometer-alt' },
+  { id: 'incidents', icon: 'fa-file-alt' },
+  { id: 'create', icon: 'fa-plus-circle' },
+  { id: 'map', icon: 'fa-map-marked-alt' },
+  { id: 'analytics', icon: 'fa-chart-bar' },
+  { id: 'reports', icon: 'fa-file-export' },
+  { id: 'audit', icon: 'fa-clipboard-list' },
+  { id: 'admin', icon: 'fa-cogs' },
 ];
 
 // Spec #3 — role → page matrix stored in role_permissions. Changes apply to every session at once
@@ -22,12 +23,13 @@ export const MODULES = [
 export default function AdminPermissions({ matrix, onChange }) {
   const { refreshUser } = useApp();
   const { showToast } = useToast();
+  const { t, tv } = useI18n();
   const [busy, setBusy] = useState(null);
   const { roles, permissions } = matrix;
 
   const handleToggle = async (role, moduleId, enabled) => {
     if (role === 'HQ Administrator' && moduleId === 'admin') {
-      showToast('The HQ Administrator role always keeps the Administration console.', 'warning');
+      showToast(t('perm.adminLocked'), 'warning');
       return;
     }
     setBusy(`${role}:${moduleId}`);
@@ -35,7 +37,7 @@ export default function AdminPermissions({ matrix, onChange }) {
       const updated = await adminApi.setPermission(role, moduleId, enabled);
       onChange(updated);
       refreshUser().catch(() => {}); // the admin's own menu may change too
-      showToast(`${enabled ? 'Granted' : 'Revoked'} ${moduleId} for ${role}`, 'success');
+      showToast(t(enabled ? 'perm.granted' : 'perm.revoked', { module: t(`perm.module.${moduleId}`), role: tv('role', role) }), 'success');
     } catch (err) {
       showToast(errorMessage(err), 'error');
     } finally {
@@ -44,12 +46,12 @@ export default function AdminPermissions({ matrix, onChange }) {
   };
 
   const reset = async () => {
-    if (!window.confirm('Reset every role to the factory default permissions?')) return;
+    if (!window.confirm(t('perm.confirmReset'))) return;
     setBusy('reset');
     try {
       onChange(await adminApi.resetPermissions());
       refreshUser().catch(() => {});
-      showToast('Permissions reset to factory defaults', 'success');
+      showToast(t('perm.resetDone'), 'success');
     } catch (err) {
       showToast(errorMessage(err), 'error');
     } finally {
@@ -59,19 +61,19 @@ export default function AdminPermissions({ matrix, onChange }) {
 
   return (
     <Card
-      title="Role Access Control Matrix"
+      title={t('perm.title')}
       icon="fa-shield-alt"
       bodyClassName="p-0"
       actions={
         <button onClick={reset} disabled={Boolean(busy)} className="btn btn-secondary text-xs">
-          <i className={`fas ${busy === 'reset' ? 'fa-spinner fa-spin' : 'fa-undo'}`} /> Reset to Defaults
+          <i className={`fas ${busy === 'reset' ? 'fa-spinner fa-spin' : 'fa-undo'}`} /> {t('perm.reset')}
         </button>
       }
     >
       <div className="flex items-center gap-3 border-b border-bgb-100 bg-bgb-50/60 p-4 text-xs text-bgb-900">
         <i className="fas fa-info-circle shrink-0 text-base text-bgb-600" />
         <p>
-          Grant or revoke module access per role. The server enforces these on every request; changes take effect immediately for all signed-in users and are recorded in the audit trail.
+          {t('perm.info')}
         </p>
       </div>
 
@@ -79,12 +81,12 @@ export default function AdminPermissions({ matrix, onChange }) {
         <table className="w-full text-left text-xs sm:text-sm">
           <thead className="bg-gray-50 text-gray-700">
             <tr>
-              <th className="th min-w-[200px]">System Module</th>
+              <th className="th min-w-[200px]">{t('perm.moduleHeader')}</th>
               {roles.map(({ name }) => (
                 <th key={name} className="th min-w-[130px] whitespace-nowrap text-center">
-                  <span className="block font-semibold text-gray-800">{name}</span>
+                  <span className="block font-semibold text-gray-800">{tv('role', name)}</span>
                   <span className="block text-[10px] font-normal text-gray-500">
-                    {(permissions[name] || []).length} / {MODULES.length} modules
+                    {t('perm.modulesCount', { n: (permissions[name] || []).length, total: MODULES.length })}
                   </span>
                 </th>
               ))}
@@ -99,8 +101,8 @@ export default function AdminPermissions({ matrix, onChange }) {
                       <i className={`fas ${mod.icon}`} />
                     </div>
                     <div>
-                      <p className="font-semibold text-gray-800">{mod.label}</p>
-                      <p className="text-xs text-gray-500">{mod.description}</p>
+                      <p className="font-semibold text-gray-800">{t(`perm.module.${mod.id}`)}</p>
+                      <p className="text-xs text-gray-500">{t(`perm.desc.${mod.id}`)}</p>
                     </div>
                   </div>
                 </td>
@@ -111,9 +113,9 @@ export default function AdminPermissions({ matrix, onChange }) {
                   return (
                     <td key={name} className="td text-center">
                       <div className={`inline-flex items-center justify-center ${busy === key ? 'opacity-50' : ''}`}>
-                        <Toggle checked={isAllowed} onChange={() => !busy && handleToggle(name, mod.id, !isAllowed)} label={`Toggle ${mod.label} for ${name}`} />
+                        <Toggle checked={isAllowed} onChange={() => !busy && handleToggle(name, mod.id, !isAllowed)} label={t('perm.toggle', { module: t(`perm.module.${mod.id}`), role: tv('role', name) })} />
                       </div>
-                      {isLocked && <span className="mt-1 block text-[9px] font-semibold text-amber-600">LOCKED</span>}
+                      {isLocked && <span className="mt-1 block text-[9px] font-semibold text-amber-600">{t('perm.locked')}</span>}
                     </td>
                   );
                 })}

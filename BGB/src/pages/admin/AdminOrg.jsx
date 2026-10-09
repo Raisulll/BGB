@@ -4,6 +4,7 @@ import { useToast } from '../../context/ToastContext';
 import * as adminApi from '../../api/admin';
 import { errorMessage } from '../../api/client';
 import Card from '../../components/ui/Card';
+import { useI18n } from '../../i18n/I18nContext';
 
 // Spec #9 — organizational hierarchy HQ → Sector → Battalion → BOP. Units are add-only: incidents
 // and user scopes refer to them by name. The server checks that a battalion stays in one sector and
@@ -11,6 +12,7 @@ import Card from '../../components/ui/Card';
 export default function AdminOrg({ org, onChange }) {
   const { reloadMeta } = useApp();
   const { showToast } = useToast();
+  const { t } = useI18n();
   const [form, setForm] = useState({ sector: '', battalion: '', bop: '' });
   const [busy, setBusy] = useState(false);
   const hierarchy = org.hierarchy;
@@ -23,7 +25,7 @@ export default function AdminOrg({ org, onChange }) {
       const body = { sector: form.sector.trim(), battalion: form.battalion.trim(), bop: form.bop.trim() };
       onChange(await adminApi.addOrgUnit(body));
       reloadMeta().catch(() => {});
-      showToast(`${body.bop} added under ${body.battalion}, ${body.sector}`, 'success');
+      showToast(t('org.added', body), 'success');
       setForm((f) => ({ ...f, bop: '' }));
     } catch (err) {
       showToast(errorMessage(err), 'error');
@@ -34,7 +36,7 @@ export default function AdminOrg({ org, onChange }) {
 
   return (
     <div className="grid grid-cols-1 items-start gap-4 sm:gap-6 lg:grid-cols-3">
-      <Card title={`Organizational Hierarchy (${org.units.length} BOPs)`} icon="fa-sitemap" className="lg:col-span-2">
+      <Card title={t('org.title', { n: org.units.length })} icon="fa-sitemap" className="lg:col-span-2">
         <div className="space-y-4">
           <div className="flex items-center gap-2 text-sm font-bold text-bgb-900">
             <i className="fas fa-flag text-bgb-600" /> {org.hq}
@@ -66,29 +68,29 @@ export default function AdminOrg({ org, onChange }) {
         </div>
       </Card>
 
-      <Card title="Add Unit" icon="fa-plus-circle">
+      <Card title={t('org.addUnit')} icon="fa-plus-circle">
         <form onSubmit={add} className="space-y-3">
           <div>
-            <label htmlFor="org-sector" className="form-label">Sector *</label>
-            <input id="org-sector" list="org-sectors" required value={form.sector} onChange={set('sector')} placeholder="Existing or new, e.g. Sector-9" className="form-input" />
+            <label htmlFor="org-sector" className="form-label">{t('common.sector')} *</label>
+            <input id="org-sector" list="org-sectors" required value={form.sector} onChange={set('sector')} placeholder={t('org.sectorPh')} className="form-input" />
             <datalist id="org-sectors">
               {Object.keys(hierarchy).map((s) => <option key={s} value={s} />)}
             </datalist>
           </div>
           <div>
-            <label htmlFor="org-bn" className="form-label">Battalion *</label>
-            <input id="org-bn" list="org-bns" required value={form.battalion} onChange={set('battalion')} placeholder="Existing or new, e.g. 55 BGB" className="form-input" />
+            <label htmlFor="org-bn" className="form-label">{t('common.battalion')} *</label>
+            <input id="org-bn" list="org-bns" required value={form.battalion} onChange={set('battalion')} placeholder={t('org.battalionPh')} className="form-input" />
             <datalist id="org-bns">
               {Object.keys(hierarchy[form.sector] || {}).map((b) => <option key={b} value={b} />)}
             </datalist>
           </div>
           <div>
-            <label htmlFor="org-bop" className="form-label">BOP *</label>
-            <input id="org-bop" required value={form.bop} onChange={set('bop')} placeholder="e.g. BOP Sonahat" className="form-input" />
+            <label htmlFor="org-bop" className="form-label">{t('common.bop')} *</label>
+            <input id="org-bop" required value={form.bop} onChange={set('bop')} placeholder={t('org.bopPh')} className="form-input" />
           </div>
-          <p className="text-[11px] text-gray-500">Units can't be renamed or removed once created, because incidents and user scopes refer to them.</p>
+          <p className="text-[11px] text-gray-500">{t('org.addOnly')}</p>
           <button type="submit" disabled={busy} className="btn btn-primary w-full">
-            <i className={`fas ${busy ? 'fa-spinner fa-spin' : 'fa-plus'}`} /> Add BOP
+            <i className={`fas ${busy ? 'fa-spinner fa-spin' : 'fa-plus'}`} /> {t('org.addBop')}
           </button>
         </form>
       </Card>

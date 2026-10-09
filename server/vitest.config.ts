@@ -12,6 +12,9 @@ export default defineConfig({
       LOG_DIR: 'logs/test',
       EVIDENCE_DIR: 'storage/test-evidence',
       EVIDENCE_MAX_FILE_MB: '1', // small cap so the size-limit test stays fast
+      MAIL_TRANSPORT: 'json', // render e-mails without sending
+      EVIDENCE_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'), // fixed test key (spec #27)
+      SMTP_HOST: '',
     },
     // One shared database: run files one at a time
     fileParallelism: false,

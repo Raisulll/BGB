@@ -13,7 +13,7 @@ import {
 
 ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, LineElement, PointElement, Filler, Legend, Tooltip);
 
-ChartJS.defaults.font.family = "'Inter', ui-sans-serif, system-ui, sans-serif";
+ChartJS.defaults.font.family = "'Inter', 'Noto Sans Bengali', ui-sans-serif, system-ui, sans-serif";
 ChartJS.defaults.color = '#6b7280';
 ChartJS.defaults.maintainAspectRatio = false;
 ChartJS.defaults.responsive = true;

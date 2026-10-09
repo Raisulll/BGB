@@ -2,7 +2,7 @@
 
 /* ============ DESIGN TOKENS ============ */
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", "Noto Sans Bengali", ui-sans-serif, system-ui, sans-serif;
 
   --color-bgb-50: #f0f7f0;
   --color-bgb-100: #d4ecd4;

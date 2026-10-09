@@ -5,6 +5,7 @@ import * as notificationsApi from '../api/notifications';
 import { errorMessage, setSessionEndedHandler } from '../api/client';
 import { lastActivityAt } from '../utils/activity';
 import { useToast } from './ToastContext';
+import { useI18n } from '../i18n/I18nContext';
 
 // Thin session + cache layer over the BIRDS REST API (CLAUDE.md §18.2). Everything that matters
 // (permissions, scope, workflow rules, audit) is enforced and recorded by the server; this
@@ -19,13 +20,11 @@ const DEFAULT_POLICY = {
   password: { minLength: 8, requireUppercase: true, requireNumber: true, requireSpecial: true },
 };
 
-const SESSION_END_MESSAGES = {
-  SESSION_EXPIRED: 'Your session expired after a period of inactivity. Please sign in again.',
-  SESSION_ENDED: 'Your session has ended. Please sign in again.',
-};
+const SESSION_END_MESSAGES = { SESSION_EXPIRED: 'session.expired', SESSION_ENDED: 'session.ended' };
 
 export function AppProvider({ children }) {
   const { showToast } = useToast();
+  const { t } = useI18n();
   const [booting, setBooting] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
   const [policy, setPolicy] = useState(DEFAULT_POLICY);
@@ -79,13 +78,13 @@ export function AppProvider({ children }) {
         return;
       }
       // Several in-flight requests can fail together; announce the end of the session once.
-      if (userRef.current) showToast(SESSION_END_MESSAGES[err?.code] || SESSION_END_MESSAGES.SESSION_ENDED, 'warning');
+      if (userRef.current) showToast(t(SESSION_END_MESSAGES[err?.code] || SESSION_END_MESSAGES.SESSION_ENDED), 'warning');
       userRef.current = null;
       authApi.setSessionHint(false);
       clearSession();
     });
     return () => setSessionEndedHandler(() => {});
-  }, [showToast, clearSession]);
+  }, [showToast, clearSession, t]);
 
   // ---------- Auth (specs #4, #28, #29) ----------
   // Returns { user } on success, or { error, locked } on failure.
@@ -96,7 +95,7 @@ export function AppProvider({ children }) {
         const user = await hydrate();
         return { user };
       } catch (err) {
-        return { error: errorMessage(err, 'Sign-in failed.'), locked: err?.status === 423 };
+        return { error: errorMessage(err), locked: err?.status === 423 };
       }
     },
     [hydrate],

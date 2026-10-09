@@ -32,10 +32,10 @@ export const refreshLimiter = rateLimit({
   message: message('Too many session refresh requests. Try again later.'),
 });
 
-/** 100 requests per minute per authenticated user (falls back to IP). Mount after requireAuth. */
+/** API_RATE_LIMIT_PER_MINUTE (default 100) requests per minute per authenticated user (falls back to IP). Mount after requireAuth. */
 export const apiLimiter = rateLimit({
   windowMs: 60_000,
-  limit: 100,
+  limit: env.API_RATE_LIMIT_PER_MINUTE,
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   skip,

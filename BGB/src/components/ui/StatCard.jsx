@@ -12,7 +12,9 @@ export default function StatCard({ label, value, icon, color = 'blue' }) {
     <div className="card p-3 transition duration-300 hover:-translate-y-0.5 hover:shadow-lg sm:p-5">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate text-xs text-gray-500 sm:text-sm">{label}</p>
+          <p className="line-clamp-2 text-xs leading-snug text-gray-500 sm:text-sm" title={label}>
+            {label}
+          </p>
           <p className={`mt-0.5 text-xl font-bold sm:mt-1 sm:text-2xl ${c.text}`}>{value}</p>
         </div>
         <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg sm:h-12 sm:w-12 sm:rounded-xl ${c.bg}`}>

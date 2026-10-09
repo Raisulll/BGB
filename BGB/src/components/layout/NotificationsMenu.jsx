@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { formatDateTime, timeAgo } from '../../utils/helpers';
+import { useI18n } from '../../i18n/I18nContext';
 
 const TYPE_ICON = {
   submission: 'fa-paper-plane text-blue-600 bg-blue-50 border-blue-200',
@@ -12,6 +13,7 @@ const TYPE_ICON = {
 
 export default function NotificationsMenu() {
   const { notifications = [], unreadCount, markAllRead, markRead } = useApp();
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState('all'); // 'all' | 'unread'
   const ref = useRef(null);
@@ -47,9 +49,9 @@ export default function NotificationsMenu() {
       <button
         onClick={() => setOpen((o) => !o)}
         className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100/90 text-slate-600 border border-slate-200/80 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 transition-all duration-200"
-        aria-label={`Notifications${unreadCount ? ` (${unreadCount} unread)` : ''}`}
+        aria-label={`${t('notif.title')}${unreadCount ? ` (${t('notif.unreadCount', { n: unreadCount })})` : ''}`}
         aria-expanded={open}
-        title="Notifications Center"
+        title={t('notif.center')}
       >
         <i className="fas fa-bell text-base" />
         {unreadCount > 0 && (
@@ -66,10 +68,10 @@ export default function NotificationsMenu() {
           <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/90 px-4 py-3">
             <div className="flex items-center gap-2">
               <i className="fas fa-bell text-emerald-600 text-sm" />
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-800">Notifications</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-800">{t('notif.title')}</span>
               {unreadCount > 0 && (
                 <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200">
-                  {unreadCount} New
+                  {t('notif.new', { n: unreadCount })}
                 </span>
               )}
             </div>
@@ -78,7 +80,7 @@ export default function NotificationsMenu() {
               className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 hover:underline disabled:opacity-40"
               disabled={!unreadCount}
             >
-              Mark all read
+              {t('notif.markAll')}
             </button>
           </div>
 
@@ -90,7 +92,7 @@ export default function NotificationsMenu() {
                 filter === 'all' ? 'bg-white font-bold text-slate-900 shadow-xs border border-slate-200' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              All
+              {t('notif.all')}
             </button>
             <button
               onClick={() => setFilter('unread')}
@@ -98,7 +100,7 @@ export default function NotificationsMenu() {
                 filter === 'unread' ? 'bg-white font-bold text-emerald-700 shadow-xs border border-slate-200' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              Unread ({unreadCount})
+              {t('notif.unread', { n: unreadCount })}
             </button>
           </div>
 
@@ -109,8 +111,8 @@ export default function NotificationsMenu() {
                 <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-400">
                   <i className="fas fa-bell-slash text-base" />
                 </div>
-                <p className="text-xs font-semibold text-slate-600">No notifications</p>
-                <p className="mt-1 text-[11px] text-slate-400">All notifications have been reviewed.</p>
+                <p className="text-xs font-semibold text-slate-600">{t('notif.empty')}</p>
+                <p className="mt-1 text-[11px] text-slate-400">{t('notif.emptyHint')}</p>
               </div>
             ) : (
               displayedNotifications.map((n) => (
@@ -129,7 +131,7 @@ export default function NotificationsMenu() {
                     <p className="text-xs font-bold text-slate-900 group-hover:text-emerald-800">{n.title}</p>
                     <p className="mt-0.5 text-xs text-slate-600 line-clamp-2">{n.message}</p>
                     <p className="mt-1 text-[10px] font-medium text-slate-400" title={formatDateTime(n.createdAt)}>
-                      {timeAgo(n.createdAt)}
+                      {timeAgo(n.createdAt, t)}
                     </p>
                   </div>
 

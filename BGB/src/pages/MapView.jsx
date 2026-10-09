@@ -9,9 +9,11 @@ import { formatDateDisplay, SEVERITY_HEX } from '../utils/helpers';
 import { StatusBadge } from '../components/ui/Badges';
 import Card from '../components/ui/Card';
 import ErrorState from '../components/ui/ErrorState';
+import { useI18n } from '../i18n/I18nContext';
 
 export default function MapView() {
   const { meta } = useApp();
+  const { t, tv } = useI18n();
   const [category, setCategory] = useState('');
   const [severity, setSeverity] = useState('');
   const [status, setStatus] = useState('');
@@ -28,7 +30,7 @@ export default function MapView() {
       if (!groups[key]) {
         groups[key] = {
           key,
-          bop: inc.bop || inc.location || 'Operational Point',
+          bop: inc.bop || inc.location || t('map.point'),
           lat: inc.lat,
           lng: inc.lng,
           incidents: [],
@@ -51,7 +53,7 @@ export default function MapView() {
     });
 
     return Object.values(groups);
-  }, [filtered]);
+  }, [filtered, t]);
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -63,9 +65,9 @@ export default function MapView() {
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               className="form-input"
-              aria-label="Filter by Category"
+              aria-label={t('map.filterCategory')}
             >
-              <option value="">All Categories</option>
+              <option value="">{t('common.allCategories')}</option>
               {(meta?.categories || []).map((c) => (
                 <option key={c.id} value={c.name}>
                   {c.name}
@@ -76,12 +78,12 @@ export default function MapView() {
               value={severity}
               onChange={(e) => setSeverity(e.target.value)}
               className="form-input"
-              aria-label="Filter by Severity"
+              aria-label={t('map.filterSeverity')}
             >
-              <option value="">All Severity</option>
+              <option value="">{t('common.allSeverity')}</option>
               {(meta?.severities || []).map((s) => (
                 <option key={s} value={s}>
-                  {s}
+                  {tv('severity', s)}
                 </option>
               ))}
             </select>
@@ -89,12 +91,12 @@ export default function MapView() {
               value={status}
               onChange={(e) => setStatus(e.target.value)}
               className="form-input"
-              aria-label="Filter by Status"
+              aria-label={t('map.filterStatus')}
             >
-              <option value="">All Status</option>
+              <option value="">{t('common.allStatus')}</option>
               {(meta?.statuses || []).map((s) => (
                 <option key={s} value={s}>
-                  {s}
+                  {tv('status', s)}
                 </option>
               ))}
             </select>
@@ -102,16 +104,16 @@ export default function MapView() {
 
           <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600 sm:gap-4">
             <span className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-red-500" /> Critical
+              <span className="h-2.5 w-2.5 rounded-full bg-red-500" /> {tv('severity', 'Critical')}
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-orange-500" /> High
+              <span className="h-2.5 w-2.5 rounded-full bg-orange-500" /> {tv('severity', 'High')}
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-yellow-500" /> Medium
+              <span className="h-2.5 w-2.5 rounded-full bg-yellow-500" /> {tv('severity', 'Medium')}
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-green-500" /> Low
+              <span className="h-2.5 w-2.5 rounded-full bg-green-500" /> {tv('severity', 'Low')}
             </span>
           </div>
         </div>
@@ -146,11 +148,11 @@ export default function MapView() {
                     <div className="flex items-center justify-between border-b border-gray-200 pb-1">
                       <span className="font-extrabold text-xs text-bgb-900">{loc.bop}</span>
                       <span className="rounded bg-bgb-100 px-1.5 py-0.5 text-[9px] font-bold text-bgb-800">
-                        {loc.incidents.length} Total
+                        {t('map.total', { n: loc.incidents.length })}
                       </span>
                     </div>
                     <div className="text-[10px] font-extrabold uppercase text-gray-500 tracking-wider">
-                      Recent Incidents (Last 2)
+                      {t('map.recentTwo')}
                     </div>
                     <div className="space-y-1">
                       {loc.recentTwo.map((inc, i) => (
@@ -173,7 +175,7 @@ export default function MapView() {
                   <div className="min-w-[220px] max-w-[260px] p-1 space-y-2">
                     <div className="border-b border-gray-200 pb-1 flex items-center justify-between">
                       <span className="font-extrabold text-xs text-bgb-900">{loc.bop}</span>
-                      <span className="text-[10px] font-bold text-gray-500">Last 2 Incidents</span>
+                      <span className="text-[10px] font-bold text-gray-500">{t('map.lastTwo')}</span>
                     </div>
 
                     <div className="space-y-2">
@@ -190,7 +192,7 @@ export default function MapView() {
                               to={`/incidents/${inc.id}`}
                               className="text-[10px] font-bold text-bgb-700 hover:text-bgb-900 hover:underline"
                             >
-                              View Details &rarr;
+                              {t('map.viewDetails')} &rarr;
                             </Link>
                           </div>
                         </div>
@@ -205,9 +207,9 @@ export default function MapView() {
       </Card>
 
       {/* Incident Locations List */}
-      <Card title="Incident Locations" bodyClassName="divide-y divide-gray-100">
+      <Card title={t('map.locations')} bodyClassName="divide-y divide-gray-100">
         {filtered.length === 0 ? (
-          <p className="p-4 text-center text-sm text-gray-400">No matching incident locations.</p>
+          <p className="p-4 text-center text-sm text-gray-400">{t('map.noLocations')}</p>
         ) : (
           filtered.map((inc) => (
             <Link

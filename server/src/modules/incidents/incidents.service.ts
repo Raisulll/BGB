@@ -9,7 +9,8 @@ import { writeAudit } from '../audit/audit.service.js';
 import { toEvidenceDto } from '../evidence/evidence.dto.js';
 import { notifyWorkflow, type WorkflowEvent } from '../notifications/notifications.service.js';
 import type { CreateIncidentInput, ListIncidentsQuery, UpdateIncidentInput } from './incidents.schema.js';
-import { availableActions, EDITABLE_STATUSES, isEditableStatus, WORKFLOW, type WorkflowAction } from './workflow.js';
+import { isAdmin } from '../../utils/roles.js';
+import { availableActions, EDITABLE_STATUSES, isArchivableStatus, isEditableStatus, WORKFLOW, type WorkflowAction } from './workflow.js';
 
 type AuthUser = Express.AuthUser;
 
@@ -45,13 +46,17 @@ export async function loadVisible(user: AuthUser, id: string) {
 // ---------------------------------------------------------------------------
 // DTOs — field names match the frontend incident model (CLAUDE.md §7)
 // ---------------------------------------------------------------------------
-function permittedActions(user: AuthUser, inc: { status: string; createdBy: string }) {
+function permittedActions(user: AuthUser, inc: { status: string; createdBy: string; archivedAt: Date | null }) {
   const own = inc.createdBy === user.id;
+  const archived = inc.archivedAt !== null;
   return {
     // Separation of duties: nobody moves their own report through review/approval
-    actions: own ? [] : availableActions(inc.status, user.role),
-    canEdit: own && isEditableStatus(inc.status),
-    canSubmit: own && isEditableStatus(inc.status),
+    actions: own || archived ? [] : availableActions(inc.status, user.role),
+    canEdit: own && !archived && isEditableStatus(inc.status),
+    canSubmit: own && !archived && isEditableStatus(inc.status),
+    // Spec #45 — HQ administrators archive final records and can restore them
+    canArchive: isAdmin(user.role) && !archived && isArchivableStatus(inc.status),
+    canRestore: isAdmin(user.role) && archived,
   };
 }
 
@@ -75,6 +80,7 @@ function toSummaryDto(inc: IncidentRow, user: AuthUser) {
     createdByName: inc.creator.name,
     createdAt: inc.createdAt.toISOString(),
     updatedAt: inc.updatedAt.toISOString(),
+    archivedAt: inc.archivedAt?.toISOString() ?? null,
     ...permittedActions(user, inc),
   };
 }
@@ -150,10 +156,18 @@ export type IncidentFilters = Omit<ListIncidentsQuery, 'page' | 'pageSize' | 'so
  * the GIS endpoint and the reports module so every view of the data obeys the same rules.
  * `submittedOnly` drops drafts entirely (analytics and reports cover filed incidents only).
  */
-export async function incidentWhere(user: AuthUser, q: IncidentFilters, submittedOnly = false): Promise<Prisma.IncidentWhereInput> {
+export async function incidentWhere(
+  user: AuthUser,
+  q: IncidentFilters,
+  submittedOnly = false,
+  archivedDefault: 'exclude' | 'include' = 'exclude',
+): Promise<Prisma.IncidentWhereInput> {
   const scope = await resolveScope(user.scope);
   const filters: Prisma.IncidentWhereInput[] = [visibilityWhere(user, scope)];
   if (submittedOnly) filters.push({ status: { not: 'Draft' } });
+  const archived = q.archived ?? archivedDefault;
+  if (archived === 'exclude') filters.push({ archivedAt: null });
+  if (archived === 'only') filters.push({ archivedAt: { not: null } });
 
   if (q.q) {
     filters.push({

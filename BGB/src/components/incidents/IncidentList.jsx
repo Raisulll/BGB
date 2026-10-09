@@ -6,12 +6,13 @@ import { errorMessage } from '../../api/client';
 import { formatDateDisplay } from '../../utils/helpers';
 import { SeverityBadge, StatusBadge } from '../ui/Badges';
 import EmptyState from '../ui/EmptyState';
+import { useI18n } from '../../i18n/I18nContext';
 
 // Quick actions show only the forward step; return/reject need a reason, so they live on the detail page.
 const QUICK_ACTIONS = {
-  review: { label: 'Review', icon: 'fa-search', cls: 'text-green-600 hover:bg-green-50' },
-  verify: { label: 'Verify', icon: 'fa-check', cls: 'text-green-600 hover:bg-green-50' },
-  approve: { label: 'Approve', icon: 'fa-thumbs-up', cls: 'text-green-700 hover:bg-green-50' },
+  review: { icon: 'fa-search', cls: 'text-green-600 hover:bg-green-50' },
+  verify: { icon: 'fa-check', cls: 'text-green-600 hover:bg-green-50' },
+  approve: { icon: 'fa-thumbs-up', cls: 'text-green-700 hover:bg-green-50' },
 };
 
 // `inc.actions` and `inc.canEdit` come from the server, which applies the workflow table, role,
@@ -20,12 +21,13 @@ function RowActions({ inc, onChanged }) {
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
+  const { t, tv } = useI18n();
 
   const run = async (action) => {
     setBusy(true);
     try {
       const updated = await incidentsApi.workflow(inc.id, action);
-      showToast(`${inc.id} ${updated.status.toLowerCase()}`, 'success');
+      showToast(t('incidents.actionDone', { id: inc.id, status: tv('status', updated.status) }), 'success');
       onChanged?.(updated);
     } catch (err) {
       showToast(errorMessage(err), 'error');
@@ -39,11 +41,11 @@ function RowActions({ inc, onChanged }) {
 
   return (
     <div className="flex items-center gap-1">
-      <button onClick={() => navigate(`/incidents/${inc.id}`)} className={`${btn} text-bgb-600 hover:bg-bgb-50`} title="View" aria-label={`View ${inc.id}`}>
+      <button onClick={() => navigate(`/incidents/${inc.id}`)} className={`${btn} text-bgb-600 hover:bg-bgb-50`} title={t('common.view')} aria-label={`${t('common.view')} ${inc.id}`}>
         <i className="fas fa-eye text-sm" />
       </button>
       {inc.canEdit && (
-        <button onClick={() => navigate(`/incidents/${inc.id}/edit`)} className={`${btn} text-blue-600 hover:bg-blue-50`} title="Edit" aria-label={`Edit ${inc.id}`}>
+        <button onClick={() => navigate(`/incidents/${inc.id}/edit`)} className={`${btn} text-blue-600 hover:bg-blue-50`} title={t('common.edit')} aria-label={`${t('common.edit')} ${inc.id}`}>
           <i className="fas fa-edit text-sm" />
         </button>
       )}
@@ -52,8 +54,8 @@ function RowActions({ inc, onChanged }) {
           onClick={() => run(quick)}
           disabled={busy}
           className={`${btn} ${QUICK_ACTIONS[quick].cls}`}
-          title={QUICK_ACTIONS[quick].label}
-          aria-label={`${QUICK_ACTIONS[quick].label} ${inc.id}`}
+          title={tv('action', quick)}
+          aria-label={`${tv('action', quick)} ${inc.id}`}
         >
           <i className={`fas ${busy ? 'fa-spinner fa-spin' : QUICK_ACTIONS[quick].icon} text-sm`} />
         </button>
@@ -68,8 +70,13 @@ function RowActions({ inc, onChanged }) {
  *  - ≥ md : data table, extra columns revealed progressively on wider screens
  */
 export default function IncidentList({ incidents, compact = false, onChanged }) {
+  const { t } = useI18n();
   if (incidents.length === 0) {
-    return <EmptyState icon="fa-search" title="No incidents found">Try adjusting your filters.</EmptyState>;
+    return (
+      <EmptyState icon="fa-search" title={t('incidents.empty')}>
+        {t('incidents.emptyHint')}
+      </EmptyState>
+    );
   }
 
   return (
@@ -82,6 +89,7 @@ export default function IncidentList({ incidents, compact = false, onChanged }) 
               <div className="mb-1 flex flex-wrap items-center gap-2">
                 <span className="font-mono text-xs font-medium text-bgb-700">{inc.id}</span>
                 <StatusBadge status={inc.status} />
+                {inc.archivedAt && <i className="fas fa-box-archive text-xs text-navy-500" title={t('incidents.archivedTag')} />}
               </div>
               <p className="truncate text-sm font-medium text-gray-800">{inc.title}</p>
               <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
@@ -103,14 +111,14 @@ export default function IncidentList({ incidents, compact = false, onChanged }) 
         <table className="w-full">
           <thead className="bg-gray-50">
             <tr>
-              <th className="th">Reference</th>
-              <th className="th">Title</th>
-              <th className="th">Category</th>
-              {!compact && <th className="th hidden xl:table-cell">BOP</th>}
-              <th className="th">Severity</th>
-              <th className="th">Status</th>
-              <th className="th hidden lg:table-cell">Date</th>
-              <th className="th">Actions</th>
+              <th className="th">{t('common.reference')}</th>
+              <th className="th">{t('common.title')}</th>
+              <th className="th">{t('common.category')}</th>
+              {!compact && <th className="th hidden xl:table-cell">{t('common.bop')}</th>}
+              <th className="th">{t('common.severity')}</th>
+              <th className="th">{t('common.status')}</th>
+              <th className="th hidden lg:table-cell">{t('common.date')}</th>
+              <th className="th">{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -123,8 +131,9 @@ export default function IncidentList({ incidents, compact = false, onChanged }) 
                 <td className="td">
                   <SeverityBadge severity={inc.severity} />
                 </td>
-                <td className="td">
+                <td className="td whitespace-nowrap">
                   <StatusBadge status={inc.status} />
+                  {inc.archivedAt && <i className="fas fa-box-archive ml-1.5 text-xs text-navy-500" title={t('incidents.archivedTag')} aria-label={t('incidents.archivedTag')} />}
                 </td>
                 <td className="td hidden whitespace-nowrap text-gray-500 lg:table-cell">{formatDateDisplay(inc.date)}</td>
                 <td className="td py-1.5">

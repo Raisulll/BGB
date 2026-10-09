@@ -2,12 +2,15 @@ import { Router } from 'express';
 import { requireAuth } from '../../middleware/auth.js';
 import { apiLimiter } from '../../middleware/rateLimiter.js';
 import { requirePermission } from '../../middleware/rbac.js';
-import { notFound } from '../../utils/errors.js';
+import { badRequest, notFound } from '../../utils/errors.js';
+import { writeAudit } from '../audit/audit.service.js';
+import { mailEnabled, mailStatus, sendTestEmail } from '../notifications/mailer.js';
+import { archiveSummary, runArchiving } from '../incidents/archive.service.js';
 import { requestContext } from '../../utils/requestContext.js';
 import { createCategorySchema, createOrgUnitSchema, updateCategorySchema, updateConfigSchema, updatePermissionsSchema } from './admin.schema.js';
 import * as service from './admin.service.js';
 
-// §19.8 — /api/v1/admin (specs #3, #6, #9, #46, #47). Backup routes come with Phase 5.
+// §19.8 — /api/v1/admin (specs #3, #6, #9, #23, #44-#47). Backup routes are deferred for the demo version.
 export const adminRouter = Router();
 adminRouter.use(requireAuth, apiLimiter, requirePermission('admin'));
 
@@ -52,4 +55,26 @@ adminRouter.get('/org-hierarchy', async (_req, res) => {
 
 adminRouter.post('/org-hierarchy', async (req, res) => {
   res.status(201).json(await service.createOrgUnit(req.user!, createOrgUnitSchema.parse(req.body), requestContext(req)));
+});
+
+// Spec #23 — e-mail delivery status and a test message to the admin's own address
+adminRouter.get('/mail', async (_req, res) => {
+  res.json(await mailStatus());
+});
+
+adminRouter.post('/mail/test', async (req, res) => {
+  if (!mailEnabled()) throw badRequest('E-mail is not configured on this server (set SMTP_HOST)');
+  const result = await sendTestEmail(req.user!);
+  await writeAudit({ action: 'MAIL_TEST', username: req.user!.username, userId: req.user!.id, details: `Test e-mail to ${result.to}: ${result.sent ? 'sent' : 'not sent'}`, ctx: requestContext(req) });
+  res.json(result);
+});
+
+// Specs #44, #45 — archiving status and an on-demand run (the same job also runs daily)
+adminRouter.get('/archive', async (_req, res) => {
+  res.json(await archiveSummary());
+});
+
+adminRouter.post('/archive/run', async (req, res) => {
+  const result = await runArchiving(req.user!, requestContext(req));
+  res.json({ ...result, summary: await archiveSummary() });
 });
