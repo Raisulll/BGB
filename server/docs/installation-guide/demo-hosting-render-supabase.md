@@ -46,8 +46,11 @@ Tested locally (2026-10-09):
   (`sslmode=verify-full&sslrootcert=...`); don't switch verification off.
 - **Free Supabase projects pause after 7 days without activity.** Open the site a day before the TEC session.
 - **Supabase free plan: 50 MB per stored file, 1 GB storage, 500 MB database.** The demo limits evidence to 49 MB per file.
-- **Render Starter plan** (paid) keeps the service always on; the free plan sleeps after 15 minutes and
-  takes about a minute to wake.
+- **Render Free plan** (the Blueprint's default): the service sleeps after 15 minutes without visitors and takes
+  about a minute to wake; open the site a few minutes before presenting. Starter (paid, about $7/month) is always
+  on: change `plan: free` to `plan: starter` in `render.yaml`, or switch the instance type in the dashboard.
+  If the Blueprint still asks for payment, create a Web Service by hand (Free instance, empty Root Directory)
+  with the build/start commands and env from `render.yaml`.
 - **`autoDeploy: false`**: pushing to GitHub doesn't redeploy. Deploy from the dashboard when you choose.
 - The SQL editor and the migration commands run as `postgres`; only the app runs as `birds`.
 
@@ -110,7 +113,7 @@ evidence unreadable.** Don't reuse the local development keys.
 
 1. Push the repository to GitHub (`origin` = `github.com/Raisulll/BGB`).
 2. Render dashboard → **New → Blueprint** → select the repo. Render reads `render.yaml` and creates
-   `birds-demo` (Singapore, Starter plan).
+   `birds-demo` (Singapore, Free plan).
 3. Fill in the values marked "sync: false":
    - `DATABASE_URL`: the `birds` connection string
    - `EVIDENCE_ENCRYPTION_KEY`: from step 3

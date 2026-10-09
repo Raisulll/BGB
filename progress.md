@@ -428,7 +428,7 @@ Added after the session summary: deferred items now appear in **Admin › Operat
 - **SPA served by the API** (`server/src/spa.ts`, env `SERVE_SPA_DIR`): hashed assets cached 1 year, `index.html` `no-cache`, client-route fallback; `/api/*` and missing files stay JSON 404s. Own CSP for the SPA: self + `*.tile.openstreetmap.org` + Google Fonts, no inline scripts
 - **S3 storage driver** (`STORAGE_DRIVER=s3`, `S3_ENDPOINT/REGION/BUCKET/ACCESS_KEY_ID/SECRET_ACCESS_KEY/FORCE_PATH_STYLE`) in `src/config/storage.ts`, wrapped by `EncryptedStorage`; `@aws-sdk/client-s3` 3.1141.0; CRC checksums only when required (S3-compatible stores)
 - `TRUST_PROXY` now accepts a hop count / true / false (Express would have read `"1"` as an IP address)
-- `render.yaml` (Blueprint: Singapore, Starter, `autoDeploy: false`, health check, env incl. secret files for JWT keys + Supabase CA; evidence limit 49 MB for Supabase free plan's 50 MB object cap)
+- `render.yaml` (Blueprint: Singapore, Free plan (user decision; Starter if always-on is needed), `autoDeploy: false`, health check, env incl. secret files for JWT keys + Supabase CA; evidence limit 49 MB for Supabase free plan's 50 MB object cap)
 - `server/prisma/sql/supabase-demo-access.sql`: revokes Supabase `anon`/`authenticated` access to `public`, grants app role `birds` data-only privileges
 - `npm run keys -- --out <dir>` for separate demo JWT keys
 - Guide rewritten as step-by-step: `server/docs/installation-guide/demo-hosting-render-supabase.md`

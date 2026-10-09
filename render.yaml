@@ -7,7 +7,9 @@ services:
     name: birds-demo
     runtime: node
     region: singapore
-    plan: starter # always on; the free plan sleeps after 15 min idle and stops the mail/archive timers
+    # Free: sleeps after 15 min idle (~1 min to wake; mail/archive timers pause meanwhile). Switch to
+    # starter (paid, always on) for the TEC session if needed: only this line changes.
+    plan: free
     autoDeploy: false # deploy deliberately from the dashboard, never mid-demo
     # NODE_ENV=production is set at build time too, so devDependencies (Vite, TypeScript, Prisma CLI)
     # must be requested explicitly. The server's postinstall runs `prisma generate`.
@@ -27,8 +29,9 @@ services:
       # Render's load balancer is the one proxy in front of the app: req.ip = real client (audit log, rate limits)
       - key: TRUST_PROXY
         value: "1"
-      # Supabase session pooler string for the non-superuser "birds" role, with TLS verification:
-      # postgresql://birds.<ref>:<pw>@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres?sslmode=verify-full&sslrootcert=/etc/secrets/supabase-ca.crt
+      # Supabase session pooler string (port 5432) for the non-superuser "birds" role, user name
+      # birds.<project-ref>, ending in ?sslmode=verify-full&sslrootcert=<path to the Supabase CA certificate>.
+      # Format: see server/docs/installation-guide/demo-hosting-render-supabase.md, step 1
       - key: DATABASE_URL
         sync: false
       # Small pool: the Supabase pooler limits client connections per project
