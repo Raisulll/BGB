@@ -28,6 +28,12 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
     res.status(400).json({ error: { code: 'BAD_JSON', message: 'Request body is not valid JSON' } });
     return;
   }
-  logger.error('Unhandled error', { err, method: req.method, url: req.originalUrl });
+  // Error objects serialize to {} in JSON logs: log their fields explicitly (server-side only)
+  const e = err as { name?: string; message?: string; code?: unknown; stack?: string } | undefined;
+  logger.error('Unhandled error', {
+    method: req.method,
+    url: req.originalUrl,
+    error: { name: e?.name, message: e?.message ?? String(err), code: e?.code, stack: e?.stack },
+  });
   res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: 'An unexpected error occurred' } });
 }

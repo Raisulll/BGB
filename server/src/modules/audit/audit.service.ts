@@ -41,7 +41,7 @@ export async function writeAudit(entry: AuditEntry): Promise<void> {
     await prisma.auditLog.create({ data });
   } catch (err) {
     // Never lose an audit event silently: if the DB write fails, it still reaches the log files.
-    logger.error('Failed to write audit entry', { err, entry: data });
+    logger.error('Failed to write audit entry', { err: String(err), stack: (err as Error)?.stack, entry: data });
     securityLogger.error('AUDIT_WRITE_FAILED', data);
   }
 }

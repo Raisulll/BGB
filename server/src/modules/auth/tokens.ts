@@ -15,6 +15,17 @@ function readKey(file: string) {
 const privateKey = readKey(env.JWT_PRIVATE_KEY_PATH);
 const publicKey = readKey(env.JWT_PUBLIC_KEY_PATH);
 
+// Fail at startup, not at the first login, when a key file is damaged or the two don't belong together
+// (e.g. contents pasted into a hosting dashboard's secret files)
+try {
+  jwt.verify(jwt.sign({ check: true }, privateKey, { algorithm: 'RS256' }), publicKey, { algorithms: ['RS256'] });
+} catch (err) {
+  throw new Error(
+    `JWT keys ${env.JWT_PRIVATE_KEY_PATH} and ${env.JWT_PUBLIC_KEY_PATH} are not a valid RS256 key pair ` +
+      `(${(err as Error).message}). Regenerate them with "npm run keys".`,
+  );
+}
+
 export interface AccessTokenPayload {
   sub: string; // user id
   sid: string; // session (refresh_tokens.id) — lets logout/lockout revoke access immediately

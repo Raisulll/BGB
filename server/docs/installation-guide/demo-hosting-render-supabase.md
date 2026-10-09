@@ -27,7 +27,7 @@ One URL for the frontend and API keeps the refresh cookie first-party (`SameSite
 | Render Blueprint (service, build/start, health check, env) | `render.yaml` (repo root) |
 | SPA served by the API, with its own CSP (OSM tiles, Google Fonts) | `server/src/spa.ts`, env `SERVE_SPA_DIR` |
 | S3 storage driver (Supabase Storage / MinIO / AWS) | `server/src/config/storage.ts`, env `STORAGE_DRIVER=s3`, `S3_*` |
-| `TRUST_PROXY` accepts a hop count (`1` behind Render's load balancer) | `server/src/config/env.ts` |
+| `TRUST_PROXY=loopback,uniquelocal` on Render (its proxies use private 10.x addresses; a hop count of 1 logged Render's own address) | `render.yaml`, `server/src/config/env.ts` |
 | Database privileges for Supabase | `server/prisma/sql/supabase-demo-access.sql` |
 | Separate JWT keys for the demo | `npm run keys -- --out keys/render` |
 
@@ -35,7 +35,7 @@ Tested locally (2026-10-09):
 - A clean copy of the repo builds with the Blueprint's build command under `NODE_ENV=production`.
 - The compiled server serves the SPA.
 - In headless Chrome, every page, the map tiles, the fonts, a deep-link reload and Swagger UI load with no CSP violations or console errors.
-- Client IPs come through with `TRUST_PROXY=1`.
+- Client IPs come through correctly behind trusted proxies, and addresses a client adds itself are ignored.
 - The access script works on a simulated Supabase database: `birds` reads and writes data, but can't update the audit log, can't disable its triggers and can't read `_prisma_migrations`; `anon` is denied.
 
 ## Things to know

@@ -26,9 +26,11 @@ services:
       # Relative to server/, where the start command runs
       - key: SERVE_SPA_DIR
         value: ../BGB/dist
-      # Render's load balancer is the one proxy in front of the app: req.ip = real client (audit log, rate limits)
+      # Render has more than one proxy hop (with "1", logs showed Render's own 10.x address). Trust its
+      # private-network proxies by address instead, so req.ip is the first outside address = the client
+      # (audit log, rate limits); addresses a client prepends itself are never reached
       - key: TRUST_PROXY
-        value: "1"
+        value: loopback,uniquelocal
       # Supabase session pooler string (port 5432) for the non-superuser "birds" role, user name
       # birds.<project-ref>, ending in ?sslmode=verify-full&sslrootcert=<path to the Supabase CA certificate>.
       # Format: see server/docs/installation-guide/demo-hosting-render-supabase.md, step 1
