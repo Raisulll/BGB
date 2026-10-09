@@ -9,6 +9,7 @@ const TYPE_ICON = {
   review: 'fa-search text-amber-600 bg-amber-50 border-amber-200',
   approval: 'fa-check-circle text-emerald-600 bg-emerald-50 border-emerald-200',
   return: 'fa-undo text-purple-600 bg-purple-50 border-purple-200',
+  comment: 'fa-comment-dots text-slate-600 bg-slate-50 border-slate-200',
 };
 
 export default function NotificationsMenu() {

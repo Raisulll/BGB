@@ -5,7 +5,7 @@ import { requirePermission } from '../../middleware/rbac.js';
 import { notFound } from '../../utils/errors.js';
 import { exportHandler } from '../reports/reports.router.js';
 import { requestContext } from '../../utils/requestContext.js';
-import { createIncidentSchema, listIncidentsSchema, updateIncidentSchema, workflowActionSchema } from './incidents.schema.js';
+import { commentSchema, createIncidentSchema, listIncidentsSchema, updateIncidentSchema, workflowActionSchema } from './incidents.schema.js';
 import * as service from './incidents.service.js';
 import { archiveIncident, restoreIncident } from './archive.service.js';
 import { WORKFLOW_ACTIONS, type WorkflowAction } from './workflow.js';
@@ -51,6 +51,13 @@ incidentsRouter.patch('/:id', requirePermission('create'), async (req, res) => {
   res.json(await service.updateIncident(req.user!, incidentId(req), input, requestContext(req)));
 });
 
+// The creator discards a never-submitted draft (kept on record, hidden everywhere); reason optional
+incidentsRouter.delete('/:id', requirePermission('create'), async (req, res) => {
+  const { notes } = workflowActionSchema.parse(req.body ?? {});
+  await service.discardDraft(req.user!, incidentId(req), notes, requestContext(req));
+  res.status(204).end();
+});
+
 incidentsRouter.post('/:id/submit', requirePermission('create'), async (req, res) => {
   res.json(await service.submitIncident(req.user!, incidentId(req), requestContext(req)));
 });
@@ -63,6 +70,18 @@ incidentsRouter.post('/:id/archive', requirePermission('admin'), async (req, res
 incidentsRouter.post('/:id/unarchive', requirePermission('admin'), async (req, res) => {
   const { notes } = workflowActionSchema.parse(req.body ?? {});
   res.json(await restoreIncident(req.user!, incidentId(req), notes, requestContext(req)));
+});
+
+// Comments (who may comment is decided in the service: filers and reviewers, not read-only roles)
+incidentsRouter.post('/:id/comments', requirePermission('incidents'), async (req, res) => {
+  const { body } = commentSchema.parse(req.body ?? {});
+  res.status(201).json(await service.addComment(req.user!, incidentId(req), body, requestContext(req)));
+});
+
+// Audit entry for printing a single incident (the browser prints)
+incidentsRouter.post('/:id/print', requirePermission('incidents'), async (req, res) => {
+  await service.recordPrint(req.user!, incidentId(req), requestContext(req));
+  res.status(204).end();
 });
 
 // review | verify | approve | close | return | reject — role checks live in the service

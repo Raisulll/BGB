@@ -7,10 +7,12 @@ import type { RequestContext } from '../../utils/requestContext.js';
 import { inScope, isValidLocation, resolveScope, scopeWhere, type ScopeFilter } from '../../utils/scope.js';
 import { writeAudit } from '../audit/audit.service.js';
 import { toEvidenceDto } from '../evidence/evidence.dto.js';
-import { notifyWorkflow, type WorkflowEvent } from '../notifications/notifications.service.js';
+import { notifyComment, notifyWorkflow, type WorkflowEvent } from '../notifications/notifications.service.js';
 import type { CreateIncidentInput, ListIncidentsQuery, UpdateIncidentInput } from './incidents.schema.js';
 import { isAdmin } from '../../utils/roles.js';
-import { availableActions, EDITABLE_STATUSES, isArchivableStatus, isEditableStatus, WORKFLOW, type WorkflowAction } from './workflow.js';
+import { permissionsFor } from '../../middleware/rbac.js';
+import { CONFIG_DEFAULTS } from '../admin/config.service.js';
+import { actionableStatuses, availableActions, EDITABLE_STATUSES, isArchivableStatus, isEditableStatus, OVERDUE_STATUSES, WORKFLOW, type WorkflowAction } from './workflow.js';
 
 type AuthUser = Express.AuthUser;
 
@@ -20,20 +22,44 @@ const detailInclude = {
   creator: { select: { name: true } },
   timeline: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
   evidence: { where: { deletedAt: null }, orderBy: { uploadedAt: 'asc' } },
+  comments: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
 } satisfies Prisma.IncidentInclude;
+
+// ---------------------------------------------------------------------------
+// Overdue: waiting longer than `workflow.overdue_days` in one workflow step (spec #47 setting)
+// ---------------------------------------------------------------------------
+export async function overdueCutoff(): Promise<Date> {
+  const row = await prisma.systemConfig.findUnique({ where: { key: 'workflow.overdue_days' } });
+  const days = Number(row?.value ?? CONFIG_DEFAULTS['workflow.overdue_days']!.value);
+  return new Date(Date.now() - (Number.isFinite(days) ? days : 3) * 86_400_000);
+}
+
+const isOverdue = (inc: { status: string; archivedAt: Date | null; statusChangedAt: Date }, cutoff: Date) =>
+  inc.archivedAt === null && (OVERDUE_STATUSES as readonly string[]).includes(inc.status) && inc.statusChangedAt < cutoff;
+
+/** Who may comment: anyone who files incidents or takes part in review/approval (not read-only roles). */
+async function mayComment(user: AuthUser, inc: { status: string; archivedAt: Date | null }) {
+  if (inc.status === 'Draft' || inc.archivedAt !== null) return false;
+  return actionableStatuses(user.role).length > 0 || (await permissionsFor(user.role)).includes('create');
+}
 
 type IncidentRow = Prisma.IncidentGetPayload<{ include: { creator: { select: { name: true } } } }>;
 type IncidentDetailRow = Prisma.IncidentGetPayload<{ include: typeof detailInclude }>;
 
 // ---------------------------------------------------------------------------
-// Visibility: inside the user's scope, and drafts only to their creator (DOUBT-008)
+// Visibility: inside the user's scope, drafts only to their creator (DOUBT-008), and never a
+// discarded draft (kept only because timeline rows are append-only)
 // ---------------------------------------------------------------------------
 function visibilityWhere(user: AuthUser, scope: ScopeFilter): Prisma.IncidentWhereInput {
-  return { AND: [scopeWhere(scope), { OR: [{ status: { not: 'Draft' } }, { createdBy: user.id }] }] };
+  return { AND: [scopeWhere(scope), { discardedAt: null }, { OR: [{ status: { not: 'Draft' } }, { createdBy: user.id }] }] };
 }
 
-function canSee(user: AuthUser, scope: ScopeFilter, inc: { status: string; createdBy: string; sector: string | null; battalion: string | null; bop: string | null }) {
-  return inScope(scope, inc) && (inc.status !== 'Draft' || inc.createdBy === user.id);
+function canSee(
+  user: AuthUser,
+  scope: ScopeFilter,
+  inc: { status: string; createdBy: string; discardedAt: Date | null; sector: string | null; battalion: string | null; bop: string | null },
+) {
+  return inScope(scope, inc) && inc.discardedAt === null && (inc.status !== 'Draft' || inc.createdBy === user.id);
 }
 
 /** Loads an incident the user may see; anything else is a 404 so existence isn't leaked. */
@@ -54,13 +80,15 @@ function permittedActions(user: AuthUser, inc: { status: string; createdBy: stri
     actions: own || archived ? [] : availableActions(inc.status, user.role),
     canEdit: own && !archived && isEditableStatus(inc.status),
     canSubmit: own && !archived && isEditableStatus(inc.status),
+    // A never-submitted draft can be discarded by its creator; anything filed stays on record
+    canDiscard: own && !archived && inc.status === 'Draft',
     // Spec #45 — HQ administrators archive final records and can restore them
     canArchive: isAdmin(user.role) && !archived && isArchivableStatus(inc.status),
     canRestore: isAdmin(user.role) && archived,
   };
 }
 
-function toSummaryDto(inc: IncidentRow, user: AuthUser) {
+function toSummaryDto(inc: IncidentRow, user: AuthUser, cutoff: Date) {
   return {
     id: inc.id,
     title: inc.title,
@@ -81,19 +109,23 @@ function toSummaryDto(inc: IncidentRow, user: AuthUser) {
     createdAt: inc.createdAt.toISOString(),
     updatedAt: inc.updatedAt.toISOString(),
     archivedAt: inc.archivedAt?.toISOString() ?? null,
+    statusChangedAt: inc.statusChangedAt.toISOString(),
+    overdue: isOverdue(inc, cutoff),
     ...permittedActions(user, inc),
   };
 }
 
-function toDetailDto(inc: IncidentDetailRow, user: AuthUser) {
+function toDetailDto(inc: IncidentDetailRow, user: AuthUser, cutoff: Date, canComment: boolean) {
   return {
-    ...toSummaryDto(inc, user),
+    ...toSummaryDto(inc, user, cutoff),
     description: inc.description,
     personsInvolved: inc.personsInvolved,
     actionTaken: inc.actionTaken,
     outcome: inc.outcome,
     timeline: inc.timeline.map(toTimelineDto),
     evidence: inc.evidence.map(toEvidenceDto),
+    comments: inc.comments.map((c) => ({ id: c.id, user: c.userName, userId: c.userId, body: c.body, date: c.createdAt.toISOString() })),
+    canComment,
   };
 }
 
@@ -188,11 +220,26 @@ export async function incidentWhere(
   if (q.dateFrom) filters.push({ incidentDate: { gte: fromDateString(q.dateFrom) } });
   if (q.dateTo) filters.push({ incidentDate: { lte: fromDateString(q.dateTo) } });
   if (q.createdBy) filters.push({ createdBy: q.createdBy === 'me' ? user.id : q.createdBy });
+  // Waiting longer than workflow.overdue_days in one step
+  if (q.overdue) {
+    filters.push({ archivedAt: null, status: { in: [...OVERDUE_STATUSES] }, statusChangedAt: { lt: await overdueCutoff() } });
+  }
+  // "Needs my action": records this user can move on now (WORKFLOW table, separation of duties),
+  // plus their own returned reports waiting for corrections
+  if (q.needsAction) {
+    filters.push({ archivedAt: null });
+    filters.push({
+      OR: [
+        { status: { in: actionableStatuses(user.role) }, createdBy: { not: user.id } },
+        { status: 'Returned', createdBy: user.id },
+      ],
+    });
+  }
   return { AND: filters };
 }
 
 export async function listIncidents(user: AuthUser, q: ListIncidentsQuery) {
-  const where = await incidentWhere(user, q);
+  const [where, cutoff] = await Promise.all([incidentWhere(user, q), overdueCutoff()]);
   const sortField = q.sort === 'incidentDate' ? 'incidentDate' : q.sort === 'id' ? 'id' : 'createdAt';
   const [rows, total] = await prisma.$transaction([
     prisma.incident.findMany({
@@ -204,14 +251,15 @@ export async function listIncidents(user: AuthUser, q: ListIncidentsQuery) {
     prisma.incident.count({ where }),
   ]);
   return paged(
-    rows.map((r) => toSummaryDto(r, user)),
+    rows.map((r) => toSummaryDto(r, user, cutoff)),
     total,
     q,
   );
 }
 
 export async function getIncident(user: AuthUser, id: string) {
-  return toDetailDto(await loadVisible(user, id), user);
+  const [inc, cutoff] = await Promise.all([loadVisible(user, id), overdueCutoff()]);
+  return toDetailDto(inc, user, cutoff, await mayComment(user, inc));
 }
 
 export async function getTimeline(user: AuthUser, id: string) {
@@ -338,6 +386,69 @@ export async function submitIncident(user: AuthUser, id: string, ctx: RequestCon
   return getIncident(user, id);
 }
 
+/**
+ * The creator discards a draft they never submitted. Timeline rows are append-only (spec #25),
+ * so the record is kept, marked discarded and hidden from every view, list and statistic.
+ */
+export async function discardDraft(user: AuthUser, id: string, notes: string | undefined, ctx: RequestContext) {
+  const inc = await loadVisible(user, id);
+  if (inc.createdBy !== user.id) {
+    await denied(user, 'DENIED_UPDATE', id, 'discard by non-creator', ctx);
+    throw forbidden('Only the officer who created this draft can discard it');
+  }
+  if (inc.status !== 'Draft') {
+    await denied(user, 'DENIED_UPDATE', id, `discard while ${inc.status}`, ctx);
+    throw conflict(`${id} is ${inc.status}; only a draft that was never submitted can be discarded`);
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const { count } = await tx.incident.updateMany({
+      where: { id, status: 'Draft', discardedAt: null },
+      data: { discardedAt: new Date(), discardedBy: user.id },
+    });
+    if (count === 0) throw conflict(`${id} changed state; reload and try again`);
+    await tx.incidentTimeline.create({
+      data: { incidentId: id, action: 'Discarded', userName: user.name, userId: user.id, status: 'Draft', notes: notes ?? null },
+    });
+  });
+
+  await writeAudit({
+    action: 'DISCARD_DRAFT',
+    username: user.username,
+    userId: user.id,
+    details: `Discarded draft ${id} (${inc.title})${notes ? `: ${notes}` : ''}`,
+    ctx,
+  });
+}
+
+/** Discussion on an incident, separate from workflow actions; append-only (DB triggers). */
+export async function addComment(user: AuthUser, id: string, body: string, ctx: RequestContext) {
+  const inc = await loadVisible(user, id);
+  if (!(await mayComment(user, inc))) {
+    await denied(user, 'DENIED_UPDATE', id, inc.status === 'Draft' || inc.archivedAt ? `comment while ${inc.archivedAt ? 'archived' : inc.status}` : 'comment by read-only role', ctx);
+    throw forbidden(inc.status === 'Draft' ? "Drafts can't be commented on" : inc.archivedAt ? 'Archived incidents are read-only' : "Your role can't comment on incidents");
+  }
+  await prisma.$transaction(async (tx) => {
+    // Recipients are the creator and earlier commenters, so look them up before adding this one
+    await notifyComment(tx, inc, user, body);
+    await tx.incidentComment.create({ data: { incidentId: id, userId: user.id, userName: user.name, body } });
+  });
+  await writeAudit({
+    action: 'COMMENT_INCIDENT',
+    username: user.username,
+    userId: user.id,
+    details: `Commented on ${id}: ${body.length > 300 ? `${body.slice(0, 300)}…` : body}`,
+    ctx,
+  });
+  return getIncident(user, id);
+}
+
+/** Printing puts a confidential record on paper: audited (spec #24). */
+export async function recordPrint(user: AuthUser, id: string, ctx: RequestContext) {
+  const inc = await loadVisible(user, id);
+  await writeAudit({ action: 'PRINT_INCIDENT', username: user.username, userId: user.id, details: `Printed ${id} (${inc.title})`, ctx });
+}
+
 const EVENT_FOR: Record<WorkflowAction, WorkflowEvent> = {
   review: 'reviewed',
   verify: 'verified',
@@ -434,5 +545,7 @@ export async function incidentMeta(user: AuthUser) {
     hierarchy,
     severities: ['Low', 'Medium', 'High', 'Critical'],
     statuses: ['Draft', 'Submitted', 'Reviewed', 'Verified', 'Approved', 'Closed', 'Returned', 'Rejected'],
+    // The role takes part in review/approval (shows the "Needs my action" view)
+    canAct: actionableStatuses(user.role).length > 0,
   };
 }

@@ -29,18 +29,18 @@
 | 9 | Border Sector Information (org hierarchy) | `DONE` | Both | Form limited to the user's units; Admin > Org Hierarchy adds units (Session 9) |
 | 10 | Evidence & Document Management | `DONE` | Both | Upload in the wizard (type/size checked client-side, content-checked server-side), download, removal with reason; browser-tested (Session 9) |
 | 11 | Media Metadata preservation | `DONE` | Both | SHA-256 + EXIF/GPS stored; shown on the detail page with an on-demand integrity check (Session 9) |
-| 12 | Incident Timeline (chronological history) | `DONE` | Both | Append-only timeline incl. return/reject reasons and evidence events, shown in BST (Session 9) |
+| 12 | Incident Timeline (chronological history) | `DONE` | Both | Append-only timeline incl. return/reject reasons and evidence events, shown in BST (Session 9). Session 12: append-only comments (DB triggers), time-in-current-step (`status_changed_at`, DB trigger) |
 | 13 | Workflow Management (Draft→…→Closed) | `DONE` | Both | Buttons from the server's `actions`; full submit → review → return → resubmit path browser-tested (Session 9) |
-| 14 | Verification & Approval (review, return, reject, etc.) | `DONE` | Both | Reason dialog for return/reject; separation of duties and scope enforced by the server |
+| 14 | Verification & Approval (review, return, reject, etc.) | `DONE` | Both | Reason dialog for return/reject; separation of duties and scope enforced by the server. Session 12: return/reject reason banner on the incident and edit form; "Needs my action" view; overdue flag (`workflow.overdue_days`) in lists, detail, filter and dashboard |
 | 15 | Incident Tracking (unique ref# + search by ref#) | `DONE` | Both | `BIRDS-<year>-NNNN` from the server; search box on the Incidents page |
-| 16 | Search Facility (advanced filter) | `DONE` | Both | Server-side filters + pagination; URL-preset filters from the dashboard (Session 9) |
+| 16 | Search Facility (advanced filter) | `DONE` | Both | Server-side filters + pagination; URL-preset filters from the dashboard (Session 9). Session 12: views All / Needs my action / My incidents / My drafts, date range, Sector→Battalion→BOP filters, sort; view + filters kept in the URL |
 | 17 | Dashboard (role-based KPIs) | `DONE` | Both | All figures from `/reports/*`, scoped per user; invented baseline numbers removed (Session 9) |
 | 18 | GIS/Map Dashboard | `DONE` | Both | MapView on `GET /gis/incidents` with server-side filters (Session 9) |
 | 19 | Analytics & Statistics | `DONE` | Both | Analytics page on the reports API (severity, sector risk, category with subcategory breakdown); placeholder metrics removed (Session 9) |
 | 20 | Trend Analysis (by day/week/month/quarter/year) | `DONE` | Both | Granularity selector + previous-year comparison on `/reports/trends` (Session 9) |
 | 21 | Reporting (configurable operational reports) | `DONE` | Both | Reports page on `/reports/operational` (4 templates, all filters) (Session 9) |
-| 22 | Export (PDF, Excel, CSV) | `DONE` | Both | Excel/CSV generated and audited by the server, downloaded from Reports, Analytics and Audit; PDF via browser print (DOUBT-004) |
-| 23 | Notifications (workflow event alerts) | `DONE` | Both | In-app per-user notifications (Session 9) + e-mail via transactional outbox for submission/approval/rejection/return (Session 10). E-mail switches on when SMTP details are set; tested with the json transport |
+| 22 | Export (PDF, Excel, CSV) | `DONE` | Both | Excel/CSV generated and audited by the server, downloaded from Reports, Analytics and Audit; PDF via browser print (DOUBT-004). Session 12: single-incident print/PDF with crest, banner, timeline, evidence hashes, comments; each print audited (`PRINT_INCIDENT`) |
+| 23 | Notifications (workflow event alerts) | `DONE` | Both | In-app per-user notifications (Session 9) + e-mail via transactional outbox for submission/approval/rejection/return (Session 10). E-mail switches on when SMTP details are set; tested with the json transport. Session 12: comment notifications (in-app) |
 | 24 | Audit Trail (tamper-evident logging) | `DONE` | Both | Audit page on the API: search, paging, real row/prev hashes, on-demand chain verification, CSV/Excel export (Session 9) |
 | 25 | Data Integrity (prevent unauthorized alteration) | `DONE` | Both | Server blocks edits outside Draft/Returned, non-creator edits, invalid transitions and races (409); evidence guards + SHA-256 verify; DB append-only triggers |
 | 26 | Data Security (access controls + architecture) | `IN PROGRESS` | Both | RBAC + scopes, Helmet, CORS, rate limits, in-memory access token + httpOnly cookie; evidence encrypted at rest (Session 10). TLS deployment config pending (#27) |
@@ -64,7 +64,7 @@
 | 44 | Data Retention (configurable policy) | `DONE` | Both | `data.retention_days` + `archive.after_days` editable; records past retention flagged for review, never auto-deleted (Session 10, DOUBT-012) |
 | 45 | Data Archiving (with audit trail) | `DONE` | Both | Archive/restore + daily job, timeline + audit entries, archive filter in UI (Session 10) |
 | 46 | Administrative Module | `DONE` | Both | Admin UI fully on the API: users, permissions, categories, org hierarchy, settings, system status (Session 9). Backup/log endpoints Phase 5 |
-| 47 | Configuration (without code changes) | `DONE` | Both | Policies, session, retention and backup settings, permissions, categories and hierarchy editable in the Admin UI (Session 9) |
+| 47 | Configuration (without code changes) | `DONE` | Both | Policies, session, retention and backup settings, permissions, categories and hierarchy editable in the Admin UI (Session 9). Session 12: `workflow.overdue_days` (Admin › Security & System › Workflow) |
 | 48 | Logging & Monitoring | `IN PROGRESS` | Backend | Winston (app/error/security logs) + Morgan HTTP log (Session 4). Daily rotation + `/admin/logs/summary`: deferred for the demo version (user decision 2026-10-09). Shown in Admin › Operations with a DEMO badge (not functional). |
 | 49 | Security Hardening (OWASP Top 10) | `IN PROGRESS` | Backend | Helmet, CORS whitelist, rate limits, Zod validation, pinned RS256, generic login errors, `npm audit` clean (Session 4). ZAP scan Phase 4 |
 | 50 | Vulnerability Assessment | `NOT STARTED` | Backend | OWASP ZAP + npm audit before UAT §20; report in `docs/security/` |

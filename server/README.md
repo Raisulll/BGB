@@ -87,13 +87,16 @@ Errors always use `{ error: { code, message, details? } }`.
 
 | Method | Path | Permission | Notes |
 |---|---|---|---|
-| GET | `/` | incidents | Filters: `q` (ref no./title/description/location), `status` and `severity` (comma lists), `category`, `sector`, `battalion`, `bop`, `dateFrom`, `dateTo`, `createdBy` (`me` or user id), `sort` (`createdAt`, `incidentDate`, `id`), `order`, `page`, `pageSize` (≤100). Returns `{ data, page, pageSize, total, totalPages }` |
-| GET | `/meta` | incidents | Categories + subcategories, and the org hierarchy the user may file under |
+| GET | `/` | incidents | Filters: `q` (ref no./title/description/location), `status` and `severity` (comma lists), `category`, `sector`, `battalion`, `bop`, `dateFrom`, `dateTo`, `createdBy` (`me` or user id), `overdue=true` (waiting longer than `workflow.overdue_days` in Submitted/Reviewed/Verified/Approved/Returned), `needsAction=true` (what the caller can act on now under the workflow table, never their own reports, plus their own Returned ones), `sort` (`createdAt`, `incidentDate`, `id`), `order`, `page`, `pageSize` (≤100). Returns `{ data, page, pageSize, total, totalPages }` |
+| GET | `/meta` | incidents | Categories + subcategories, the org hierarchy the user may file under, and `canAct` (the role reviews/approves) |
 | POST | `/` | create | Body = incident fields + `status`: `Draft` (default) or `Submitted` |
-| GET | `/:id` | incidents | Detail incl. `timeline`, `evidence`, and the caller's `actions`, `canEdit`, `canSubmit` |
+| GET | `/:id` | incidents | Detail incl. `timeline`, `evidence`, `comments`, `statusChangedAt` + `overdue`, and the caller's `actions`, `canEdit`, `canSubmit`, `canDiscard`, `canComment` |
 | GET | `/:id/timeline` | incidents | Append-only history |
 | PATCH | `/:id` | create | Creator only, Draft/Returned only |
+| DELETE | `/:id` | create | Discard a never-submitted Draft (creator only; body `{ notes? }`). Timeline rows are append-only, so the record is kept with `discarded_at` set and hidden from every view; DB CHECK allows it only on Drafts. Timeline "Discarded" + audit `DISCARD_DRAFT` |
 | POST | `/:id/submit` | create | Draft/Returned → Submitted (creator only) |
+| POST | `/:id/comments` | incidents | Body `{ body }` (≤4000). Roles that file or review incidents, not on drafts or archived records. Append-only (`incident_comments` triggers), audited `COMMENT_INCIDENT`, notifies the creator and earlier commenters (type `comment`) |
+| POST | `/:id/print` | incidents | Records `PRINT_INCIDENT` before the browser prints the single-incident report |
 | POST | `/:id/{review,verify,approve,close,return,reject}` | incidents + role | Body `{ notes? }`; `notes` required for return/reject |
 
 GIS: `GET /api/v1/gis/incidents` (permission `map`) returns lightweight markers within scope.

@@ -36,3 +36,21 @@ export function Tag({ children, className = '' }) {
     </span>
   );
 }
+
+/** Whole days an incident has waited in its current workflow step (0 = less than a day). */
+export const daysWaiting = (since) => Math.max(0, Math.floor((Date.now() - new Date(since).getTime()) / 86_400_000));
+
+/** Shown when the server flags a record overdue (longer than workflow.overdue_days in one step). */
+export function OverdueBadge({ since }) {
+  const { t } = useI18n();
+  const n = Math.max(1, daysWaiting(since));
+  return (
+    <span
+      className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-700"
+      title={t('incidents.overdueTitle', { n })}
+    >
+      <i className="fas fa-hourglass-end text-[10px]" />
+      {t('incidents.overdueDays', { n })}
+    </span>
+  );
+}

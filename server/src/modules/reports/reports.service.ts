@@ -4,8 +4,8 @@ import { badRequest } from '../../utils/errors.js';
 import type { ExportTable } from '../../utils/export.js';
 import { toBstDisplay, toDateString, toDisplayDate, toTimeString } from '../../utils/formatDate.js';
 import { listIncidentsSchema } from '../incidents/incidents.schema.js';
-import { incidentWhere, type IncidentFilters } from '../incidents/incidents.service.js';
-import { SEVERITIES, STATUSES } from '../incidents/workflow.js';
+import { incidentWhere, overdueCutoff, type IncidentFilters } from '../incidents/incidents.service.js';
+import { OVERDUE_STATUSES, SEVERITIES, STATUSES } from '../incidents/workflow.js';
 
 type AuthUser = Express.AuthUser;
 
@@ -42,10 +42,11 @@ const where = (user: AuthUser, f: IncidentFilters) => incidentWhere(user, f, tru
 // ---------------------------------------------------------------------------
 export async function summary(user: AuthUser, f: IncidentFilters) {
   const w = await where(user, f);
-  const [byStatusRows, bySeverityRows, criticalOpen] = await Promise.all([
+  const [byStatusRows, bySeverityRows, criticalOpen, overdue] = await Promise.all([
     prisma.incident.groupBy({ by: ['status'], where: w, _count: { _all: true } }),
     prisma.incident.groupBy({ by: ['severity'], where: w, _count: { _all: true } }),
     prisma.incident.count({ where: { AND: [w, { severity: { in: ['High', 'Critical'] } }, { status: { notIn: RESOLVED } }] } }),
+    prisma.incident.count({ where: { AND: [w, { archivedAt: null, status: { in: [...OVERDUE_STATUSES] }, statusChangedAt: { lt: await overdueCutoff() } }] } }),
   ]);
   const byStatus = Object.fromEntries(STATUSES.filter((s) => s !== 'Draft').map((s) => [s, 0])) as Record<string, number>;
   for (const r of byStatusRows) byStatus[r.status] = r._count._all;
@@ -63,6 +64,8 @@ export async function summary(user: AuthUser, f: IncidentFilters) {
     rejected: byStatus.Rejected ?? 0,
     open: total - sum(RESOLVED),
     highSeverityOpen: criticalOpen,
+    overdue, // waiting longer than workflow.overdue_days in one step
+
     byStatus,
     bySeverity,
   };

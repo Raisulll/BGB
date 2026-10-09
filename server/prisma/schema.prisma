@@ -56,6 +56,7 @@ model User {
   roleRef       Role               @relation(fields: [role], references: [name], onUpdate: Cascade)
   incidents     Incident[]
   timeline      IncidentTimeline[]
+  comments      IncidentComment[]
   evidence      Evidence[]
   notifications Notification[]
   configUpdates SystemConfig[]
@@ -124,9 +125,16 @@ model Incident {
   // lists and statistics but are never deleted
   archivedAt      DateTime? @map("archived_at") @db.Timestamptz
   archivedBy      String?   @map("archived_by") @db.VarChar(10)
+  // A draft its creator discarded (never submitted). Timeline rows are append-only, so the record
+  // stays in the database, hidden from every view; only Drafts can be discarded (DB CHECK)
+  discardedAt     DateTime? @map("discarded_at") @db.Timestamptz
+  discardedBy     String?   @map("discarded_by") @db.VarChar(10)
+  // When the current status began (overdue indicator). Kept by a DB trigger on every status change
+  statusChangedAt DateTime  @default(now()) @map("status_changed_at") @db.Timestamptz
 
   creator       User               @relation(fields: [createdBy], references: [id])
   timeline      IncidentTimeline[]
+  comments      IncidentComment[]
   evidence      Evidence[]
   notifications Notification[]
 
@@ -137,6 +145,7 @@ model Incident {
   @@index([sector, status], map: "idx_incidents_sector_status")
   @@index([createdBy, status], map: "idx_incidents_creator_status")
   @@index([archivedAt], map: "idx_incidents_archived")
+  @@index([status, statusChangedAt], map: "idx_incidents_status_since")
   @@map("incidents")
 }
 
@@ -156,6 +165,23 @@ model IncidentTimeline {
 
   @@index([incidentId, createdAt])
   @@map("incident_timeline")
+}
+
+// Discussion on an incident, separate from workflow actions. Append-only like the timeline
+// (DB triggers): a comment is part of the record and is never edited or deleted.
+model IncidentComment {
+  id         Int      @id @default(autoincrement())
+  incidentId String   @map("incident_id") @db.VarChar(30)
+  userId     String   @map("user_id") @db.VarChar(10)
+  userName   String   @map("user_name") @db.VarChar(100)
+  body       String
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Restrict)
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@index([incidentId, createdAt])
+  @@map("incident_comments")
 }
 
 // §17.8 — deleted_at supports the soft-delete in §19.4

@@ -14,6 +14,7 @@ import Spinner from '../components/ui/Spinner';
 import StatCard from '../components/ui/StatCard';
 import IncidentList from '../components/incidents/IncidentList';
 import DashboardCategoryCard from '../components/dashboard/DashboardCategoryCard';
+import WorkQueue from '../components/dashboard/WorkQueue';
 import { useI18n } from '../i18n/I18nContext';
 
 const monthLabel = (period, t) => {
@@ -173,6 +174,9 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* What is waiting for this user */}
+      <WorkQueue overdueInScope={summary.overdue ?? 0} />
 
       {/* Primary KPI Summary Grid */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 xl:grid-cols-5">

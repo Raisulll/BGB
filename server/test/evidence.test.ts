@@ -112,6 +112,15 @@ describe('download, verification and visibility', () => {
     const inline = await operator.get(`${item.downloadUrl}?inline=1`);
     expect(inline.headers['content-disposition']).toMatch(/^inline;/);
     expect((await lastAudit('VIEW_EVIDENCE'))?.details).toContain(`#${item.id}`);
+
+    // Previews load automatically on every page open: a repeat view isn't logged again, a download always is
+    const views = () => prisma.auditLog.count({ where: { action: 'VIEW_EVIDENCE', details: { contains: `#${item.id})` } } });
+    const downloads = () => prisma.auditLog.count({ where: { action: 'DOWNLOAD_EVIDENCE', details: { contains: `#${item.id})` } } });
+    const [v0, d0] = [await views(), await downloads()];
+    expect((await operator.get(`${item.downloadUrl}?inline=1`)).status).toBe(200);
+    expect(await views()).toBe(v0);
+    expect((await operator.get(item.downloadUrl)).status).toBe(200);
+    expect(await downloads()).toBe(d0 + 1);
   });
 
   it('verifies integrity, and detects a file altered on disk', async () => {

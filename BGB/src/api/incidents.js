@@ -1,7 +1,7 @@
 // §19.3, §19.4, §19.9 — incidents, workflow, evidence and GIS
 import { api, downloadFrom, fetchBlob } from './client';
 
-/** Filters: q, status, severity, category, sector, battalion, bop, dateFrom, dateTo, createdBy, sort, order, page, pageSize */
+/** Filters: q, status, severity, category, sector, battalion, bop, dateFrom, dateTo, createdBy ('me'), needsAction, archived, sort, order, page, pageSize */
 export const list = (query, signal) => api('/incidents', { query, signal });
 export const meta = () => api('/incidents/meta');
 export const get = (id, signal) => api(`/incidents/${encodeURIComponent(id)}`, { signal });
@@ -11,6 +11,12 @@ export const timeline = (id) => api(`/incidents/${encodeURIComponent(id)}/timeli
 export const create = (data, status) => api('/incidents', { method: 'POST', body: { ...data, status } });
 export const update = (id, data) => api(`/incidents/${encodeURIComponent(id)}`, { method: 'PATCH', body: data });
 export const submit = (id) => api(`/incidents/${encodeURIComponent(id)}/submit`, { method: 'POST' });
+/** Adds a comment; returns the incident with its comments. */
+export const comment = (id, body) => api(`/incidents/${encodeURIComponent(id)}/comments`, { method: 'POST', body: { body } });
+/** Audit entry for printing a single incident (the browser does the printing). */
+export const recordPrint = (id) => api(`/incidents/${encodeURIComponent(id)}/print`, { method: 'POST' });
+/** The creator discards a never-submitted draft (kept on record, hidden everywhere). Reason optional. */
+export const discard = (id, notes) => api(`/incidents/${encodeURIComponent(id)}`, { method: 'DELETE', body: notes ? { notes } : undefined });
 
 /** action: review | verify | approve | close | return | reject. Return/reject need notes. */
 export const workflow = (id, action, notes) =>

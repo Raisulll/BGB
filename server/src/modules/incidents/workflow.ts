@@ -32,8 +32,16 @@ export const isEditableStatus = (status: string) => (EDITABLE_STATUSES as readon
 export const ARCHIVABLE_STATUSES = ['Closed', 'Rejected'] as const;
 export const isArchivableStatus = (status: string) => (ARCHIVABLE_STATUSES as readonly string[]).includes(status);
 
+/** Statuses that wait on someone (reviewer, approver, HQ, or the filer for corrections): these can be overdue. */
+export const OVERDUE_STATUSES = ['Submitted', 'Reviewed', 'Verified', 'Approved', 'Returned'] as const;
+
 export const SEVERITIES = ['Low', 'Medium', 'High', 'Critical'] as const;
 export const STATUSES = ['Draft', 'Submitted', 'Reviewed', 'Verified', 'Approved', 'Closed', 'Returned', 'Rejected'] as const;
+
+/** Statuses in which this role has at least one workflow action ("Needs my action"). */
+export const actionableStatuses = (role: string) => [
+  ...new Set(WORKFLOW_ACTIONS.filter((a) => WORKFLOW[a].allowed(role)).flatMap((a) => WORKFLOW[a].from)),
+];
 
 /** Actions this role may take on an incident in `status` (separation-of-duties is checked separately). */
 export const availableActions = (status: string, role: string) =>

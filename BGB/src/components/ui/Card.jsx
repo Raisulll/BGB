@@ -1,12 +1,12 @@
 import { cn } from '../../utils/helpers';
 
 /** White rounded panel with optional header (title, icon, right-side actions). */
-export default function Card({ title, icon, actions, children, className = '', bodyClassName = '', as: Tag = 'section' }) {
+export default function Card({ id, title, icon, actions, children, className = '', bodyClassName = '', as: Tag = 'section' }) {
   const hasHeader = title || actions;
   const bodyPadding = /\bp-\d+\b|\bpx-\d+\b|\bpy-\d+\b/.test(bodyClassName) ? '' : 'p-4 sm:p-5';
 
   return (
-    <Tag className={cn('card', className)}>
+    <Tag id={id} className={cn('card', className)}>
       {hasHeader && (
         <header className="flex flex-col gap-2 border-b border-gray-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-4">
           {title && (

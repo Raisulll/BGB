@@ -18,8 +18,24 @@ import {
   USERS,
 } from './data/seed-data.js';
 
+// Seed dates are relative to the day the seed runs: every date moves by the same whole number of days
+// so the newest seed event falls on yesterday (Bangladesh), keeping the gaps and the times of day.
+// With the fixed dates in seed-data.js, demo records dated after the seeding day would sort above
+// incidents filed today and skew the trend charts. Tests set SEED_FIXED_DATES=true to stay deterministic.
+const DAY_MS = 86_400_000;
+const latestSeedDay = SEED_INCIDENTS.flatMap((i: { createdAt: string; timeline: { date: string }[] }) => [i.createdAt, ...i.timeline.map((t) => t.date)])
+  .map((s: string) => s.slice(0, 10))
+  .sort()
+  .at(-1)!;
+const todayDhaka = new Date(Date.now() + 6 * 3_600_000).toISOString().slice(0, 10);
+const SHIFT_DAYS =
+  process.env.SEED_FIXED_DATES === 'true' ? 0 : Math.round((Date.parse(todayDhaka) - DAY_MS - Date.parse(latestSeedDay)) / DAY_MS);
+const shiftDay = (ymd: string) => new Date(Date.parse(ymd) + SHIFT_DAYS * DAY_MS).toISOString().slice(0, 10);
+/** Moves every YYYY-MM-DD in a string (dates, timestamps, metadata text). */
+const shiftText = (s: string) => s.replace(/(?<!\d)\d{4}-\d{2}-\d{2}(?!\d)/g, shiftDay);
+
 // Seed timestamps are Bangladesh local time (UTC+06:00).
-const dhaka = (s: string) => new Date(`${s.trim().replace(' ', 'T')}+06:00`);
+const dhaka = (s: string) => new Date(`${shiftText(s).trim().replace(' ', 'T')}+06:00`);
 
 const MIME_BY_EXT: Record<string, string> = {
   jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif',
@@ -31,6 +47,17 @@ const UNITS: Record<string, number> = { B: 1, KB: 1024, MB: 1024 ** 2, GB: 1024 
 function parseSize(size: string): bigint {
   const m = /^([\d.]+)\s*(B|KB|MB|GB)$/i.exec(size.trim());
   return m ? BigInt(Math.round(Number(m[1]) * UNITS[m[2]!.toUpperCase()]!)) : 0n;
+}
+
+// When the incident's current status began: the first timeline entry of the final run with that
+// status (same rule as the backfill in migration status_since_and_comments)
+function statusSince(inc: { status: string; createdAt: string; timeline: { date: string; status: string }[] }): Date {
+  let since: string | null = null;
+  for (const t of inc.timeline) {
+    if (t.status !== inc.status) since = null;
+    else since ??= t.date;
+  }
+  return dhaka(since ?? inc.createdAt);
 }
 
 // "2 hours ago" / "1 day ago" → Date
@@ -116,7 +143,7 @@ async function main() {
           subcategory: inc.subcategory ?? null,
           severity: inc.severity,
           status: inc.status,
-          incidentDate: new Date(`${inc.date}T00:00:00Z`),
+          incidentDate: new Date(`${shiftDay(inc.date)}T00:00:00Z`),
           incidentTime: new Date(`1970-01-01T${inc.time}:00Z`),
           location: inc.location ?? null,
           bop: inc.bop ?? null,
@@ -130,6 +157,7 @@ async function main() {
           outcome: inc.outcome ?? null,
           createdBy: inc.createdBy,
           createdAt: dhaka(inc.createdAt),
+          statusChangedAt: statusSince(inc),
           timeline: {
             create: inc.timeline.map((t: { action: string; user: string; date: string; status: string }) => ({
               action: t.action,
@@ -146,7 +174,7 @@ async function main() {
               mimeType: mimeFor(e.name),
               fileSize: parseSize(e.size),
               storagePath: `seed-placeholder/${inc.id}/${e.name}`, // no file in object storage yet
-              fileMetadata: e.metadata ? { source: e.metadata } : undefined,
+              fileMetadata: e.metadata ? { source: shiftText(e.metadata) } : undefined,
               uploadedBy: inc.createdBy,
               uploadedAt: dhaka(`${e.date} 00:00`),
             })),

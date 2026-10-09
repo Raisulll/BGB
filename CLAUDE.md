@@ -211,7 +211,7 @@ These are the factory defaults (`role_permissions`, editable in Admin > Permissi
 |---|---|
 | `formatDateDisplay(str)` | Any date → `DD-MM-YYYY`; ISO timestamps give the Bangladesh calendar date |
 | `formatDateTime(iso, { withSeconds })` | ISO timestamp → `DD-MM-YYYY HH:MM[:SS]` in BST |
-| `timeAgo(iso)` | "5 min ago" style for feeds |
+| `timeAgo(iso, t)` | "5 min ago" style for feeds; pass `t` from `useI18n()` |
 | `todayISO()` | Today in Bangladesh as `YYYY-MM-DD` (date inputs) |
 | `validatePassword(pwd, policy.password)` | Client-side check mirroring the server policy |
 | `isAdmin(user)` | Display hint only |
@@ -808,6 +808,9 @@ All endpoints require `Authorization: Bearer <access_token>` unless marked **Pub
 | POST | `/incidents` | create | Create new incident (Draft or Submitted) | #5 |
 | GET | `/incidents/:id` | incidents | Get full incident detail including timeline | #7, #12 |
 | PATCH | `/incidents/:id` | create | Edit Draft/Returned incident | #5 |
+| DELETE | `/incidents/:id` | create | Discard a never-submitted draft (creator; soft, hidden everywhere, audited) | #5, #25 |
+| POST | `/incidents/:id/comments` | incidents | Comment (filers/reviewers; not drafts/archived); append-only, notifies creator + earlier commenters | #12, #23 |
+| POST | `/incidents/:id/print` | incidents | Audit entry before the browser prints a single incident | #22, #24 |
 | POST | `/incidents/:id/submit` | create | Submit Draft → Submitted | #13 |
 | POST | `/incidents/:id/review` | reviewer | Submitted → Reviewed | #14 |
 | POST | `/incidents/:id/verify` | approver | Reviewed → Verified | #14 |

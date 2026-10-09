@@ -4,7 +4,7 @@ import { useToast } from '../../context/ToastContext';
 import * as incidentsApi from '../../api/incidents';
 import { errorMessage } from '../../api/client';
 import { formatDateDisplay } from '../../utils/helpers';
-import { SeverityBadge, StatusBadge } from '../ui/Badges';
+import { OverdueBadge, SeverityBadge, StatusBadge } from '../ui/Badges';
 import EmptyState from '../ui/EmptyState';
 import { useI18n } from '../../i18n/I18nContext';
 
@@ -69,12 +69,13 @@ function RowActions({ inc, onChanged }) {
  *  - < md : stacked cards (easy to tap, no horizontal scrolling)
  *  - ≥ md : data table, extra columns revealed progressively on wider screens
  */
-export default function IncidentList({ incidents, compact = false, onChanged }) {
+export default function IncidentList({ incidents, compact = false, onChanged, empty }) {
   const { t } = useI18n();
   if (incidents.length === 0) {
+    // `empty` = { icon, title, hint } for a specific view (My drafts, Needs my action)
     return (
-      <EmptyState icon="fa-search" title={t('incidents.empty')}>
-        {t('incidents.emptyHint')}
+      <EmptyState icon={empty?.icon || 'fa-search'} title={empty?.title || t('incidents.empty')}>
+        {empty ? empty.hint : t('incidents.emptyHint')}
       </EmptyState>
     );
   }
@@ -89,6 +90,7 @@ export default function IncidentList({ incidents, compact = false, onChanged }) 
               <div className="mb-1 flex flex-wrap items-center gap-2">
                 <span className="font-mono text-xs font-medium text-bgb-700">{inc.id}</span>
                 <StatusBadge status={inc.status} />
+                {inc.overdue && <OverdueBadge since={inc.statusChangedAt} />}
                 {inc.archivedAt && <i className="fas fa-box-archive text-xs text-navy-500" title={t('incidents.archivedTag')} />}
               </div>
               <p className="truncate text-sm font-medium text-gray-800">{inc.title}</p>
@@ -133,6 +135,11 @@ export default function IncidentList({ incidents, compact = false, onChanged }) 
                 </td>
                 <td className="td whitespace-nowrap">
                   <StatusBadge status={inc.status} />
+                  {inc.overdue && (
+                    <span className="ml-1.5">
+                      <OverdueBadge since={inc.statusChangedAt} />
+                    </span>
+                  )}
                   {inc.archivedAt && <i className="fas fa-box-archive ml-1.5 text-xs text-navy-500" title={t('incidents.archivedTag')} aria-label={t('incidents.archivedTag')} />}
                 </td>
                 <td className="td hidden whitespace-nowrap text-gray-500 lg:table-cell">{formatDateDisplay(inc.date)}</td>

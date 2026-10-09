@@ -114,7 +114,7 @@ export async function archiveSummary() {
   const [afterDays, retentionDays] = await Promise.all([intSetting('archive.after_days'), intSetting('data.retention_days')]);
   const now = Date.now();
   const [active, archived, dueForArchive, pastRetention, lastRun] = await Promise.all([
-    prisma.incident.count({ where: { archivedAt: null } }),
+    prisma.incident.count({ where: { archivedAt: null, discardedAt: null } }),
     prisma.incident.count({ where: { archivedAt: { not: null } } }),
     prisma.incident.count({ where: { archivedAt: null, status: { in: [...ARCHIVABLE_STATUSES] }, updatedAt: { lt: new Date(now - afterDays * DAY_MS) } } }),
     prisma.incident.count({ where: { archivedAt: { not: null }, incidentDate: { lt: new Date(now - retentionDays * DAY_MS) } } }),

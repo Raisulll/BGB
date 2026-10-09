@@ -20,7 +20,8 @@ export default async function setup() {
 
   rmSync('storage/test-evidence', { recursive: true, force: true });
 
-  const env = { ...process.env, DATABASE_URL: testUrl, BCRYPT_ROUNDS: '10', NODE_ENV: 'test' };
+  // Fixed seed dates: tests refer to them (seed.ts otherwise shifts them relative to today)
+  const env = { ...process.env, DATABASE_URL: testUrl, BCRYPT_ROUNDS: '10', NODE_ENV: 'test', SEED_FIXED_DATES: 'true' };
   execSync('npx prisma migrate deploy', { env, stdio: 'pipe' });
   execSync('npx tsx prisma/seed.ts', { env, stdio: 'pipe' });
 }

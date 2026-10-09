@@ -35,6 +35,11 @@ const SECTIONS = [
       { key: 'session.single_session', icon: 'fa-desktop' },
     ],
   },
+  {
+    title: 'set.workflowTitle',
+    icon: 'fa-project-diagram',
+    items: [{ key: 'workflow.overdue_days', icon: 'fa-hourglass-half' }],
+  },
 ];
 
 export default function AdminSettings({ config, onChange }) {

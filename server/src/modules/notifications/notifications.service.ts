@@ -59,3 +59,28 @@ export async function notifyWorkflow(tx: Tx, incident: IncidentRef, event: Workf
 }
 
 const EMAIL_EVENTS: EmailEvent[] = ['submitted', 'approved', 'rejected', 'returned'];
+
+/**
+ * A new comment notifies the incident's creator and everyone who commented before, if they are
+ * still active and the incident is still inside their scope. Never the author. In-app only.
+ */
+export async function notifyComment(tx: Tx, incident: IncidentRef, actor: { id: string; name: string }, body: string) {
+  const earlier = await tx.incidentComment.findMany({ where: { incidentId: incident.id }, select: { userId: true }, distinct: ['userId'] });
+  const ids = new Set([incident.createdBy, ...earlier.map((c) => c.userId)]);
+  ids.delete(actor.id);
+  if (ids.size === 0) return;
+  const users = await tx.user.findMany({ where: { id: { in: [...ids] }, isActive: true }, select: { id: true, scope: true } });
+  const recipients: string[] = [];
+  for (const u of users) if (inScope(await resolveScope(u.scope), incident)) recipients.push(u.id);
+  if (recipients.length === 0) return;
+  const snippet = body.length > 140 ? `${body.slice(0, 140)}…` : body;
+  await tx.notification.createMany({
+    data: recipients.map((userId) => ({
+      userId,
+      title: 'New Comment',
+      message: `${incident.id} (${incident.title}): ${actor.name} commented: ${snippet}`.slice(0, 2000),
+      type: 'comment',
+      incidentId: incident.id,
+    })),
+  });
+}

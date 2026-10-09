@@ -5,9 +5,11 @@ import { useToast } from '../context/ToastContext';
 import * as incidentsApi from '../api/incidents';
 import { errorMessage } from '../api/client';
 import useApi from '../hooks/useApi';
+import useUnsavedChanges from '../hooks/useUnsavedChanges';
 import { cn, FILE_ICONS, fileKind, formatDateTime, formatFileSize, todayISO } from '../utils/helpers';
 import Card from '../components/ui/Card';
-import EvidencePreview, { PREVIEW_TYPES } from '../components/incidents/EvidencePreview';
+import EvidenceMedia, { LocalMedia, PREVIEW_TYPES } from '../components/incidents/EvidenceMedia';
+import ReasonBanner from '../components/incidents/ReasonBanner';
 import ErrorState from '../components/ui/ErrorState';
 import Spinner from '../components/ui/Spinner';
 import { useI18n } from '../i18n/I18nContext';
@@ -115,8 +117,11 @@ function IncidentFormBody({ existing, initialStep }) {
   const [activeStep, setActiveStep] = useState(Math.min(3, Math.max(1, initialStep)));
   const [files, setFiles] = useState([]); // File objects waiting to be uploaded
   const [savedEvidence, setSavedEvidence] = useState(existing?.evidence || []);
-  const [previewing, setPreviewing] = useState(null); // saved evidence shown in the viewer
   const [saving, setSaving] = useState(null); // 'Draft' | 'Submitted'
+
+  // Warn before typed input or picked files are lost (not while a save is running)
+  const [loadedForm] = useState(() => JSON.stringify(form));
+  const unsavedDialog = useUnsavedChanges(!saving && (files.length > 0 || JSON.stringify(form) !== loadedForm));
 
   // Reference data from /incidents/meta: active categories and the org units within the user's scope
   const hierarchy = useMemo(() => meta?.hierarchy || {}, [meta]);
@@ -300,6 +305,9 @@ function IncidentFormBody({ existing, initialStep }) {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
+      {/* A returned report: what the reviewer asked to change */}
+      {existing && <ReasonBanner incident={existing} />}
+
       {/* Step Progress Header Bar */}
       <div className="rounded-2xl border border-gray-200/80 bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between mb-3">
@@ -660,53 +668,51 @@ function IncidentFormBody({ existing, initialStep }) {
                     {savedEvidence.map((ev) => {
                       const fi = FILE_ICONS[fileKind(ev.mimeType)] || FILE_ICONS.file;
                       return (
-                        <li key={`saved-${ev.id}`} className="flex items-center justify-between rounded-xl bg-emerald-50/50 p-2.5 border border-emerald-200">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${fi.cls}`}>
-                              <i className={`fas ${fi.icon} text-xs`} />
+                        <li key={`saved-${ev.id}`} className="rounded-xl bg-emerald-50/50 p-2.5 border border-emerald-200">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${fi.cls}`}>
+                                <i className={`fas ${fi.icon} text-xs`} />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="truncate text-xs font-bold text-gray-800">{ev.name}</p>
+                                <p className="text-[10px] text-gray-500 font-mono">
+                                  {formatFileSize(ev.size)} &bull; {t('form.uploadedAt', { date: formatDateTime(ev.uploadedAt) })}
+                                </p>
+                              </div>
                             </div>
-                            <div className="min-w-0">
-                              <p className="truncate text-xs font-bold text-gray-800">{ev.name}</p>
-                              <p className="text-[10px] text-gray-500 font-mono">
-                                {formatFileSize(ev.size)} &bull; {t('form.uploadedAt', { date: formatDateTime(ev.uploadedAt) })}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex shrink-0 items-center gap-1">
-                            {ev.available && PREVIEW_TYPES.has(ev.mimeType) && (
-                              <button type="button" onClick={() => setPreviewing(ev)} className="btn btn-ghost p-1 text-slate-600 hover:text-slate-800" title={t('detail.preview')} aria-label={t('detail.previewAria', { name: ev.name })}>
-                                <i className="fas fa-eye text-xs" />
-                              </button>
-                            )}
                             <button type="button" onClick={() => removeSaved(ev)} className="btn btn-ghost p-1 text-red-500 hover:text-red-700" title={t('form.removeFile')} aria-label={t('detail.removeAria', { name: ev.name })}>
                               <i className="fas fa-trash-alt text-xs" />
                             </button>
                           </div>
+                          {ev.available && PREVIEW_TYPES.has(ev.mimeType) && <EvidenceMedia incidentId={existing.id} evidence={ev} size="small" />}
                         </li>
                       );
                     })}
                     {files.map((f, idx) => {
                       const fi = FILE_ICONS[fileKind(f.type)] || FILE_ICONS.file;
                       return (
-                        <li key={`${f.name}-${idx}`} className="flex items-center justify-between rounded-xl bg-gray-50 p-2.5 border border-gray-200">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${fi.cls}`}>
-                              <i className={`fas ${fi.icon} text-xs`} />
+                        <li key={`${f.name}-${idx}`} className="rounded-xl bg-gray-50 p-2.5 border border-gray-200">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${fi.cls}`}>
+                                <i className={`fas ${fi.icon} text-xs`} />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="truncate text-xs font-bold text-gray-800">{f.name}</p>
+                                <p className="text-[10px] text-gray-500 font-mono">{formatFileSize(f.size)} &bull; {t('form.uploadsOnSave')}</p>
+                              </div>
                             </div>
-                            <div className="min-w-0">
-                              <p className="truncate text-xs font-bold text-gray-800">{f.name}</p>
-                              <p className="text-[10px] text-gray-500 font-mono">{formatFileSize(f.size)} &bull; {t('form.uploadsOnSave')}</p>
-                            </div>
+                            <button type="button" onClick={() => removeFile(idx)} className="btn btn-ghost p-1 text-red-500 hover:text-red-700" title={t('form.removeFile')} aria-label={t('detail.removeAria', { name: f.name })}>
+                              <i className="fas fa-times text-xs" />
+                            </button>
                           </div>
-                          <button type="button" onClick={() => removeFile(idx)} className="btn btn-ghost p-1 text-red-500 hover:text-red-700" title={t('form.removeFile')} aria-label={t('detail.removeAria', { name: f.name })}>
-                            <i className="fas fa-times text-xs" />
-                          </button>
+                          {PREVIEW_TYPES.has(f.type) && <LocalMedia file={f} />}
                         </li>
                       );
                     })}
                   </ul>
                 )}
-                {existing && <EvidencePreview incidentId={existing.id} evidence={previewing} onClose={() => setPreviewing(null)} />}
               </div>
 
               <div className="flex justify-between pt-4 border-t border-gray-100">
@@ -751,6 +757,7 @@ function IncidentFormBody({ existing, initialStep }) {
           </div>
         </form>
       </Card>
+      {unsavedDialog}
     </div>
   );
 }

@@ -208,6 +208,8 @@ paths:
         - $ref: '#/components/parameters/DateFrom'
         - $ref: '#/components/parameters/DateTo'
         - { name: createdBy, in: query, schema: { type: string }, description: 'User id, or `me`' }
+        - { name: needsAction, in: query, schema: { type: string, enum: ['true', 'false'] }, description: 'true = incidents the caller can act on now (their role''s workflow steps, not their own), plus their own Returned reports' }
+        - { name: overdue, in: query, schema: { type: string, enum: ['true', 'false'] }, description: 'true = waiting longer than the workflow.overdue_days setting in their current step (Submitted, Reviewed, Verified, Approved, Returned; not archived)' }
         - $ref: '#/components/parameters/Archived'
         - { name: sort, in: query, schema: { type: string, enum: [createdAt, incidentDate, id], default: createdAt } }
         - { name: order, in: query, schema: { type: string, enum: [asc, desc], default: desc } }
@@ -261,6 +263,7 @@ paths:
                   hierarchy: { $ref: '#/components/schemas/Hierarchy' }
                   severities: { type: array, items: { $ref: '#/components/schemas/Severity' } }
                   statuses: { type: array, items: { $ref: '#/components/schemas/Status' } }
+                  canAct: { type: boolean, description: 'The caller''s role takes part in review/approval (has a "Needs my action" view)' }
   /incidents/export/{format}:
     get:
       tags: [Reports]
@@ -290,6 +293,42 @@ paths:
         '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/IncidentDetail' } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [Incidents]
+      summary: Discard a draft that was never submitted (creator only)
+      description: 'Timeline rows are append-only (spec #25), so the record is kept, marked discarded and hidden from every view. Adds a "Discarded" timeline entry and a DISCARD_DRAFT audit entry. Only status Draft.'
+      x-permission: create
+      requestBody:
+        required: false
+        content: { application/json: { schema: { type: object, properties: { notes: { type: string, maxLength: 2000, description: Optional reason } } } } }
+      responses:
+        '204': { description: Discarded }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /incidents/{id}/comments:
+    parameters: [{ $ref: '#/components/parameters/IncidentId' }]
+    post:
+      tags: [Incidents]
+      summary: Add a comment (append-only; notifies the creator and earlier commenters)
+      description: 'Allowed for roles that file or review incidents, on records that are not drafts and not archived. Audited as COMMENT_INCIDENT. Comments are returned in the incident detail.'
+      x-permission: incidents
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [body], properties: { body: { type: string, minLength: 1, maxLength: 4000 } } } } }
+      responses:
+        '201': { description: The incident with the new comment, content: { application/json: { schema: { $ref: '#/components/schemas/IncidentDetail' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /incidents/{id}/print:
+    parameters: [{ $ref: '#/components/parameters/IncidentId' }]
+    post:
+      tags: [Incidents]
+      summary: Record that the caller printed this incident (audit PRINT_INCIDENT); the browser does the printing
+      x-permission: incidents
+      responses:
+        '204': { description: Recorded }
+        '404': { $ref: '#/components/responses/NotFound' }
   /incidents/{id}/timeline:
     parameters: [{ $ref: '#/components/parameters/IncidentId' }]
     get:
@@ -508,6 +547,7 @@ paths:
                   rejected: { type: integer }
                   open: { type: integer }
                   highSeverityOpen: { type: integer }
+                  overdue: { type: integer, description: Waiting longer than workflow.overdue_days in one step }
                   byStatus: { type: object, additionalProperties: { type: integer } }
                   bySeverity: { type: object, additionalProperties: { type: integer } }
   /reports/trends:
@@ -1199,9 +1239,12 @@ components:
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
         archivedAt: { type: [string, 'null'], format: date-time }
+        statusChangedAt: { type: string, format: date-time, description: When the current status began }
+        overdue: { type: boolean, description: 'Waiting longer than workflow.overdue_days in this step' }
         actions: { type: array, items: { type: string, enum: [review, verify, approve, close, return, reject] }, description: Workflow actions the caller may take now }
         canEdit: { type: boolean }
         canSubmit: { type: boolean }
+        canDiscard: { type: boolean, description: The caller created this never-submitted draft and may discard it }
         canArchive: { type: boolean }
         canRestore: { type: boolean }
     IncidentDetail:
@@ -1215,6 +1258,16 @@ components:
             outcome: { type: [string, 'null'] }
             timeline: { type: array, items: { $ref: '#/components/schemas/TimelineEntry' } }
             evidence: { type: array, items: { $ref: '#/components/schemas/Evidence' } }
+            comments: { type: array, items: { $ref: '#/components/schemas/Comment' } }
+            canComment: { type: boolean, description: 'The caller may comment (files incidents or reviews them; not on drafts or archived records)' }
+    Comment:
+      type: object
+      properties:
+        id: { type: integer }
+        user: { type: string }
+        userId: { type: string }
+        body: { type: string }
+        date: { type: string, format: date-time }
     TimelineEntry:
       type: object
       properties:

@@ -43,6 +43,8 @@ export const createIncidentSchema = z
 // PATCH: any subset of the fields. Status changes go through the workflow endpoints.
 export const updateIncidentSchema = z.object(incidentFields).partial().strict();
 
+export const commentSchema = z.object({ body: trimmed(4_000).pipe(z.string().min(1, 'Comment is empty')) }).strict();
+
 export const workflowActionSchema = z.object({ notes: trimmed(2_000).optional() }).strict();
 
 const csv = <T extends string>(values: readonly [T, ...T[]]) =>
@@ -63,6 +65,10 @@ export const listIncidentsSchema = paginationSchema.extend({
   dateFrom: isoDate.optional(),
   dateTo: isoDate.optional(),
   createdBy: trimmed(10).optional(), // user id, or "me"
+  // "Needs my action": incidents the caller can act on now, plus their own Returned reports
+  needsAction: z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
+  // Waiting longer than the workflow.overdue_days setting in their current step
+  overdue: z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
   // Spec #45 — archived records: lists exclude them unless asked; statistics include them
   archived: z.enum(['exclude', 'include', 'only']).optional(),
   sort: z.enum(['createdAt', 'incidentDate', 'id']).default('createdAt'),

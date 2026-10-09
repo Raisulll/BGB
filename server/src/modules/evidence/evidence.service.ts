@@ -186,6 +186,21 @@ async function loadEvidence(user: AuthUser, incidentId: string, evidenceId: numb
 
 const INLINE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'application/pdf', 'video/mp4']);
 
+// Images and videos are shown automatically on the incident page, so every page open fetches them.
+// A repeat view of the same file by the same user within this window is not logged again (the first
+// view always is; downloads always are). Per process, like the audit-trail view de-duplication.
+const VIEW_DEDUPE_MS = 10 * 60_000;
+const lastView = new Map<string, number>();
+function isRepeatView(userId: string, evidenceId: number) {
+  const now = Date.now();
+  if (lastView.size > 10_000) for (const [k, at] of lastView) if (now - at >= VIEW_DEDUPE_MS) lastView.delete(k);
+  const key = `${userId}:${evidenceId}`;
+  const prev = lastView.get(key);
+  if (prev !== undefined && now - prev < VIEW_DEDUPE_MS) return true;
+  lastView.set(key, now);
+  return false;
+}
+
 export async function openEvidence(user: AuthUser, incidentId: string, evidenceId: number, inline: boolean, ctx: RequestContext) {
   const { ev } = await loadEvidence(user, incidentId, evidenceId);
   let object: Awaited<ReturnType<typeof readObject>> = null;
@@ -213,13 +228,15 @@ export async function openEvidence(user: AuthUser, incidentId: string, evidenceI
   // Spec #24 — an in-browser preview is recorded as a view, a saved copy as a download
   const shownInline = inline && INLINE_TYPES.has(ev.mimeType);
 
-  await writeAudit({
-    action: shownInline ? 'VIEW_EVIDENCE' : 'DOWNLOAD_EVIDENCE',
-    username: user.username,
-    userId: user.id,
-    details: `${incidentId}: ${ev.originalName} (#${ev.id})`,
-    ctx,
-  });
+  if (!(shownInline && isRepeatView(user.id, ev.id))) {
+    await writeAudit({
+      action: shownInline ? 'VIEW_EVIDENCE' : 'DOWNLOAD_EVIDENCE',
+      username: user.username,
+      userId: user.id,
+      details: `${incidentId}: ${ev.originalName} (#${ev.id})`,
+      ctx,
+    });
+  }
   return {
     stream,
     name: ev.originalName,
