@@ -212,7 +212,8 @@ export default {
     "VERIFY_AUDIT_CHAIN": "VERIFY AUDIT CHAIN",
     "VERIFY_EVIDENCE": "VERIFY EVIDENCE",
     "VERIFY_INCIDENT": "VERIFY INCIDENT",
-    "VIEW_AUDIT_LOG": "VIEW AUDIT LOG"
+    "VIEW_AUDIT_LOG": "VIEW AUDIT LOG",
+    "VIEW_EVIDENCE": "VIEW EVIDENCE"
   },
   "cat": {
     "add": "Add Category",
@@ -368,6 +369,9 @@ export default {
     "notFound": "Incident {id} was not found or is outside your area of responsibility.",
     "outcome": "Outcome",
     "persons": "Persons Involved",
+    "preview": "View",
+    "previewAria": "View {name}",
+    "previewNote": "Viewing evidence is recorded in the audit trail.",
     "rejectTitle": "Reject incident: {id}",
     "removeAria": "Remove {name}",
     "removeTitle": "Remove {name}",

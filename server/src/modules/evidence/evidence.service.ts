@@ -210,9 +210,11 @@ export async function openEvidence(user: AuthUser, incidentId: string, evidenceI
   }
   if (!object) throw new AppError(404, 'FILE_UNAVAILABLE', 'The file for this evidence record is not in storage');
   const stream = Readable.from(object.data);
+  // Spec #24 — an in-browser preview is recorded as a view, a saved copy as a download
+  const shownInline = inline && INLINE_TYPES.has(ev.mimeType);
 
   await writeAudit({
-    action: 'DOWNLOAD_EVIDENCE',
+    action: shownInline ? 'VIEW_EVIDENCE' : 'DOWNLOAD_EVIDENCE',
     username: user.username,
     userId: user.id,
     details: `${incidentId}: ${ev.originalName} (#${ev.id})`,
@@ -224,7 +226,7 @@ export async function openEvidence(user: AuthUser, incidentId: string, evidenceI
     mimeType: ev.mimeType,
     size: Number(ev.fileSize),
     sha256: ev.sha256,
-    inline: inline && INLINE_TYPES.has(ev.mimeType),
+    inline: shownInline,
   };
 }
 

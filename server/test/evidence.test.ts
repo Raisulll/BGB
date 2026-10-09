@@ -108,8 +108,10 @@ describe('download, verification and visibility', () => {
     expect(res.headers['cache-control']).toContain('no-store');
     expect((await lastAudit('DOWNLOAD_EVIDENCE'))?.details).toContain(`#${item.id}`);
 
+    // In-browser preview: shown inline and audited as a view, not a download (spec #24)
     const inline = await operator.get(`${item.downloadUrl}?inline=1`);
     expect(inline.headers['content-disposition']).toMatch(/^inline;/);
+    expect((await lastAudit('VIEW_EVIDENCE'))?.details).toContain(`#${item.id}`);
   });
 
   it('verifies integrity, and detects a file altered on disk', async () => {

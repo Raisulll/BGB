@@ -36,6 +36,9 @@ export function spaRouter(dir: string) {
 
   const router = express.Router();
   router.use(helmet.contentSecurityPolicy(SPA_CSP));
+  // Helmet's default "no-referrer" makes OpenStreetMap refuse the tiles: its usage policy requires a
+  // Referer. Cross-origin requests carry only the site origin, never the page path (incident IDs).
+  router.use(helmet.referrerPolicy({ policy: 'strict-origin-when-cross-origin' }));
 
   // Vite's hashed bundles never change under the same name
   router.use('/assets', express.static(path.join(root, 'assets'), { immutable: true, maxAge: '1y', index: false }));

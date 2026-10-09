@@ -7,6 +7,7 @@ import { errorMessage } from '../api/client';
 import useApi from '../hooks/useApi';
 import { cn, FILE_ICONS, fileKind, formatDateTime, formatFileSize, todayISO } from '../utils/helpers';
 import Card from '../components/ui/Card';
+import EvidencePreview, { PREVIEW_TYPES } from '../components/incidents/EvidencePreview';
 import ErrorState from '../components/ui/ErrorState';
 import Spinner from '../components/ui/Spinner';
 import { useI18n } from '../i18n/I18nContext';
@@ -114,6 +115,7 @@ function IncidentFormBody({ existing, initialStep }) {
   const [activeStep, setActiveStep] = useState(Math.min(3, Math.max(1, initialStep)));
   const [files, setFiles] = useState([]); // File objects waiting to be uploaded
   const [savedEvidence, setSavedEvidence] = useState(existing?.evidence || []);
+  const [previewing, setPreviewing] = useState(null); // saved evidence shown in the viewer
   const [saving, setSaving] = useState(null); // 'Draft' | 'Submitted'
 
   // Reference data from /incidents/meta: active categories and the org units within the user's scope
@@ -670,9 +672,16 @@ function IncidentFormBody({ existing, initialStep }) {
                               </p>
                             </div>
                           </div>
-                          <button type="button" onClick={() => removeSaved(ev)} className="btn btn-ghost p-1 text-red-500 hover:text-red-700" title={t('form.removeFile')} aria-label={t('detail.removeAria', { name: ev.name })}>
-                            <i className="fas fa-trash-alt text-xs" />
-                          </button>
+                          <div className="flex shrink-0 items-center gap-1">
+                            {ev.available && PREVIEW_TYPES.has(ev.mimeType) && (
+                              <button type="button" onClick={() => setPreviewing(ev)} className="btn btn-ghost p-1 text-slate-600 hover:text-slate-800" title={t('detail.preview')} aria-label={t('detail.previewAria', { name: ev.name })}>
+                                <i className="fas fa-eye text-xs" />
+                              </button>
+                            )}
+                            <button type="button" onClick={() => removeSaved(ev)} className="btn btn-ghost p-1 text-red-500 hover:text-red-700" title={t('form.removeFile')} aria-label={t('detail.removeAria', { name: ev.name })}>
+                              <i className="fas fa-trash-alt text-xs" />
+                            </button>
+                          </div>
                         </li>
                       );
                     })}
@@ -697,6 +706,7 @@ function IncidentFormBody({ existing, initialStep }) {
                     })}
                   </ul>
                 )}
+                {existing && <EvidencePreview incidentId={existing.id} evidence={previewing} onClose={() => setPreviewing(null)} />}
               </div>
 
               <div className="flex justify-between pt-4 border-t border-gray-100">

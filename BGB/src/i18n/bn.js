@@ -212,7 +212,8 @@ export default {
     "VERIFY_AUDIT_CHAIN": "অডিট চেইন যাচাই",
     "VERIFY_EVIDENCE": "প্রমাণ যাচাই",
     "VERIFY_INCIDENT": "ঘটনা যাচাই",
-    "VIEW_AUDIT_LOG": "অডিট লগ দেখা"
+    "VIEW_AUDIT_LOG": "অডিট লগ দেখা",
+    "VIEW_EVIDENCE": "প্রমাণ দেখা"
   },
   "cat": {
     "add": "শ্রেণি যোগ করুন",
@@ -368,6 +369,9 @@ export default {
     "notFound": "ঘটনা {id} পাওয়া যায়নি অথবা আপনার দায়িত্বপ্রাপ্ত এলাকার বাইরে।",
     "outcome": "ফলাফল",
     "persons": "সংশ্লিষ্ট ব্যক্তি",
+    "preview": "দেখুন",
+    "previewAria": "{name} দেখুন",
+    "previewNote": "প্রমাণ দেখার তথ্য অডিট ট্রেইলে সংরক্ষিত হয়।",
     "rejectTitle": "ঘটনা প্রত্যাখ্যান: {id}",
     "removeAria": "{name} অপসারণ",
     "removeTitle": "{name} অপসারণ",

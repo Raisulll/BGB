@@ -10,6 +10,7 @@ import useApi from '../hooks/useApi';
 import { FILE_ICONS, fileKind, formatDateDisplay, formatDateTime, formatFileSize, isAdmin } from '../utils/helpers';
 import { SeverityBadge, StatusBadge } from '../components/ui/Badges';
 import Card from '../components/ui/Card';
+import EvidencePreview, { PREVIEW_TYPES } from '../components/incidents/EvidencePreview';
 import ErrorState from '../components/ui/ErrorState';
 import ReasonDialog from '../components/ui/ReasonDialog';
 import Spinner from '../components/ui/Spinner';
@@ -57,6 +58,7 @@ export default function IncidentDetail() {
   const { data: inc, error, message, reload, setData } = useApi((signal) => incidentsApi.get(id, signal), [id]);
   const [busy, setBusy] = useState(null);
   const [dialog, setDialog] = useState(null); // { kind: 'workflow', action } | { kind: 'evidence', ev }
+  const [previewing, setPreviewing] = useState(null); // evidence item shown in the viewer
 
   const run = async (action, notes) => {
     setBusy(action);
@@ -268,6 +270,11 @@ export default function IncidentDetail() {
                       </div>
                       {ev.available ? (
                         <div className="flex shrink-0 items-center">
+                          {PREVIEW_TYPES.has(ev.mimeType) && (
+                            <button onClick={() => setPreviewing(ev)} disabled={Boolean(busy)} className="btn btn-ghost px-3 text-slate-700" title={t('detail.preview')} aria-label={t('detail.previewAria', { name: ev.name })}>
+                              <i className="fas fa-eye" />
+                            </button>
+                          )}
                           {ev.sha256 && (
                             <button onClick={() => verify(ev)} disabled={Boolean(busy)} className="btn btn-ghost px-3 text-emerald-700" title={t('detail.verifyIntegrity')} aria-label={t('detail.verifyAria', { name: ev.name })}>
                               <i className={`fas ${busy === `vf-${ev.id}` ? 'fa-spinner fa-spin' : 'fa-shield-alt'}`} />
@@ -360,6 +367,8 @@ export default function IncidentDetail() {
           </Card>
         </div>
       </div>
+
+      <EvidencePreview incidentId={inc.id} evidence={previewing} onClose={() => setPreviewing(null)} />
 
       <ReasonDialog
         open={dialog?.kind === 'workflow'}
