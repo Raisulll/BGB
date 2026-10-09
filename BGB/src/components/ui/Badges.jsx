@@ -1,4 +1,4 @@
-import { SEVERITY_STYLES, STATUS_STYLES, cn } from '../../utils/helpers';
+import { SEVERITY_HEX, SEVERITY_STYLES, STATUS_STYLES, cn } from '../../utils/helpers';
 import { useI18n } from '../../i18n/I18nContext';
 
 export function StatusBadge({ status }) {
@@ -6,7 +6,7 @@ export function StatusBadge({ status }) {
   return (
     <span
       className={cn(
-        'inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-semibold',
+        'inline-flex items-center whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-medium',
         STATUS_STYLES[status] || STATUS_STYLES.Draft,
       )}
     >
@@ -20,10 +20,11 @@ export function SeverityBadge({ severity }) {
   return (
     <span
       className={cn(
-        'inline-flex items-center whitespace-nowrap rounded px-2 py-0.5 text-[11px] font-medium sm:text-xs',
-        SEVERITY_STYLES[severity] || 'bg-gray-50 text-gray-600',
+        'inline-flex items-center gap-1.5 whitespace-nowrap rounded border px-2 py-0.5 text-xs font-medium',
+        SEVERITY_STYLES[severity] || 'border-slate-300 bg-slate-50 text-slate-700',
       )}
     >
+      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: SEVERITY_HEX[severity] || '#64748b' }} aria-hidden="true" />
       {tv('severity', severity)}
     </span>
   );
@@ -31,7 +32,7 @@ export function SeverityBadge({ severity }) {
 
 export function Tag({ children, className = '' }) {
   return (
-    <span className={cn('inline-flex items-center whitespace-nowrap rounded bg-navy-50 px-2 py-0.5 text-[11px] font-medium text-navy-700 sm:text-xs', className)}>
+    <span className={cn('inline-flex items-center whitespace-nowrap rounded bg-navy-50 px-2 py-0.5 text-xs font-medium text-navy-700 sm:text-xs', className)}>
       {children}
     </span>
   );
@@ -46,10 +47,10 @@ export function OverdueBadge({ since }) {
   const n = Math.max(1, daysWaiting(since));
   return (
     <span
-      className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-700"
+      className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-medium text-red-800"
       title={t('incidents.overdueTitle', { n })}
     >
-      <i className="fas fa-hourglass-end text-[10px]" />
+      <i className="fas fa-hourglass-end text-xs" />
       {t('incidents.overdueDays', { n })}
     </span>
   );

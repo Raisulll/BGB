@@ -173,6 +173,46 @@ All changes are audited (`CONFIG_CHANGE`, `PERMISSION_CHANGE`, `PERMISSION_RESET
 
 Each recipient gets their own row (read state is per user). There are no shared "broadcast" rows.
 
+## Messaging API (`/api/v1/messaging`, permission `messages`)
+
+Direct (one thread per pair) and group conversations between any active users, text and voice messages. Messages are permanent records: `messages` is append-only by trigger, there is no edit or delete route, and leaving a group keeps its history.
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/users` | Directory: every other active user; `?q=` name, username or unit |
+| GET | `/unread` | `{ unread }` across the caller's conversations (sidebar badge) |
+| GET | `/conversations` | Most recent activity first, with `unread`, `lastMessage`, members |
+| POST | `/conversations` | `{ kind: 'direct', userId }` returns the existing thread if there is one; `{ kind: 'group', title, memberIds }` (audited `MESSAGE_GROUP_CREATE`) |
+| GET | `/conversations/:id` | Members only (others get 404) |
+| GET | `/conversations/:id/messages` | Oldest first; page back with `before` (id) and `limit` (max 100); `hasMore` |
+| POST | `/conversations/:id/messages` | `{ body }`, 1–4000 characters |
+| POST | `/conversations/:id/voice` | multipart `audio` + `durationMs` (300–300000). WebM, Ogg, MP4/M4A or MP3, recognised by the bytes; up to 10 MB; anything else is 415 and audited `UPLOAD_REJECTED`. Stored encrypted like evidence, with SHA-256 |
+| GET | `/conversations/:id/messages/:mid/audio` | Members only; the SHA-256 is checked before the file is served (409 on mismatch) |
+| POST | `/conversations/:id/read` | `{ lastReadId }`; never moves backwards |
+| POST | `/conversations/:id/members` | Groups only; any member may add (audited `MESSAGE_GROUP_ADD`) |
+| POST | `/conversations/:id/leave` | Groups only (audited `MESSAGE_GROUP_LEAVE`) |
+
+## Calls API (`/api/v1/calls`, permission `messages`)
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/ice` | ICE servers for `RTCPeerConnection`: `STUN_URLS`, plus `TURN_URLS` / `TURN_USERNAME` / `TURN_CREDENTIAL` when set |
+| GET | `/` | The caller's own call log (paginated), with `direction`, `other`, `durationSeconds` |
+| GET | `/all` | Every call; roles with the `admin` or `audit` page only. `?userId=` |
+
+1:1 audio only. The audio goes browser to browser (or through the TURN relay) and is never stored. Each finished call is a `calls` row (ringing → answered → ended, or declined / missed / cancelled / failed) and an audit entry `CALL`; a missed call notifies the callee (type `call`). Unanswered calls are missed after `CALL_RING_SECONDS` (default 30). A second call to someone in a call is recorded as `failed` (busy). On start-up, records a crash left open are closed (`sweepStaleCalls`): still ringing after a minute → missed (`interrupted`), answered more than 12 hours ago → ended (`stale`).
+
+## Realtime channel (`/api/v1/ws`)
+
+One WebSocket per browser tab, same origin as the API (`src/realtime/hub.ts`).
+
+- **Auth**: the first frame must be `{"type":"auth","token":"<access token>"}` within 10 s; the reply is `{"type":"ready"}` or close code 4001. The SPA sends the new token again after each refresh. A foreign `Origin` is refused with 403 (no `Origin` at all only outside production).
+- **Sessions** are re-checked every 60 s, so logout, deactivation and idle timeout close the socket. Socket traffic never counts as user activity.
+- **Pushed events**: `message` {message}, `conversation` {conversationId}, `read` {conversationId}, and the call messages listed in the OpenAPI `Calls` tag.
+- **Several API processes** (PM2 cluster, more than one host): events go through PostgreSQL `LISTEN/NOTIFY` on channel `birds_events` (`src/realtime/bus.ts`), so a socket on any process receives them. Payloads carry ids only; message bodies are read from the database.
+- **Proxies** must pass WebSocket upgrades for `/api/v1/ws` (Nginx: `proxy_http_version 1.1`, `Upgrade` and `Connection` headers, a read timeout above the 30 s ping). Render supports this as is.
+- **Microphone** access needs HTTPS (or localhost).
+
 ## Reports API (`/api/v1/reports`)
 
 | Method | Path | Permission | Notes |
@@ -198,6 +238,7 @@ The SPA (`../BGB`, `src/api/client.js`) relies on these behaviours:
 - On page load it calls `/auth/refresh` only if a non-secret `birds.session_hint` flag is set in `localStorage` (set at login, cleared at logout or session end).
 - Workflow buttons and the Edit link come from each incident's `actions` / `canEdit`; the SPA holds no copy of the workflow table.
 - Notifications are polled every 30 s and marked `X-Background-Request: 1` when there was no user input since the previous poll.
+- Messaging and calls use the realtime channel (`src/api/realtime.js`, `context/CommsContext.jsx`); fetches triggered by socket events and the 60 s unread poll are background requests.
 
 ## Data integrity (`prisma/sql/integrity.sql`)
 

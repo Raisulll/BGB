@@ -40,7 +40,7 @@ export default function IncidentComments({ incident, onUpdated }) {
             <li key={c.id} className="rounded-lg bg-gray-50 p-3">
               <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
                 <span className="text-xs font-bold text-gray-800">{c.user}</span>
-                <span className="text-[11px] text-gray-400" title={formatDateTime(c.date)}>
+                <span className="text-xs text-gray-400" title={formatDateTime(c.date)}>
                   {timeAgo(c.date, t)}
                 </span>
               </div>
@@ -67,14 +67,14 @@ export default function IncidentComments({ incident, onUpdated }) {
             disabled={busy}
           />
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] text-gray-400">{t('detail.commentNote')}</span>
+            <span className="text-xs text-gray-400">{t('detail.commentNote')}</span>
             <button type="submit" disabled={busy || !text.trim()} className="btn btn-primary shrink-0">
               <i className={`fas ${busy ? 'fa-spinner fa-spin' : 'fa-paper-plane'}`} /> {t('detail.commentPost')}
             </button>
           </div>
         </form>
       ) : (
-        incident.status !== 'Draft' && <p className="mt-3 text-[11px] text-gray-400">{t(incident.archivedAt ? 'detail.commentsArchived' : 'detail.commentsReadOnly')}</p>
+        incident.status !== 'Draft' && <p className="mt-3 text-xs text-gray-400">{t(incident.archivedAt ? 'detail.commentsArchived' : 'detail.commentsReadOnly')}</p>
       )}
     </Card>
   );

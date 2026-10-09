@@ -16,7 +16,7 @@ export default function ReasonBanner({ incident, className = '' }) {
   const step = [...(incident.timeline || [])].reverse().find((e) => e.action === incident.status);
   if (!step) return null;
   return (
-    <div className={`flex items-start gap-3 rounded-xl border-l-4 border p-3 sm:p-4 ${style.box} ${className}`} role="note">
+    <div className={`flex items-start gap-3 rounded-md border-l-4 border p-3 sm:p-4 ${style.box} ${className}`} role="note">
       <i className={`fas ${style.icon} mt-0.5`} />
       <div className="min-w-0">
         <p className="text-sm font-bold">{t(style.title, { user: step.user, date: formatDateTime(step.date) })}</p>

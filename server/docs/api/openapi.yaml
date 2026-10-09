@@ -58,6 +58,23 @@ tags:
   - name: Notifications
   - name: Users
   - name: Admin
+  - name: Messaging
+    description: |
+      Direct and group conversations; messages are permanent records (append-only). Live delivery uses
+      the realtime channel: a WebSocket at `/api/v1/ws` on the same origin. The client's first message
+      is `{"type":"auth","token":"<access token>"}` (also sent again after a token refresh); the server
+      answers `{"type":"ready"}` or closes with 4001. Pushed events: `message` {message},
+      `conversation` {conversationId}, `read` {conversationId}. Sessions are re-checked every minute;
+      socket traffic never counts as user activity for the idle timeout.
+  - name: Calls
+    description: |
+      1:1 audio calls with WebRTC. Signalling runs over the realtime channel. Client messages:
+      `call.invite` {to}, `call.accept` / `call.decline` / `call.cancel` / `call.end` {callId},
+      `call.signal` {callId, data} (SDP offer/answer, ICE candidates, relayed to the other party).
+      Server messages: `call.ringing`, `call.incoming`, `call.accepted`, `call.taken`, `call.busy`,
+      `call.signal`, `call.ended` {callId, status, reason}, `call.error`. Calls ring for
+      CALL_RING_SECONDS (default 30) before they are missed. Audio is never stored; each finished
+      call is audited (CALL) and listed in the call log.
   - name: System
 
 paths:
@@ -1103,6 +1120,158 @@ paths:
         '200': { description: Result, content: { application/json: { schema: { type: object, properties: { to: { type: string }, sent: { type: integer }, failed: { type: integer } } } } } }
         '400': { description: E-mail not configured, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
+  /messaging/users:
+    get:
+      tags: [Messaging]
+      summary: People the caller can message (all other active users)
+      x-permission: messages
+      parameters: [{ name: q, in: query, schema: { type: string }, description: 'Name, username or unit' }]
+      responses:
+        '200': { description: Users, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Person' } } } } }
+  /messaging/unread:
+    get:
+      tags: [Messaging]
+      summary: Total unread messages across the caller's conversations
+      x-permission: messages
+      responses:
+        '200': { description: Count, content: { application/json: { schema: { type: object, properties: { unread: { type: integer } } } } } }
+  /messaging/conversations:
+    get:
+      tags: [Messaging]
+      summary: The caller's conversations, most recent activity first
+      x-permission: messages
+      responses:
+        '200': { description: Conversations, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Conversation' } } } } }
+    post:
+      tags: [Messaging]
+      summary: Open a direct conversation (one per pair, returned if it exists) or create a group
+      description: 'Group creation is audited (MESSAGE_GROUP_CREATE) and adds a system message.'
+      x-permission: messages
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - { type: object, required: [kind, userId], properties: { kind: { const: direct }, userId: { type: string } } }
+                - { type: object, required: [kind, title, memberIds], properties: { kind: { const: group }, title: { type: string, minLength: 2, maxLength: 100 }, memberIds: { type: array, items: { type: string }, minItems: 1, maxItems: 50 } } }
+      responses:
+        '201': { description: Conversation, content: { application/json: { schema: { $ref: '#/components/schemas/Conversation' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /messaging/conversations/{id}:
+    parameters: [{ $ref: '#/components/parameters/ConversationId' }]
+    get:
+      tags: [Messaging]
+      summary: One conversation (members only)
+      x-permission: messages
+      responses:
+        '200': { description: Conversation, content: { application/json: { schema: { $ref: '#/components/schemas/Conversation' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /messaging/conversations/{id}/messages:
+    parameters: [{ $ref: '#/components/parameters/ConversationId' }]
+    get:
+      tags: [Messaging]
+      summary: Message history, oldest first; page backwards with `before`
+      x-permission: messages
+      parameters:
+        - { name: before, in: query, schema: { type: integer }, description: Only messages with a smaller id }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        '200': { description: Page, content: { application/json: { schema: { type: object, properties: { messages: { type: array, items: { $ref: '#/components/schemas/Message' } }, hasMore: { type: boolean } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Messaging]
+      summary: Send a text message (permanent; no edit or delete)
+      x-permission: messages
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [body], properties: { body: { type: string, minLength: 1, maxLength: 4000 } } } } }
+      responses:
+        '201': { description: Message, content: { application/json: { schema: { $ref: '#/components/schemas/Message' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /messaging/conversations/{id}/voice:
+    parameters: [{ $ref: '#/components/parameters/ConversationId' }]
+    post:
+      tags: [Messaging]
+      summary: Send a voice message (WebM, Ogg, MP4/M4A or MP3, up to 10 MB, 0.3–300 s; stored encrypted)
+      x-permission: messages
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { type: object, required: [audio, durationMs], properties: { audio: { type: string, format: binary }, durationMs: { type: integer, minimum: 300, maximum: 300000 } } }
+      responses:
+        '201': { description: Message, content: { application/json: { schema: { $ref: '#/components/schemas/Message' } } } }
+        '413': { description: Too large }
+        '415': { description: Not a recognised audio file (checked on the bytes; audited UPLOAD_REJECTED) }
+  /messaging/conversations/{id}/messages/{mid}/audio:
+    parameters:
+      - { $ref: '#/components/parameters/ConversationId' }
+      - { name: mid, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Messaging]
+      summary: Audio of a voice message (members only; SHA-256 checked before it is served)
+      x-permission: messages
+      responses:
+        '200': { $ref: '#/components/responses/File' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: Integrity check failed }
+  /messaging/conversations/{id}/read:
+    parameters: [{ $ref: '#/components/parameters/ConversationId' }]
+    post:
+      tags: [Messaging]
+      summary: Mark messages up to `lastReadId` as read (never moves backwards)
+      x-permission: messages
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [lastReadId], properties: { lastReadId: { type: integer } } } } }
+      responses:
+        '200': { description: Conversation, content: { application/json: { schema: { $ref: '#/components/schemas/Conversation' } } } }
+  /messaging/conversations/{id}/members:
+    parameters: [{ $ref: '#/components/parameters/ConversationId' }]
+    post:
+      tags: [Messaging]
+      summary: Add people to a group (any member; audited MESSAGE_GROUP_ADD)
+      x-permission: messages
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [userIds], properties: { userIds: { type: array, items: { type: string } } } } } }
+      responses:
+        '200': { description: Conversation, content: { application/json: { schema: { $ref: '#/components/schemas/Conversation' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /messaging/conversations/{id}/leave:
+    parameters: [{ $ref: '#/components/parameters/ConversationId' }]
+    post:
+      tags: [Messaging]
+      summary: Leave a group (audited MESSAGE_GROUP_LEAVE); the caller loses access to it
+      x-permission: messages
+      responses:
+        '204': { description: Left }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /calls:
+    get:
+      tags: [Calls]
+      summary: The caller's call log, newest first
+      x-permission: messages
+      parameters: [{ $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PageSize' }]
+      responses:
+        '200': { description: Page of calls, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/Call' } }, page: { type: integer }, pageSize: { type: integer }, total: { type: integer }, totalPages: { type: integer } } } } } }
+  /calls/all:
+    get:
+      tags: [Calls]
+      summary: Every call in the system (roles with the admin or audit page)
+      x-permission: messages + (admin or audit)
+      parameters: [{ $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PageSize' }, { name: userId, in: query, schema: { type: string } }]
+      responses:
+        '200': { description: Page of calls, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/Call' } }, total: { type: integer } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /calls/ice:
+    get:
+      tags: [Calls]
+      summary: ICE servers (STUN, and TURN relay if configured) for the browser's RTCPeerConnection
+      x-permission: messages
+      responses:
+        '200': { description: ICE configuration, content: { application/json: { schema: { type: object, properties: { iceServers: { type: array, items: { type: object } }, relay: { type: boolean } } } } } }
 components:
   securitySchemes:
     bearerAuth:
@@ -1115,6 +1284,7 @@ components:
       name: birds_rt
 
   parameters:
+    ConversationId: { name: id, in: path, required: true, schema: { type: integer } }
     IncidentId: { name: id, in: path, required: true, schema: { type: string, pattern: '^BIRDS-\d{4}-\d{4,}$', example: BIRDS-2026-1001 } }
     Page: { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
     PageSize: { name: pageSize, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 25 } }
@@ -1177,6 +1347,46 @@ components:
     RateLimited: { description: RATE_LIMITED, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   schemas:
+    Person:
+      type: object
+      properties: { id: { type: string }, name: { type: string }, role: { type: string }, scope: { type: string } }
+    Message:
+      type: object
+      properties:
+        id: { type: integer }
+        conversationId: { type: integer }
+        kind: { type: string, enum: [text, voice, system] }
+        body: { type: [string, 'null'] }
+        sender: { type: object, properties: { id: { type: string }, name: { type: string } } }
+        createdAt: { type: string, format: date-time }
+        voice: { type: [object, 'null'], properties: { mime: { type: string }, size: { type: integer }, durationMs: { type: integer }, url: { type: string } } }
+    Conversation:
+      type: object
+      properties:
+        id: { type: integer }
+        kind: { type: string, enum: [direct, group] }
+        title: { type: string, description: 'Group title, or the other person''s name for a direct conversation' }
+        members: { type: array, items: { $ref: '#/components/schemas/Person' } }
+        createdBy: { type: string }
+        createdAt: { type: string, format: date-time }
+        lastMessage: { oneOf: [{ $ref: '#/components/schemas/Message' }, { type: 'null' }] }
+        lastMessageAt: { type: string, format: date-time }
+        unread: { type: integer }
+        lastReadId: { type: integer }
+    Call:
+      type: object
+      properties:
+        id: { type: integer }
+        status: { type: string, enum: [ringing, answered, ended, declined, missed, cancelled, failed] }
+        caller: { $ref: '#/components/schemas/Person' }
+        callee: { $ref: '#/components/schemas/Person' }
+        direction: { type: string, enum: [incoming, outgoing], description: From the caller's point of view (own log only) }
+        other: { $ref: '#/components/schemas/Person' }
+        startedAt: { type: string, format: date-time }
+        answeredAt: { type: [string, 'null'], format: date-time }
+        endedAt: { type: [string, 'null'], format: date-time }
+        durationSeconds: { type: [integer, 'null'] }
+        endReason: { type: [string, 'null'] }
     Error:
       type: object
       required: [error]

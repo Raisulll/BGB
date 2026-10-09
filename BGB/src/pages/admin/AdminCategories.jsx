@@ -23,6 +23,7 @@ export default function AdminCategories() {
   const [dialog, setDialog] = useState(null); // { mode: 'new' } | { mode: 'edit', cat }
   const [name, setName] = useState('');
   const [subs, setSubs] = useState('');
+  const [subActive, setSubActive] = useState({}); // name -> active, for the category being edited
   const [busy, setBusy] = useState(null);
 
   const done = (msg) => {
@@ -53,6 +54,7 @@ export default function AdminCategories() {
   const openEdit = (cat) => {
     setName(cat.name);
     setSubs('');
+    setSubActive(Object.fromEntries(cat.subcategories.map((x) => [x.name, x.isActive])));
     setDialog({ mode: 'edit', cat });
   };
 
@@ -66,6 +68,8 @@ export default function AdminCategories() {
       const patch = {};
       if (name.trim() !== dialog.cat.name) patch.name = name.trim();
       if (list.length) patch.addSubcategories = list;
+      const changed = dialog.cat.subcategories.filter((x) => subActive[x.name] !== x.isActive).map((x) => ({ name: x.name, isActive: subActive[x.name] }));
+      if (changed.length) patch.subcategoryStatus = changed;
       if (!Object.keys(patch).length) return setDialog(null);
       ok = await run('save', () => adminApi.updateCategory(dialog.cat.id, patch), t('cat.updated', { name: name.trim() }));
     }
@@ -87,49 +91,42 @@ export default function AdminCategories() {
     >
       <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2">
         {data.map((cat) => (
-          <div key={cat.id} className={`rounded-xl border p-4 transition-all hover:shadow-sm ${cat.isActive ? 'border-gray-200 bg-gray-50/50 hover:border-bgb-300' : 'border-dashed border-gray-300 bg-gray-100/60 opacity-75'}`}>
+          <div key={cat.id} className={`rounded-md border p-4 ${cat.isActive ? 'border-slate-200 bg-white' : 'border-dashed border-slate-300 bg-slate-50'}`}>
             <div className="mb-2 flex items-center justify-between gap-2">
-              <h4 className="flex min-w-0 items-center gap-2 text-sm font-bold text-gray-800 sm:text-base">
-                <span className={`h-2 w-2 shrink-0 rounded-full ${cat.isActive ? 'bg-bgb-600' : 'bg-gray-400'}`} />
+              <h4 className="flex min-w-0 items-center gap-2 text-base font-semibold text-slate-900">
                 <span className="truncate">{cat.name}</span>
-                {!cat.isActive && <span className="rounded bg-gray-200 px-1.5 py-0.5 text-[9px] font-bold text-gray-600">{t('cat.inactive')}</span>}
+                {!cat.isActive && <span className="rounded bg-gray-200 px-1.5 py-0.5 text-xs font-bold text-gray-600">{t('cat.inactive')}</span>}
               </h4>
               <div className="flex shrink-0 items-center gap-1.5">
-                <span className="rounded border border-gray-200 bg-white px-2 py-0.5 font-mono text-xs font-semibold text-gray-500" title={t('cat.usage')}>
-                  {cat.id} &bull; {cat.incidentCount}
+                <span className="text-xs text-slate-600" title={t('cat.usage')}>
+                  {cat.id} · {t('cat.usedBy', { n: cat.incidentCount })}
                 </span>
-                <button type="button" onClick={() => openEdit(cat)} className="flex h-6 w-6 items-center justify-center rounded border border-gray-200 bg-white text-gray-400 transition-colors hover:bg-bgb-50 hover:text-bgb-600" title={t('cat.edit')} aria-label={t('cat.editAria', { name: cat.name })}>
-                  <i className="fas fa-edit text-xs" />
+                <button type="button" onClick={() => openEdit(cat)} className="btn btn-sm btn-secondary" aria-label={t('cat.editAria', { name: cat.name })}>
+                  {t('common.edit')}
                 </button>
                 <button
                   type="button"
                   disabled={Boolean(busy)}
                   onClick={() => run(`cat-${cat.id}`, () => adminApi.updateCategory(cat.id, { isActive: !cat.isActive }), t(cat.isActive ? 'cat.deactivated' : 'cat.reactivated', { name: cat.name }))}
-                  className={`flex h-6 w-6 items-center justify-center rounded border bg-white transition-colors ${cat.isActive ? 'border-gray-200 text-gray-400 hover:bg-red-50 hover:text-red-600' : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'}`}
-                  title={cat.isActive ? t('cat.deactivateTitle') : t('cat.reactivateTitle')}
+                  className={`btn btn-sm ${cat.isActive ? 'btn-danger-outline' : 'btn-secondary'}`}
                   aria-label={t('cat.toggleAria', { action: cat.isActive ? t('users.deactivate') : t('users.reactivate'), name: cat.name })}
                 >
-                  <i className={`fas ${busy === `cat-${cat.id}` ? 'fa-spinner fa-spin' : cat.isActive ? 'fa-eye-slash' : 'fa-eye'} text-xs`} />
+                  {busy === `cat-${cat.id}` && <i className="fas fa-spinner fa-spin" aria-hidden="true" />}
+                  {cat.isActive ? t('users.deactivate') : t('users.reactivate')}
                 </button>
               </div>
             </div>
-            <div className="flex flex-wrap gap-1.5 pt-1">
+            <ul className="flex flex-wrap gap-1.5 pt-1">
               {cat.subcategories.map((sub) => (
-                <button
+                <li
                   key={sub.name}
-                  type="button"
-                  disabled={Boolean(busy)}
-                  onClick={() =>
-                    run(`sub-${cat.id}-${sub.name}`, () => adminApi.updateCategory(cat.id, { subcategoryStatus: [{ name: sub.name, isActive: !sub.isActive }] }), t(sub.isActive ? 'cat.deactivated' : 'cat.reactivated', { name: sub.name }))
-                  }
-                  className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition-colors ${sub.isActive ? 'border-gray-200 bg-white text-gray-700 hover:border-red-200 hover:text-red-700' : 'border-dashed border-gray-300 bg-gray-100 text-gray-400 line-through hover:text-emerald-700'}`}
-                  title={sub.isActive ? t('cat.subDeactivate') : t('cat.subReactivate')}
+                  className={`rounded border px-2 py-0.5 text-xs ${sub.isActive ? 'border-slate-200 bg-white text-slate-800' : 'border-dashed border-slate-300 bg-slate-50 text-slate-500 line-through'}`}
+                  title={sub.isActive ? undefined : t('cat.inactive')}
                 >
                   {sub.name}
-                  <i className={`fas ${sub.isActive ? 'fa-times' : 'fa-undo'} text-[9px]`} />
-                </button>
+                </li>
               ))}
-            </div>
+            </ul>
           </div>
         ))}
       </div>
@@ -147,9 +144,27 @@ export default function AdminCategories() {
               className="form-input"
             />
             {dialog?.mode === 'edit' && dialog.cat.incidentCount > 0 && (
-              <p className="mt-1 text-[11px] text-gray-500">{t('cat.inUse', { n: dialog.cat.incidentCount })}</p>
+              <p className="mt-1 text-xs text-gray-500">{t('cat.inUse', { n: dialog.cat.incidentCount })}</p>
             )}
           </div>
+          {dialog?.mode === 'edit' && dialog.cat.subcategories.length > 0 && (
+            <fieldset>
+              <legend className="form-label">{t('cat.subcategoriesActive')}</legend>
+              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                {dialog.cat.subcategories.map((x) => (
+                  <label key={x.name} className="flex items-center gap-2 text-sm text-slate-800">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(subActive[x.name])}
+                      onChange={(e) => setSubActive((m) => ({ ...m, [x.name]: e.target.checked }))}
+                      className="h-4 w-4 accent-bgb-700"
+                    />
+                    {x.name}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )}
           <div>
             <label htmlFor="cat-subs" className="form-label">{dialog?.mode === 'new' ? t('cat.subcategories') : t('cat.addSubcategories')}</label>
             <textarea id="cat-subs" rows={3} value={subs} onChange={(e) => setSubs(e.target.value)} placeholder={t('cat.subsPh')} className="form-input" />

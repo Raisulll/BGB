@@ -36,8 +36,8 @@ export default function AdminArchive({ byKey, onSave, busy }) {
 
   const stat = (label, value, cls = 'text-gray-900') => (
     <div className="rounded-lg bg-gray-50 p-2 text-center">
-      <p className={`text-lg font-black ${cls}`}>{value ?? '–'}</p>
-      <p className="text-[10px] text-gray-500">{label}</p>
+      <p className={`text-lg font-semibold ${cls}`}>{value ?? '–'}</p>
+      <p className="text-xs text-gray-500">{label}</p>
     </div>
   );
 
@@ -56,9 +56,9 @@ export default function AdminArchive({ byKey, onSave, busy }) {
             {stat(t('arch.due'), data?.dueForArchive, data?.dueForArchive ? 'text-amber-600' : 'text-gray-900')}
             {stat(t('arch.pastRetention'), data?.pastRetention, data?.pastRetention ? 'text-red-600' : 'text-gray-900')}
           </div>
-          <p className="text-[11px] text-gray-500">{t('arch.policy')}</p>
+          <p className="text-xs text-gray-500">{t('arch.policy')}</p>
           {data?.lastRun && (
-            <p className="text-[11px] text-gray-500">
+            <p className="text-xs text-gray-500">
               <i className="fas fa-history mr-1" />
               {t('arch.lastRun', { date: formatDateTime(data.lastRun.at) })}
             </p>

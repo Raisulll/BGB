@@ -22,11 +22,9 @@ function deviceName(ua, t) {
   return browser && os ? t('profile.browserOn', { browser, os }) : browser || os || t('profile.unknownDevice');
 }
 
+// Only failures stand out; ordinary sign-ins are neutral
 const EVENT_STYLE = {
-  LOGIN: 'text-emerald-700',
-  LOGOUT: 'text-gray-600',
-  SESSION_TIMEOUT: 'text-gray-600',
-  LOGIN_FAILED: 'text-red-600',
+  LOGIN_FAILED: 'text-red-700',
   LOGIN_BLOCKED: 'text-red-700',
   ACCOUNT_LOCKED: 'text-red-700',
 };
@@ -71,13 +69,13 @@ export default function Profile() {
       <Card>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow ring-2 ring-emerald-200">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-bgb-600 text-white shadow ring-2 ring-bgb-200">
               <i className="fas fa-user-shield text-xl" />
             </div>
             <div className="min-w-0">
               <h2 className="truncate text-lg font-bold text-gray-900 sm:text-xl">{user.name}</h2>
               <p className="text-sm text-gray-500">{user.username}</p>
-              <span className="mt-1 inline-block rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 ring-1 ring-emerald-300">{tv('role', user.role)}</span>
+              <span className="mt-1 inline-block rounded-full bg-bgb-100 px-2.5 py-0.5 text-xs font-semibold text-bgb-800 ring-1 ring-bgb-300">{tv('role', user.role)}</span>
             </div>
           </div>
           <Link to="/change-password" className="btn btn-secondary">
@@ -113,38 +111,46 @@ export default function Profile() {
                 <div className="min-w-0 flex-1">
                   <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-gray-800">
                     {deviceName(s.userAgent, t)}
-                    {s.current && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">{t('profile.thisDevice')}</span>}
+                    {s.current && <span className="rounded-full bg-bgb-100 px-2 py-0.5 text-xs font-bold text-bgb-800">{t('profile.thisDevice')}</span>}
                   </p>
                   <p className="text-xs text-gray-500">
                     {s.ipAddress || t('common.na')} · {t('profile.signedIn', { date: formatDateTime(s.startedAt) })}
                   </p>
-                  <p className="text-[11px] text-gray-400">{t('profile.lastActive', { ago: timeAgo(s.lastSeenAt, t) })}</p>
+                  <p className="text-xs text-gray-400">{t('profile.lastActive', { ago: timeAgo(s.lastSeenAt, t) })}</p>
                 </div>
               </li>
             ))}
           </ul>
-          <p className="border-t border-gray-100 px-4 py-2.5 text-[11px] text-gray-400 sm:px-5">{t('profile.sessionsNote')}</p>
+          <p className="border-t border-gray-100 px-4 py-2.5 text-xs text-gray-400 sm:px-5">{t('profile.sessionsNote')}</p>
         </Card>
 
         {/* Recent sign-in activity */}
         <Card title={t('profile.activity')} icon="fa-user-clock" bodyClassName="p-0">
           {activity.length ? (
-            <ul className="divide-y divide-gray-100">
-              {activity.map((a, i) => (
-                <li key={i} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm sm:px-5">
-                  <span className={`font-semibold ${EVENT_STYLE[a.action] || 'text-gray-700'}`}>{tv('auditAction', a.action)}</span>
-                  <span className="text-right text-xs text-gray-500">
-                    {formatDateTime(a.date)}
-                    <br />
-                    {a.ipAddress}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="th">{t('profile.thEvent')}</th>
+                    <th className="th">{t('profile.thTime')}</th>
+                    <th className="th">{t('profile.thIp')}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {activity.map((a, i) => (
+                    <tr key={i}>
+                      <td className={`td font-medium ${EVENT_STYLE[a.action] || 'text-slate-800'}`}>{tv('auditAction', a.action)}</td>
+                      <td className="td whitespace-nowrap text-slate-700">{formatDateTime(a.date)}</td>
+                      <td className="td font-mono text-xs text-slate-700">{a.ipAddress || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           ) : (
             <p className="p-4 text-sm text-gray-400">{t('profile.noActivity')}</p>
           )}
-          <p className="border-t border-gray-100 px-4 py-2.5 text-[11px] text-gray-400 sm:px-5">{t('profile.activityNote')}</p>
+          <p className="border-t border-gray-100 px-4 py-2.5 text-xs text-gray-400 sm:px-5">{t('profile.activityNote')}</p>
         </Card>
       </div>
 

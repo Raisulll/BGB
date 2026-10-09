@@ -1,0 +1,603 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import * as messagingApi from '../api/messaging';
+import { errorMessage } from '../api/client';
+import { onRealtime } from '../api/realtime';
+import { useApp } from '../context/AppContext';
+import { useComms } from '../context/CommsContext';
+import { useToast } from '../context/ToastContext';
+import useApi from '../hooks/useApi';
+import { useI18n } from '../i18n/I18nContext';
+import { cn, formatDateDisplay, formatDateTime } from '../utils/helpers';
+import Avatar from '../components/messaging/Avatar';
+import Composer from '../components/messaging/Composer';
+import PeoplePicker from '../components/messaging/PeoplePicker';
+import VoiceMessage from '../components/messaging/VoiceMessage';
+import { formatDuration } from '../components/messaging/CallPanel';
+import ErrorState from '../components/ui/ErrorState';
+import Modal from '../components/ui/Modal';
+import Spinner from '../components/ui/Spinner';
+
+// Messaging (spec #58 extension): direct and group conversations between any BIRDS users, text
+// and voice messages, live delivery over the realtime channel. Messages are permanent records:
+// there is no edit or delete, and the server keeps them append-only.
+
+const PAGE = 50;
+
+/** "HH:MM" today, otherwise "DD-MM-YYYY" (BST). */
+function shortTime(iso) {
+  const full = formatDateTime(iso);
+  return formatDateDisplay(iso) === formatDateDisplay(new Date().toISOString()) ? full.slice(11) : full.slice(0, 10);
+}
+
+function preview(m, t, myId) {
+  if (!m) return t('msg.noMessages');
+  const who = m.kind !== 'system' && m.sender?.id === myId ? `${t('msg.you')}: ` : '';
+  if (m.kind === 'voice') return `${who}${t('msg.voiceMessage')} (${formatDuration(m.voice?.durationMs / 1000)})`;
+  return `${who}${m.body}`;
+}
+
+// ---------------------------------------------------------------------------
+// Conversation list
+// ---------------------------------------------------------------------------
+function ConversationList({ list, activeId, myId, onNewDirect, onNewGroup }) {
+  const { t } = useI18n();
+  const [q, setQ] = useState('');
+  const shown = q.trim() ? list.filter((c) => c.title.toLowerCase().includes(q.trim().toLowerCase())) : list;
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="space-y-2 border-b border-slate-200 p-3">
+        <div className="flex gap-2">
+          <button type="button" onClick={onNewDirect} className="btn btn-primary btn-sm flex-1">
+            <i className="fas fa-pen" aria-hidden="true" />
+            {t('msg.newMessage')}
+          </button>
+          <button type="button" onClick={onNewGroup} className="btn btn-secondary btn-sm flex-1">
+            <i className="fas fa-users" aria-hidden="true" />
+            {t('msg.newGroup')}
+          </button>
+        </div>
+        <label htmlFor="conv-filter" className="sr-only">
+          {t('msg.filterConversations')}
+        </label>
+        <input id="conv-filter" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('msg.filterConversations')} className="form-input" />
+      </div>
+
+      <ul className="min-h-0 flex-1 divide-y divide-slate-100 overflow-y-auto" aria-label={t('msg.conversations')}>
+        {shown.length === 0 && <li className="p-6 text-center text-sm text-slate-500">{list.length ? t('msg.noMatch') : t('msg.noConversations')}</li>}
+        {shown.map((c) => (
+          <li key={c.id}>
+            <Link
+              to={`/messages/${c.id}`}
+              aria-current={c.id === activeId ? 'page' : undefined}
+              className={cn('flex items-center gap-3 px-3 py-3 hover:bg-slate-50', c.id === activeId && 'bg-bgb-50 hover:bg-bgb-50')}
+            >
+              <Avatar name={c.title} group={c.kind === 'group'} />
+              <span className="min-w-0 flex-1">
+                <span className="flex items-baseline justify-between gap-2">
+                  <span className={cn('truncate text-sm text-slate-900', c.unread ? 'font-semibold' : 'font-medium')}>{c.title}</span>
+                  <span className="shrink-0 text-xs text-slate-500">{shortTime(c.lastMessageAt)}</span>
+                </span>
+                <span className="flex items-center justify-between gap-2">
+                  <span className={cn('truncate text-xs', c.unread ? 'text-slate-800' : 'text-slate-500')}>{preview(c.lastMessage, t, myId)}</span>
+                  {c.unread > 0 && (
+                    <span className="shrink-0 rounded-full bg-bgb-700 px-1.5 text-xs font-semibold text-white" aria-label={t('msg.unreadCount', { n: c.unread })}>
+                      {c.unread}
+                    </span>
+                  )}
+                </span>
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Thread
+// ---------------------------------------------------------------------------
+function MessageBubble({ m, mine, showSender }) {
+  if (m.kind === 'system') {
+    return (
+      <li className="my-2 text-center">
+        <span className="inline-block rounded-md bg-slate-100 px-2.5 py-1 text-xs text-slate-600">
+          {m.body} · {formatDateTime(m.createdAt).slice(11)}
+        </span>
+      </li>
+    );
+  }
+  return (
+    <li className={cn('flex', mine ? 'justify-end' : 'justify-start')}>
+      <div className={cn('max-w-[85%] rounded-lg px-3 py-2 sm:max-w-[70%]', mine ? 'bg-bgb-700 text-white' : 'border border-slate-200 bg-white text-slate-900')}>
+        {showSender && !mine && <p className="mb-0.5 text-xs font-semibold text-bgb-800">{m.sender.name}</p>}
+        {m.kind === 'voice' ? <VoiceMessage voice={m.voice} mine={mine} /> : <p className="whitespace-pre-wrap break-words text-sm">{m.body}</p>}
+        <p className={cn('mt-1 text-right text-[11px]', mine ? 'text-white/75' : 'text-slate-500')} title={formatDateTime(m.createdAt, { withSeconds: true })}>
+          {formatDateTime(m.createdAt).slice(11)}
+        </p>
+      </div>
+    </li>
+  );
+}
+
+function Thread({ conversation, myId, onChanged, onBack }) {
+  const { t, tv } = useI18n();
+  const { showToast } = useToast();
+  const { startCall, call, refreshUnread, connected } = useComms();
+  const navigate = useNavigate();
+  const id = conversation.id;
+  const [messages, setMessages] = useState(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [error, setError] = useState('');
+  const [membersOpen, setMembersOpen] = useState(false);
+  const scrollRef = useRef(null);
+  const stickToBottom = useRef(true);
+  const lastRead = useRef(conversation.lastReadId);
+
+  const other = conversation.kind === 'direct' ? conversation.members.find((m) => m.id !== myId) : null;
+
+  const markRead = useCallback(
+    async (list, background) => {
+      const last = list?.at(-1);
+      if (!last || last.id <= lastRead.current || document.visibilityState !== 'visible') return;
+      lastRead.current = last.id;
+      try {
+        await messagingApi.markRead(id, last.id, { background });
+        refreshUnread();
+        onChanged(); // the list's unread count, even if the socket missed the event
+      } catch {}
+    },
+    [id, refreshUnread, onChanged],
+  );
+
+  // First page
+  useEffect(() => {
+    const controller = new AbortController();
+    setMessages(null);
+    setError('');
+    stickToBottom.current = true;
+    messagingApi
+      .history(id, { limit: PAGE }, controller.signal)
+      .then((r) => {
+        setMessages(r.messages);
+        setHasMore(r.hasMore);
+      })
+      .catch((err) => !controller.signal.aborted && setError(errorMessage(err)));
+    return () => controller.abort();
+  }, [id]);
+
+  // Whatever is on screen (first page, live arrivals) counts as read while the tab is visible
+  useEffect(() => {
+    markRead(messages, true);
+  }, [messages, markRead]);
+
+  // Live messages for this conversation
+  useEffect(
+    () =>
+      onRealtime((msg) => {
+        if (msg.type !== 'message' || msg.message.conversationId !== id) return;
+        setMessages((list) => (!list || list.some((m) => m.id === msg.message.id) ? list : [...list, msg.message]));
+      }),
+    [id],
+  );
+
+  // After a reconnect, add anything that arrived while the channel was down
+  const loaded = Boolean(messages);
+  useEffect(() => {
+    if (!connected || !loaded) return;
+    messagingApi
+      .history(id, { limit: PAGE, background: true })
+      .then((r) =>
+        setMessages((list) => {
+          const known = new Set(list.map((m) => m.id));
+          const fresh = r.messages.filter((m) => !known.has(m.id) && m.id > (list.at(-1)?.id ?? 0));
+          return fresh.length ? [...list, ...fresh] : list;
+        }),
+      )
+      .catch(() => {});
+  }, [connected, loaded, id]);
+
+  // Coming back to the tab marks what arrived meanwhile as read
+  useEffect(() => {
+    const onVisible = () => document.visibilityState === 'visible' && markRead(messages, false);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [messages, markRead]);
+
+  // Keep the newest message in view unless the user scrolled up to read history
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el && stickToBottom.current) el.scrollTop = el.scrollHeight;
+  }, [messages]);
+
+  const onScroll = () => {
+    const el = scrollRef.current;
+    stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  };
+
+  const loadOlder = async () => {
+    if (!messages?.length) return;
+    const el = scrollRef.current;
+    const fromBottom = el.scrollHeight - el.scrollTop;
+    setLoadingOlder(true);
+    try {
+      const r = await messagingApi.history(id, { before: messages[0].id, limit: PAGE });
+      stickToBottom.current = false;
+      setMessages((list) => [...r.messages, ...list]);
+      setHasMore(r.hasMore);
+      requestAnimationFrame(() => (el.scrollTop = el.scrollHeight - fromBottom));
+    } catch (err) {
+      showToast(errorMessage(err), 'error');
+    } finally {
+      setLoadingOlder(false);
+    }
+  };
+
+  const append = (m) => {
+    stickToBottom.current = true;
+    lastRead.current = Math.max(lastRead.current, m.id);
+    setMessages((list) => (list && !list.some((x) => x.id === m.id) ? [...list, m] : list));
+    onChanged();
+  };
+
+  const sendText = async (body) => {
+    try {
+      append(await messagingApi.send(id, body));
+    } catch (err) {
+      throw new Error(errorMessage(err));
+    }
+  };
+  const sendVoice = async (blob, durationMs) => {
+    try {
+      append(await messagingApi.sendVoice(id, blob, durationMs));
+    } catch (err) {
+      throw new Error(errorMessage(err));
+    }
+  };
+
+  // Day separators
+  const rows = useMemo(() => {
+    const out = [];
+    let day = null;
+    for (const m of messages || []) {
+      const d = formatDateDisplay(m.createdAt);
+      if (d !== day) out.push({ day: d, key: `d-${m.id}` });
+      day = d;
+      out.push({ m, key: m.id });
+    }
+    return out;
+  }, [messages]);
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      {/* Header */}
+      <div className="flex items-center gap-3 border-b border-slate-200 px-3 py-2.5">
+        <button type="button" onClick={onBack} className="btn btn-secondary btn-sm md:hidden" aria-label={t('msg.backToList')}>
+          <i className="fas fa-arrow-left" aria-hidden="true" />
+        </button>
+        <Avatar name={conversation.title} group={conversation.kind === 'group'} />
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate text-base font-semibold text-slate-900">{conversation.title}</h2>
+          <p className="truncate text-xs text-slate-500">
+            {other ? [tv('role', other.role), other.scope].join(' · ') : t('msg.memberCount', { n: conversation.members.length })}
+          </p>
+        </div>
+        {other ? (
+          <button type="button" onClick={() => startCall(other)} disabled={Boolean(call)} className="btn btn-secondary btn-sm">
+            <i className="fas fa-phone" aria-hidden="true" />
+            {t('calls.call')}
+          </button>
+        ) : (
+          <button type="button" onClick={() => setMembersOpen(true)} className="btn btn-secondary btn-sm">
+            <i className="fas fa-users" aria-hidden="true" />
+            {t('msg.members')}
+          </button>
+        )}
+      </div>
+
+      {/* Messages */}
+      <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto bg-slate-50 px-3 py-3">
+        {error ? (
+          <ErrorState message={error} />
+        ) : !messages ? (
+          <Spinner />
+        ) : (
+          <>
+            {hasMore && (
+              <div className="mb-3 text-center">
+                <button type="button" onClick={loadOlder} disabled={loadingOlder} className="btn btn-secondary btn-sm">
+                  {loadingOlder && <i className="fas fa-spinner fa-spin" aria-hidden="true" />}
+                  {t('msg.loadEarlier')}
+                </button>
+              </div>
+            )}
+            {messages.length === 0 && <p className="mt-10 text-center text-sm text-slate-500">{t('msg.startHint')}</p>}
+            <ol className="space-y-2" aria-label={t('msg.messagesIn', { name: conversation.title })} aria-live="polite">
+              {rows.map((r) =>
+                r.day ? (
+                  <li key={r.key} className="py-1 text-center text-xs font-medium text-slate-500" role="separator">
+                    {r.day}
+                  </li>
+                ) : (
+                  <MessageBubble key={r.key} m={r.m} mine={r.m.sender?.id === myId} showSender={conversation.kind === 'group'} />
+                ),
+              )}
+            </ol>
+          </>
+        )}
+      </div>
+
+      <p className="border-t border-slate-200 bg-white px-3 pt-2 text-[11px] text-slate-500">
+        <i className="fas fa-lock mr-1" aria-hidden="true" />
+        {t('msg.recordNotice')}
+      </p>
+      <Composer key={id} onSendText={sendText} onSendVoice={sendVoice} disabled={!messages} />
+
+      {membersOpen && (
+        <MembersDialog
+          conversation={conversation}
+          myId={myId}
+          onClose={() => setMembersOpen(false)}
+          onChanged={onChanged}
+          onLeft={() => {
+            setMembersOpen(false);
+            onChanged();
+            navigate('/messages');
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Dialogs
+// ---------------------------------------------------------------------------
+function NewDirectDialog({ onClose, onOpened }) {
+  const { t } = useI18n();
+  const { showToast } = useToast();
+  const [busy, setBusy] = useState(false);
+  const pick = async (person) => {
+    setBusy(true);
+    try {
+      onOpened(await messagingApi.openDirect(person.id));
+    } catch (err) {
+      showToast(errorMessage(err), 'error');
+      setBusy(false);
+    }
+  };
+  return (
+    <Modal open title={t('msg.newMessage')} icon="fa-pen" onClose={onClose} busy={busy}>
+      <PeoplePicker onPick={pick} disabled={busy} />
+    </Modal>
+  );
+}
+
+function NewGroupDialog({ onClose, onOpened }) {
+  const { t } = useI18n();
+  const { showToast } = useToast();
+  const [title, setTitle] = useState('');
+  const [selected, setSelected] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const valid = title.trim().length >= 2 && selected.length > 0;
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!valid) return;
+    setBusy(true);
+    try {
+      onOpened(await messagingApi.createGroup(title.trim(), selected));
+    } catch (err) {
+      showToast(errorMessage(err), 'error');
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal open title={t('msg.newGroup')} icon="fa-users" onClose={onClose} busy={busy} maxWidth="max-w-lg">
+      <form onSubmit={submit} className="space-y-4">
+        <div>
+          <label htmlFor="group-title" className="form-label">
+            {t('msg.groupName')}
+          </label>
+          <input id="group-title" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={100} required className="form-input" placeholder={t('msg.groupNameHint')} />
+        </div>
+        <div>
+          <p className="form-label">{t('msg.groupMembers', { n: selected.length })}</p>
+          <PeoplePicker multiple selected={selected} onChange={setSelected} disabled={busy} />
+        </div>
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onClose} disabled={busy} className="btn btn-secondary">
+            {t('common.cancel')}
+          </button>
+          <button type="submit" disabled={!valid || busy} className="btn btn-primary">
+            {t('msg.createGroup')}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function MembersDialog({ conversation, myId, onClose, onChanged, onLeft }) {
+  const { t, tv } = useI18n();
+  const { showToast } = useToast();
+  const [adding, setAdding] = useState(false);
+  const [selected, setSelected] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const memberIds = conversation.members.map((m) => m.id);
+
+  const add = async () => {
+    setBusy(true);
+    try {
+      await messagingApi.addMembers(conversation.id, selected);
+      showToast(t('msg.membersAdded', { n: selected.length }), 'success');
+      setSelected([]);
+      setAdding(false);
+      onChanged();
+    } catch (err) {
+      showToast(errorMessage(err), 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const leave = async () => {
+    if (!window.confirm(t('msg.leaveConfirm', { name: conversation.title }))) return;
+    setBusy(true);
+    try {
+      await messagingApi.leave(conversation.id);
+      showToast(t('msg.left', { name: conversation.title }), 'success');
+      onLeft();
+    } catch (err) {
+      showToast(errorMessage(err), 'error');
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal open title={t('msg.membersOf', { name: conversation.title })} icon="fa-users" onClose={onClose} busy={busy} maxWidth="max-w-lg">
+      {adding ? (
+        <div className="space-y-3">
+          <PeoplePicker multiple selected={selected} onChange={setSelected} exclude={memberIds} disabled={busy} />
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setAdding(false)} disabled={busy} className="btn btn-secondary">
+              {t('common.cancel')}
+            </button>
+            <button type="button" onClick={add} disabled={busy || selected.length === 0} className="btn btn-primary">
+              {t('msg.addSelected', { n: selected.length })}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <ul className="max-h-72 divide-y divide-slate-100 overflow-y-auto rounded-md border border-slate-200">
+            {conversation.members.map((m) => (
+              <li key={m.id} className="flex items-center gap-3 px-3 py-2">
+                <Avatar name={m.name} size="sm" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium text-slate-900">
+                    {m.name}
+                    {m.id === myId && <span className="ml-1 font-normal text-slate-500">({t('msg.you')})</span>}
+                  </span>
+                  <span className="block truncate text-xs text-slate-500">
+                    {tv('role', m.role)} · {m.scope}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-slate-500">{t('msg.membersNotice')}</p>
+          <div className="flex flex-wrap justify-between gap-2">
+            <button type="button" onClick={leave} disabled={busy} className="btn btn-danger-outline">
+              {t('msg.leaveGroup')}
+            </button>
+            <button type="button" onClick={() => setAdding(true)} disabled={busy} className="btn btn-primary">
+              <i className="fas fa-user-plus" aria-hidden="true" />
+              {t('msg.addPeople')}
+            </button>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
+export default function Messages() {
+  const { t } = useI18n();
+  const { currentUser } = useApp();
+  const { connected } = useComms();
+  // Only report a lost channel after a few seconds (not while it is first connecting)
+  const [offline, setOffline] = useState(false);
+  useEffect(() => {
+    if (connected) return setOffline(false);
+    const id = setTimeout(() => setOffline(true), 4000);
+    return () => clearTimeout(id);
+  }, [connected]);
+  const { id: idParam } = useParams();
+  const navigate = useNavigate();
+  const activeId = idParam ? Number(idParam) : null;
+  const [dialog, setDialog] = useState(null); // 'direct' | 'group'
+  const myId = currentUser.id;
+
+  const { data: list, error, message, reload, setData } = useApi((signal) => messagingApi.conversations({ signal }), []);
+
+  // Socket events change the list (new message, new group, membership, read on another device):
+  // reload it in the background, coalescing bursts.
+  const timer = useRef(null);
+  const reloadQuietly = useCallback(() => {
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      messagingApi
+        .conversations({ background: true })
+        .then(setData)
+        .catch(() => {});
+    }, 300);
+  }, [setData]);
+  // After a reconnect, catch up on whatever was pushed while the channel was down
+  useEffect(() => {
+    if (connected) reloadQuietly();
+  }, [connected, reloadQuietly]);
+  useEffect(() => {
+    const off = onRealtime((msg) => ['message', 'conversation', 'read'].includes(msg.type) && reloadQuietly());
+    return () => {
+      off();
+      clearTimeout(timer.current);
+    };
+  }, [reloadQuietly]);
+
+  // The open conversation: from the list, or fetched (just created, or opened by link)
+  const fromList = list?.find((c) => c.id === activeId);
+  const { data: fetched, error: convError, message: convMessage } = useApi((signal) => messagingApi.conversation(activeId, signal), [activeId, Boolean(fromList)], {
+    enabled: Boolean(activeId) && Boolean(list) && !fromList,
+  });
+  const active = fromList || (fetched?.id === activeId ? fetched : null);
+
+  const opened = (c) => {
+    setDialog(null);
+    reloadQuietly();
+    navigate(`/messages/${c.id}`);
+  };
+
+  if (error) return <ErrorState message={message} onRetry={reload} />;
+
+  return (
+    <div className="space-y-3">
+      {offline && (
+        <p role="status" className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <i className="fas fa-plug mr-2" aria-hidden="true" />
+          {t('msg.offlineBanner')}
+        </p>
+      )}
+      <div className="card flex h-[calc(100dvh-10rem)] min-h-[28rem] overflow-hidden">
+        <aside className={cn('w-full shrink-0 border-r border-slate-200 md:block md:w-80 lg:w-96', activeId ? 'hidden' : 'block')}>
+          {!list ? <Spinner /> : <ConversationList list={list} activeId={activeId} myId={myId} onNewDirect={() => setDialog('direct')} onNewGroup={() => setDialog('group')} />}
+        </aside>
+        <section className={cn('min-w-0 flex-1', activeId ? 'block' : 'hidden md:block')}>
+          {!activeId ? (
+            <div className="flex h-full flex-col items-center justify-center p-6 text-center">
+              <i className="fas fa-comments mb-3 text-3xl text-slate-300" aria-hidden="true" />
+              <p className="text-sm font-medium text-slate-700">{t('msg.pickConversation')}</p>
+              <p className="mt-1 max-w-sm text-xs text-slate-500">{t('msg.pickHint')}</p>
+            </div>
+          ) : convError ? (
+            <ErrorState message={convMessage} />
+          ) : !active ? (
+            <Spinner />
+          ) : (
+            <Thread key={active.id} conversation={active} myId={myId} onChanged={reloadQuietly} onBack={() => navigate('/messages')} />
+          )}
+        </section>
+      </div>
+
+      {dialog === 'direct' && <NewDirectDialog onClose={() => setDialog(null)} onOpened={opened} />}
+      {dialog === 'group' && <NewGroupDialog onClose={() => setDialog(null)} onOpened={opened} />}
+    </div>
+  );
+}

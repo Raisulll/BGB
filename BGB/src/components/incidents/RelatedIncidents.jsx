@@ -36,10 +36,10 @@ export default function RelatedIncidents({ incidentId }) {
                   <SeverityBadge severity={r.severity} />
                 </div>
                 <p className="mt-0.5 truncate text-sm font-medium text-gray-800">{r.title}</p>
-                <p className="mt-0.5 text-[11px] text-gray-500">
+                <p className="mt-0.5 text-xs text-gray-500">
                   {formatDateDisplay(r.date)} · {r.category}
                 </p>
-                <p className="mt-1 text-[11px] font-semibold text-amber-700">
+                <p className="mt-1 text-xs font-semibold text-amber-700">
                   <i className="fas fa-link mr-1" />
                   {matchText(r.match, t)}
                 </p>

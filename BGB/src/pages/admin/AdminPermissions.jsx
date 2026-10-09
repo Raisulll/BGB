@@ -4,7 +4,6 @@ import { useToast } from '../../context/ToastContext';
 import * as adminApi from '../../api/admin';
 import { errorMessage } from '../../api/client';
 import Card from '../../components/ui/Card';
-import Toggle from '../../components/ui/Toggle';
 import { useI18n } from '../../i18n/I18nContext';
 
 export const MODULES = [
@@ -16,6 +15,7 @@ export const MODULES = [
   { id: 'reports', icon: 'fa-file-export' },
   { id: 'audit', icon: 'fa-clipboard-list' },
   { id: 'admin', icon: 'fa-cogs' },
+  { id: 'messages', icon: 'fa-comments' },
 ];
 
 // Spec #3 — role → page matrix stored in role_permissions. Changes apply to every session at once
@@ -85,7 +85,7 @@ export default function AdminPermissions({ matrix, onChange }) {
               {roles.map(({ name }) => (
                 <th key={name} className="th min-w-[130px] whitespace-nowrap text-center">
                   <span className="block font-semibold text-gray-800">{tv('role', name)}</span>
-                  <span className="block text-[10px] font-normal text-gray-500">
+                  <span className="block text-xs font-normal text-gray-500">
                     {t('perm.modulesCount', { n: (permissions[name] || []).length, total: MODULES.length })}
                   </span>
                 </th>
@@ -96,15 +96,8 @@ export default function AdminPermissions({ matrix, onChange }) {
             {MODULES.map((mod) => (
               <tr key={mod.id} className="transition-colors hover:bg-gray-50/80">
                 <td className="td">
-                  <div className="flex items-start gap-2.5">
-                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-bgb-50 text-bgb-700">
-                      <i className={`fas ${mod.icon}`} />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-800">{t(`perm.module.${mod.id}`)}</p>
-                      <p className="text-xs text-gray-500">{t(`perm.desc.${mod.id}`)}</p>
-                    </div>
-                  </div>
+                  <p className="font-medium text-slate-900">{t(`perm.module.${mod.id}`)}</p>
+                  <p className="text-xs text-slate-600">{t(`perm.desc.${mod.id}`)}</p>
                 </td>
                 {roles.map(({ name }) => {
                   const isAllowed = (permissions[name] || []).includes(mod.id);
@@ -112,10 +105,15 @@ export default function AdminPermissions({ matrix, onChange }) {
                   const key = `${name}:${mod.id}`;
                   return (
                     <td key={name} className="td text-center">
-                      <div className={`inline-flex items-center justify-center ${busy === key ? 'opacity-50' : ''}`}>
-                        <Toggle checked={isAllowed} onChange={() => !busy && handleToggle(name, mod.id, !isAllowed)} label={t('perm.toggle', { module: t(`perm.module.${mod.id}`), role: tv('role', name) })} />
-                      </div>
-                      {isLocked && <span className="mt-1 block text-[9px] font-semibold text-amber-600">{t('perm.locked')}</span>}
+                      <input
+                        type="checkbox"
+                        checked={isAllowed}
+                        disabled={Boolean(busy) || isLocked}
+                        onChange={() => handleToggle(name, mod.id, !isAllowed)}
+                        aria-label={t('perm.toggle', { module: t(`perm.module.${mod.id}`), role: tv('role', name) })}
+                        className={`h-5 w-5 cursor-pointer accent-bgb-700 disabled:cursor-not-allowed ${busy === key ? 'opacity-50' : ''}`}
+                      />
+                      {isLocked && <span className="mt-1 block text-xs text-slate-600">{t('perm.locked')}</span>}
                     </td>
                   );
                 })}

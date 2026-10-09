@@ -12,6 +12,8 @@ import { incidentsRouter } from '../src/modules/incidents/incidents.router.js';
 import { notificationsRouter } from '../src/modules/notifications/notifications.router.js';
 import { reportsRouter } from '../src/modules/reports/reports.router.js';
 import { usersRouter } from '../src/modules/users/users.router.js';
+import { messagingRouter } from '../src/modules/messaging/messaging.router.js';
+import { callsRouter } from '../src/modules/calls/calls.router.js';
 import { app } from './helpers.js';
 
 // Specs #31, #52 — docs/api/openapi.yaml must be valid OpenAPI 3.1 and describe exactly the routes
@@ -27,6 +29,8 @@ const MOUNTS: [string, Router][] = [
   ['/audit', auditRouter],
   ['/notifications', notificationsRouter],
   ['/reports', reportsRouter],
+  ['/messaging', messagingRouter],
+  ['/calls', callsRouter],
 ];
 
 // "GET /incidents/{id}" for every route the routers define, plus the health probe in app.ts

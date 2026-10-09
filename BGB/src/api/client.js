@@ -24,10 +24,22 @@ let accessToken = null;
 let refreshing = null;
 let onSessionEnded = () => {};
 
+const tokenListeners = new Set();
+
 export const setAccessToken = (token) => {
-  accessToken = token || null;
+  const next = token || null;
+  if (next === accessToken) return;
+  accessToken = next;
+  for (const fn of tokenListeners) fn(accessToken);
 };
 export const hasAccessToken = () => Boolean(accessToken);
+/** The realtime channel authenticates with the same in-memory token (never stored). */
+export const getAccessToken = () => accessToken;
+/** Called with the new token (or null) whenever it changes; returns an unsubscribe function. */
+export const onAccessTokenChange = (fn) => {
+  tokenListeners.add(fn);
+  return () => tokenListeners.delete(fn);
+};
 
 /** AppContext registers this to drop the user when the server ends the session. */
 export const setSessionEndedHandler = (fn) => {

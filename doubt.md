@@ -300,3 +300,25 @@ Option A. Closed/Rejected incidents are archived after `archive.after_days` (def
 
 ### Resolution (if resolved)
 *Ask BGB which records rules apply and who may authorise disposal.*
+
+---
+## DOUBT-013 — In-App Messaging and Audio Calls (Beyond the 58 Specs)
+
+**TEC Spec**: #58 — Future expansion; also #23 (notifications), #24 (audit), #26/#27 (security)
+**Raised on**: 2026-10-09
+**Status**: ASSUMED
+
+### The ambiguity
+The project owner asked for direct/group messaging, voice messages, 1:1 audio calls and a call log. No TEC spec asks for them. Open points: who may contact whom, whether messages are official records, and how call audio crosses BGB's networks (WebRTC needs STUN and, behind firewalls, a TURN relay).
+
+### Options considered
+1. Who: anyone in the system / only within the chain of command / only within one's own scope.
+2. Retention: permanent records / auto-delete after a period / user-deletable.
+3. Relay: free hosted TURN for the demo / BGB's own coturn / no relay (calls may fail behind NAT).
+
+### Assumption made (if proceeding)
+Owner's choices (2026-10-09): anyone can message and call anyone; 1:1 and group chats, 1:1 calls; messages are permanent (append-only, no edit/delete, voice stored encrypted with SHA-256); the demo uses public STUN plus a free hosted TURN relay, production uses BGB's own coturn (`TURN_URLS`). Call audio is never recorded; every call is a record and an audit entry. Access is a new page permission `messages`, on for all roles by default and switchable per role in the Permissions matrix.
+
+### Resolution (if resolved)
+*Confirm with BGB: whether messaging falls under the same records rules as incidents (retention, disclosure), and which TURN/STUN servers are allowed on the production network (a public STUN server reveals users' public IP addresses to that server).*
+

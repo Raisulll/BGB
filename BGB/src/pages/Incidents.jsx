@@ -148,7 +148,7 @@ export default function Incidents() {
     <div className="space-y-4">
       {/* Views */}
       {views.length > 1 && (
-        <nav className="flex gap-1 overflow-x-auto rounded-xl border border-gray-200 bg-white p-1 shadow-sm" aria-label={t('incidents.views')}>
+        <nav className="flex gap-1 overflow-x-auto rounded-md border border-gray-200 bg-white p-1 shadow-sm" aria-label={t('incidents.views')}>
           {views.map((v) => {
             const badge = v.id === 'action' ? counts?.action : v.id === 'drafts' ? counts?.drafts : 0;
             return (
@@ -165,7 +165,7 @@ export default function Incidents() {
                 <i className={`fas ${v.icon} text-xs`} />
                 {v.label}
                 {badge > 0 && (
-                  <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-bold', view === v.id ? 'bg-white/20 text-white' : v.id === 'action' ? 'bg-amber-100 text-amber-800' : 'bg-gray-200 text-gray-700')}>
+                  <span className={cn('rounded-full px-2 py-0.5 text-xs font-bold', view === v.id ? 'bg-white/20 text-white' : v.id === 'action' ? 'bg-amber-100 text-amber-800' : 'bg-gray-200 text-gray-700')}>
                     {badge}
                   </span>
                 )}
@@ -239,11 +239,11 @@ export default function Incidents() {
 
           <label className="flex items-center gap-2">
             <span className="w-10 shrink-0 text-xs font-medium text-gray-500">{t('incidents.dateFrom')}</span>
-            <input id="filter-date-from" type="date" value={filters.dateFrom} max={filters.dateTo || undefined} onChange={set('dateFrom')} className="form-input" />
+            <input id="filter-date-from" type="date" value={filters.dateFrom} max={filters.dateTo || undefined} onChange={set('dateFrom')} className="form-input min-w-0" />
           </label>
           <label className="flex items-center gap-2">
             <span className="w-10 shrink-0 text-xs font-medium text-gray-500">{t('incidents.dateTo')}</span>
-            <input id="filter-date-to" type="date" value={filters.dateTo} min={filters.dateFrom || undefined} onChange={set('dateTo')} className="form-input" />
+            <input id="filter-date-to" type="date" value={filters.dateTo} min={filters.dateFrom || undefined} onChange={set('dateTo')} className="form-input min-w-0" />
           </label>
           {view !== 'action' && (
             <select id="filter-archived" value={filters.archived} onChange={set('archived')} className="form-input" aria-label={t('incidents.archiveFilter')}>

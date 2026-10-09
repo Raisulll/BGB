@@ -30,13 +30,14 @@ function Detail({ label, value }) {
   );
 }
 
+// The forward step is the primary action; Return is secondary; Reject is destructive
 const ACTION_BTN = {
-  return: { icon: 'fa-undo', cls: 'bg-pink-50 text-pink-600 hover:bg-pink-100' },
-  review: { icon: 'fa-search', cls: 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100' },
-  verify: { icon: 'fa-check', cls: 'bg-green-50 text-green-600 hover:bg-green-100' },
-  reject: { icon: 'fa-times', cls: 'bg-red-50 text-red-600 hover:bg-red-100' },
-  approve: { icon: 'fa-thumbs-up', cls: 'bg-green-50 text-green-700 hover:bg-green-100' },
-  close: { icon: 'fa-lock', cls: 'bg-gray-100 text-gray-700 hover:bg-gray-200' },
+  review: { cls: 'btn-primary', order: 0 },
+  verify: { cls: 'btn-primary', order: 0 },
+  approve: { cls: 'btn-primary', order: 0 },
+  close: { cls: 'btn-primary', order: 0 },
+  return: { cls: 'btn-secondary', order: 1 },
+  reject: { cls: 'btn-danger-outline', order: 2 },
 };
 // The server rejects these without a reason (spec #14); value = dialog title key
 const NEEDS_REASON = { return: 'detail.returnTitle', reject: 'detail.rejectTitle' };
@@ -232,37 +233,41 @@ export default function IncidentDetail() {
             </div>
             <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
               {inc.canEdit && (
-                <Link to={`/incidents/${inc.id}/edit`} className="btn bg-blue-50 text-blue-600 hover:bg-blue-100">
-                  <i className="fas fa-edit" /> {t('common.edit')}
+                <Link to={`/incidents/${inc.id}/edit`} className="btn btn-secondary">
+                  {t('common.edit')}
                 </Link>
               )}
-              {actions.map((a) => (
+              {[...actions].sort((x, y) => ACTION_BTN[x].order - ACTION_BTN[y].order).map((a) => (
                 <button
                   key={a}
                   disabled={Boolean(busy)}
                   onClick={() => (NEEDS_REASON[a] ? setDialog({ kind: 'workflow', action: a }) : run(a))}
                   className={`btn ${ACTION_BTN[a].cls}`}
                 >
-                  <i className={`fas ${busy === a ? 'fa-spinner fa-spin' : ACTION_BTN[a].icon}`} /> {tv('action', a)}
+                  {busy === a && <i className="fas fa-spinner fa-spin" aria-hidden="true" />}
+                  {tv('action', a)}
                 </button>
               ))}
               {inc.canDiscard && (
-                <button id="discard-draft" disabled={Boolean(busy)} onClick={() => setDialog({ kind: 'discard' })} className="btn bg-red-50 text-red-600 hover:bg-red-100">
-                  <i className={`fas ${busy === 'discard' ? 'fa-spinner fa-spin' : 'fa-trash-alt'}`} /> {t('detail.discard')}
+                <button id="discard-draft" disabled={Boolean(busy)} onClick={() => setDialog({ kind: 'discard' })} className="btn btn-danger-outline">
+                  {busy === 'discard' && <i className="fas fa-spinner fa-spin" aria-hidden="true" />}
+                  {t('detail.discard')}
                 </button>
               )}
               {inc.canArchive && (
-                <button disabled={Boolean(busy)} onClick={archive} className="btn bg-navy-50 text-navy-700 hover:bg-navy-100">
-                  <i className={`fas ${busy === 'archive' ? 'fa-spinner fa-spin' : 'fa-box-archive'}`} /> {t('detail.archive')}
+                <button disabled={Boolean(busy)} onClick={archive} className="btn btn-secondary">
+                  {busy === 'archive' && <i className="fas fa-spinner fa-spin" aria-hidden="true" />}
+                  {t('detail.archive')}
                 </button>
               )}
               {inc.canRestore && (
-                <button disabled={Boolean(busy)} onClick={() => setDialog({ kind: 'restore' })} className="btn bg-navy-50 text-navy-700 hover:bg-navy-100">
-                  <i className="fas fa-box-open" /> {t('detail.restore')}
+                <button disabled={Boolean(busy)} onClick={() => setDialog({ kind: 'restore' })} className="btn btn-secondary">
+                  {t('detail.restore')}
                 </button>
               )}
               <button id="print-incident" disabled={Boolean(busy)} onClick={print} className="btn btn-secondary" title={t('detail.printHint')}>
-                <i className={`fas ${busy === 'print' ? 'fa-spinner fa-spin' : 'fa-print'}`} /> {t('detail.print')}
+                {busy === 'print' && <i className="fas fa-spinner fa-spin" aria-hidden="true" />}
+                {t('detail.print')}
               </button>
             </div>
           </div>
@@ -314,29 +319,31 @@ export default function IncidentDetail() {
                             <p className="text-xs text-gray-500">
                               {formatFileSize(ev.size)} • {formatDateTime(ev.uploadedAt)}
                             </p>
-                            <p className="truncate text-[11px] text-gray-400" title={ev.sha256 ? `SHA-256 ${ev.sha256}` : undefined}>
+                            <p className="truncate text-xs text-gray-400" title={ev.sha256 ? `SHA-256 ${ev.sha256}` : undefined}>
                               <i className="fas fa-info-circle mr-1" />
                               {metadataSummary(ev, t)}
                             </p>
                           </div>
                           {ev.available ? (
-                            <div className="flex shrink-0 items-center">
+                            <div className="flex shrink-0 flex-wrap items-center gap-1.5">
                               {ev.sha256 && (
-                                <button onClick={() => verify(ev)} disabled={Boolean(busy)} className="btn btn-ghost px-3 text-emerald-700" title={t('detail.verifyIntegrity')} aria-label={t('detail.verifyAria', { name: ev.name })}>
-                                  <i className={`fas ${busy === `vf-${ev.id}` ? 'fa-spinner fa-spin' : 'fa-shield-alt'}`} />
+                                <button onClick={() => verify(ev)} disabled={Boolean(busy)} className="btn btn-sm btn-secondary" title={t('detail.verifyIntegrity')} aria-label={t('detail.verifyAria', { name: ev.name })}>
+                                {busy === `vf-${ev.id}` && <i className="fas fa-spinner fa-spin" aria-hidden="true" />}
+                                {t('detail.verify')}
                                 </button>
                               )}
-                              <button onClick={() => download(ev)} disabled={Boolean(busy)} className="btn btn-ghost px-3 text-bgb-600" title={t('common.download')} aria-label={t('detail.downloadAria', { name: ev.name })}>
-                                <i className={`fas ${busy === `dl-${ev.id}` ? 'fa-spinner fa-spin' : 'fa-download'}`} />
+                              <button onClick={() => download(ev)} disabled={Boolean(busy)} className="btn btn-sm btn-secondary" title={t('common.download')} aria-label={t('detail.downloadAria', { name: ev.name })}>
+                                {busy === `dl-${ev.id}` && <i className="fas fa-spinner fa-spin" aria-hidden="true" />}
+                                {t('common.download')}
                               </button>
                               {canRemoveEvidence && (
-                                <button onClick={() => setDialog({ kind: 'evidence', ev })} disabled={Boolean(busy)} className="btn btn-ghost px-3 text-red-600" title={t('common.remove')} aria-label={t('detail.removeAria', { name: ev.name })}>
-                                  <i className="fas fa-trash-alt" />
+                                <button onClick={() => setDialog({ kind: 'evidence', ev })} disabled={Boolean(busy)} className="btn btn-sm btn-danger-outline" title={t('common.remove')} aria-label={t('detail.removeAria', { name: ev.name })}>
+                                {t('common.remove')}
                                 </button>
                               )}
                             </div>
                           ) : (
-                            <span className="shrink-0 text-[11px] text-gray-400" title={t('detail.metadataOnlyTitle')}>
+                            <span className="shrink-0 text-xs text-gray-400" title={t('detail.metadataOnlyTitle')}>
                               {t('detail.metadataOnly')}
                             </span>
                           )}

@@ -60,6 +60,11 @@ model User {
   evidence      Evidence[]
   notifications Notification[]
   configUpdates SystemConfig[]
+  conversationsCreated Conversation[] @relation("ConversationCreator")
+  memberships   ConversationMember[]
+  messagesSent  Message[]
+  callsMade     Call[]             @relation("CallCaller")
+  callsReceived Call[]             @relation("CallCallee")
   refreshTokens RefreshToken[]
 
   @@map("users")
@@ -301,4 +306,81 @@ model EmailOutbox {
 
   @@index([status, nextAttemptAt], map: "idx_email_outbox_due")
   @@map("email_outbox")
+}
+
+// ---------------------------------------------------------------------------
+// Messaging and calls (spec #58 extension). Messages are permanent records (append-only DB
+// triggers); voice notes go through the evidence storage driver, so they are encrypted at rest
+// like evidence (spec #27). Calls are 1:1 WebRTC audio; only the call record is kept, never audio.
+// ---------------------------------------------------------------------------
+model Conversation {
+  id            Int       @id @default(autoincrement())
+  kind          String    @db.VarChar(10) // 'direct' | 'group' (DB CHECK)
+  title         String?   @db.VarChar(100) // groups only
+  // Direct conversations: both user ids sorted and joined with ':', so a pair has exactly one thread
+  directKey     String?   @unique @map("direct_key") @db.VarChar(25)
+  createdBy     String    @map("created_by") @db.VarChar(10)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  lastMessageAt DateTime? @map("last_message_at") @db.Timestamptz
+
+  creator  User                 @relation("ConversationCreator", fields: [createdBy], references: [id])
+  members  ConversationMember[]
+  messages Message[]
+
+  @@index([lastMessageAt])
+  @@map("conversations")
+}
+
+model ConversationMember {
+  conversationId Int       @map("conversation_id")
+  userId         String    @map("user_id") @db.VarChar(10)
+  joinedAt       DateTime  @default(now()) @map("joined_at") @db.Timestamptz
+  leftAt         DateTime? @map("left_at") @db.Timestamptz // members who leave keep their row (history)
+  lastReadId     Int       @default(0) @map("last_read_id") // highest message id this member has read
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Restrict)
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@id([conversationId, userId])
+  @@index([userId])
+  @@map("conversation_members")
+}
+
+model Message {
+  id              Int      @id @default(autoincrement())
+  conversationId  Int      @map("conversation_id")
+  senderId        String   @map("sender_id") @db.VarChar(10)
+  kind            String   @db.VarChar(10) // 'text' | 'voice' | 'system' (DB CHECK)
+  body            String? // text, or the wording of a system event
+  voicePath       String?  @map("voice_path") @db.VarChar(500)
+  voiceMime       String?  @map("voice_mime") @db.VarChar(100)
+  voiceSize       Int?     @map("voice_size")
+  voiceDurationMs Int?     @map("voice_duration_ms")
+  voiceSha256     String?  @map("voice_sha256") @db.VarChar(64)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Restrict)
+  sender       User         @relation(fields: [senderId], references: [id])
+
+  @@index([conversationId, id])
+  @@map("messages")
+}
+
+model Call {
+  id         Int       @id @default(autoincrement())
+  callerId   String    @map("caller_id") @db.VarChar(10)
+  calleeId   String    @map("callee_id") @db.VarChar(10)
+  // ringing -> answered -> ended, or ringing -> declined | missed | cancelled | failed (DB CHECK)
+  status     String    @db.VarChar(12)
+  startedAt  DateTime  @default(now()) @map("started_at") @db.Timestamptz
+  answeredAt DateTime? @map("answered_at") @db.Timestamptz
+  endedAt    DateTime? @map("ended_at") @db.Timestamptz
+  endReason  String?   @map("end_reason") @db.VarChar(40)
+
+  caller User @relation("CallCaller", fields: [callerId], references: [id])
+  callee User @relation("CallCallee", fields: [calleeId], references: [id])
+
+  @@index([callerId, startedAt])
+  @@index([calleeId, startedAt])
+  @@map("calls")
 }

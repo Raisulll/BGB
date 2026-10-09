@@ -4,6 +4,11 @@ import { logger } from './config/logger.js';
 import { prisma } from './db.js';
 import { startMailWorker, stopMailWorker } from './modules/notifications/mailer.js';
 import { startArchiveScheduler, stopArchiveScheduler } from './modules/incidents/archive.service.js';
+import { registerMessagingRealtime } from './modules/messaging/messaging.realtime.js';
+import { registerCallRealtime } from './modules/calls/calls.realtime.js';
+import { sweepStaleCalls } from './modules/calls/calls.service.js';
+import { startBus, stopBus } from './realtime/bus.js';
+import { attachRealtime, stopRealtime } from './realtime/hub.js';
 
 // Entry point. In production run under PM2 cluster mode (ecosystem.config.cjs) — §26.
 const server = createApp().listen(env.PORT, () => {
@@ -12,6 +17,13 @@ const server = createApp().listen(env.PORT, () => {
   startArchiveScheduler();
 });
 
+// Realtime channel (messaging, calls): WebSocket on the same port, events via PostgreSQL NOTIFY
+registerMessagingRealtime();
+registerCallRealtime();
+sweepStaleCalls().catch((err) => logger.warn('Stale call clean-up failed', { err: String(err) }));
+attachRealtime(server);
+startBus().catch((err) => logger.error('Realtime bus failed to start', { err: String(err) }));
+
 let shuttingDown = false;
 async function shutdown(signal: string) {
   if (shuttingDown) return;
@@ -19,6 +31,8 @@ async function shutdown(signal: string) {
   logger.info(`${signal} received, shutting down`);
   stopMailWorker();
   stopArchiveScheduler();
+  stopRealtime();
+  await stopBus();
   const force = setTimeout(() => process.exit(1), 10_000);
   force.unref();
   server.close(async () => {

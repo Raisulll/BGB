@@ -69,6 +69,16 @@ const schema = z.object({
   // Default: on except in production, where the route map is published only when chosen (e.g. TEC demo).
   API_DOCS: z.enum(['true', 'false']).optional(),
 
+  // Audio calls (WebRTC): ICE servers handed to browsers. STUN finds the public address; TURN relays
+  // audio when a direct path is blocked (strict firewalls, some mobile networks). Comma-separated.
+  // Production: BGB's own coturn server, so call audio never passes through a third party.
+  STUN_URLS: z.string().default('stun:stun.l.google.com:19302'),
+  TURN_URLS: z.string().optional(),
+  TURN_USERNAME: z.string().optional(),
+  TURN_CREDENTIAL: z.string().optional(),
+  // How long an incoming call rings before it counts as missed
+  CALL_RING_SECONDS: z.coerce.number().int().min(1).max(120).default(30),
+
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'http', 'debug']).default('info'),
   LOG_DIR: z.string().default('logs'),
 });

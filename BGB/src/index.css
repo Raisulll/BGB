@@ -77,30 +77,47 @@
   .form-label {
     @apply mb-1 block text-sm font-medium text-gray-700;
   }
+  /* Design system: flat white surfaces, slate neutrals, BGB green only for the primary action
+     and active navigation. Three button variants; every button carries a text label. */
   .card {
-    @apply rounded-xl border border-gray-100 bg-white shadow-sm;
+    @apply rounded-lg border border-slate-200 bg-white shadow-xs;
   }
   .btn {
-    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors
-      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bgb-500/40 disabled:opacity-50 md:min-h-10;
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-transparent px-4 py-2 text-sm font-medium
+      transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bgb-700 focus-visible:ring-offset-2
+      disabled:cursor-not-allowed disabled:opacity-50 md:min-h-10;
   }
   .btn-primary {
-    @apply bg-bgb-600 text-white hover:bg-bgb-700 active:bg-bgb-800;
+    @apply bg-bgb-700 text-white hover:bg-bgb-800 active:bg-bgb-900;
   }
   .btn-secondary {
-    @apply bg-gray-100 text-gray-700 hover:bg-gray-200;
+    @apply border-slate-300 bg-white text-slate-800 hover:border-slate-400 hover:bg-slate-50;
   }
   .btn-ghost {
-    @apply text-gray-500 hover:bg-gray-100 hover:text-gray-700;
+    @apply text-slate-600 hover:bg-slate-100 hover:text-slate-800;
   }
   .btn-danger {
-    @apply bg-red-600 text-white hover:bg-red-700 active:bg-red-800;
+    @apply bg-red-700 text-white hover:bg-red-800 active:bg-red-900;
+  }
+  .btn-danger-outline {
+    @apply border-red-300 bg-white text-red-700 hover:border-red-400 hover:bg-red-50;
+  }
+  /* Older names, kept as aliases of the variants above */
+  .btn-outline {
+    @apply border-slate-300 bg-white text-slate-800 hover:border-slate-400 hover:bg-slate-50;
+  }
+  .btn-outline-primary {
+    @apply border-bgb-700 bg-white text-bgb-800 hover:bg-bgb-50;
+  }
+  /* Compact size for table rows */
+  .btn-sm {
+    @apply min-h-8 gap-1.5 px-2.5 py-1 text-xs md:min-h-8;
   }
   .th {
-    @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500;
+    @apply px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600;
   }
   .td {
-    @apply px-4 py-3 text-sm;
+    @apply px-3 py-2.5 text-sm;
   }
 }
 
@@ -112,19 +129,15 @@
   }
 }
 
-/* ============ AUTO-HIDING SCROLLBAR ============ */
+/* ============ SCROLLBARS ============ */
+/* Always visible: a hidden scrollbar hid the table's action column at desktop widths */
 :root {
-  --scrollbar-thumb-color: transparent;
-}
-
-body.is-scrolling,
-.is-scrolling {
-  --scrollbar-thumb-color: rgba(148, 163, 184, 0.65);
+  --scrollbar-thumb-color: rgba(100, 116, 139, 0.45);
 }
 
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -138,7 +151,7 @@ body.is-scrolling,
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(16, 185, 129, 0.8) !important;
+  background-color: rgba(71, 85, 105, 0.7);
 }
 
 /* Firefox support */

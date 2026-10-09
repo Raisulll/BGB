@@ -17,6 +17,8 @@ const AuditTrail = lazy(() => import('./pages/AuditTrail'));
 const Admin = lazy(() => import('./pages/admin/Admin'));
 const ChangePassword = lazy(() => import('./pages/ChangePassword'));
 const Profile = lazy(() => import('./pages/Profile'));
+const Messages = lazy(() => import('./pages/Messages'));
+const CallLog = lazy(() => import('./pages/CallLog'));
 
 function RequireAuth({ children }) {
   const { currentUser } = useApp();
@@ -126,6 +128,31 @@ export default function App() {
             element={
               <RequirePermission pageId="audit">
                 <AuditTrail />
+              </RequirePermission>
+            }
+          />
+          {/* Messaging and audio calls (spec #58 extension) */}
+          <Route
+            path="messages"
+            element={
+              <RequirePermission pageId="messages">
+                <Messages />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="messages/:id"
+            element={
+              <RequirePermission pageId="messages">
+                <Messages />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="calls"
+            element={
+              <RequirePermission pageId="messages">
+                <CallLog />
               </RequirePermission>
             }
           />

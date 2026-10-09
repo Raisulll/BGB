@@ -76,7 +76,7 @@ function Media({ url, error, name, mimeType, size }) {
   if (!url) {
     return (
       <div className={`mt-2 flex ${s.box} w-full items-center justify-center rounded-lg bg-slate-100`} role="status" aria-label={t('common.loading')}>
-        <i className={`fas ${isVideo ? 'fa-film' : 'fa-image'} animate-pulse text-2xl text-slate-300`} />
+        <i className={`fas ${isVideo ? 'fa-film' : 'fa-image'} text-2xl text-slate-300`} />
       </div>
     );
   }
@@ -90,8 +90,8 @@ function Media({ url, error, name, mimeType, size }) {
       </button>
       {enlarged && (
         <Modal open title={name} icon="fa-image" onClose={() => setEnlarged(false)} maxWidth="max-w-5xl">
-          <div className="flex items-center justify-center rounded-xl bg-slate-950/90">
-            <img src={url} alt={name} className="max-h-[75vh] w-auto max-w-full rounded-xl object-contain" />
+          <div className="flex items-center justify-center rounded-md bg-slate-950/90">
+            <img src={url} alt={name} className="max-h-[75vh] w-auto max-w-full rounded-md object-contain" />
           </div>
         </Modal>
       )}

@@ -69,7 +69,7 @@ export default function AdminSettings({ config, onChange }) {
   return (
     <div className="grid grid-cols-1 items-start gap-4 sm:gap-6 lg:grid-cols-2">
       {SECTIONS.map((section) => (
-        <Card key={section.title} title={t(section.title)} icon={section.icon} bodyClassName="space-y-3">
+        <Card key={section.title} title={t(section.title)} icon={section.icon} bodyClassName="py-1">
           {section.items.map((item) =>
             byKey[item.key] ? <ConfigRow key={`${item.key}:${byKey[item.key].value}`} item={item} row={byKey[item.key]} onSave={save} busy={busy} /> : null,
           )}
@@ -90,27 +90,27 @@ export default function AdminSettings({ config, onChange }) {
           </button>
         }
       >
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-gray-200/90 bg-gray-50/60 p-3.5 text-xs">
+        <div className="flex items-center justify-between gap-3 rounded-md border border-gray-200/90 bg-gray-50/60 p-3.5 text-xs">
           <span className="font-bold text-gray-800">
             <i className="fas fa-network-wired mr-2 text-bgb-600" />
             {t('set.api')}
           </span>
           {health ? (
-            <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200/60 bg-emerald-50 px-2.5 py-1 font-bold text-emerald-700">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" /> {health.status === 'ok' ? t('set.operational') : health.status}
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-bgb-200/60 bg-bgb-50 px-2.5 py-1 font-bold text-bgb-700">
+              <span className="h-2 w-2 rounded-full bg-bgb-500" /> {health.status === 'ok' ? t('set.operational') : health.status}
             </span>
           ) : (
             <span className="font-bold text-gray-400">{checking ? t('set.checking') : t('set.unreachable')}</span>
           )}
         </div>
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-gray-200/90 bg-gray-50/60 p-3.5 text-xs">
+        <div className="flex items-center justify-between gap-3 rounded-md border border-gray-200/90 bg-gray-50/60 p-3.5 text-xs">
           <span className="font-bold text-gray-800">
             <i className="fas fa-database mr-2 text-bgb-600" />
             {t('set.database')}
           </span>
           {health?.database === 'up' ? (
-            <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200/60 bg-emerald-50 px-2.5 py-1 font-bold text-emerald-700">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" /> {t('set.connected')}
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-bgb-200/60 bg-bgb-50 px-2.5 py-1 font-bold text-bgb-700">
+              <span className="h-2 w-2 rounded-full bg-bgb-500" /> {t('set.connected')}
             </span>
           ) : (
             <span className="inline-flex items-center gap-1.5 rounded-md border border-red-200/60 bg-red-50 px-2.5 py-1 font-bold text-red-700">
@@ -118,11 +118,11 @@ export default function AdminSettings({ config, onChange }) {
             </span>
           )}
         </div>
-        {health?.time && <p className="text-[11px] text-gray-500">{t('set.serverTime', { time: formatDateTime(health.time, { withSeconds: true }) })}</p>}
+        {health?.time && <p className="text-xs text-gray-500">{t('set.serverTime', { time: formatDateTime(health.time, { withSeconds: true }) })}</p>}
 
         {counters.length > 0 && (
           <div className="border-t border-gray-100 pt-3">
-            <p className="mb-2 text-xs font-bold uppercase tracking-wider text-gray-500">{t('set.nextRefs')}</p>
+            <p className="mb-2 text-xs font-bold text-gray-500">{t('set.nextRefs')}</p>
             {counters.map((c) => (
               <div key={c.key} className="flex justify-between text-xs">
                 <span className="text-gray-600">{c.key.split('.').pop()}</span>
@@ -131,7 +131,7 @@ export default function AdminSettings({ config, onChange }) {
                 </span>
               </div>
             ))}
-            <p className="mt-1 text-[11px] text-gray-400">{t('set.readOnly')}</p>
+            <p className="mt-1 text-xs text-gray-400">{t('set.readOnly')}</p>
           </div>
         )}
       </Card>

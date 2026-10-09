@@ -15,6 +15,7 @@ export default defineConfig({
       MAIL_TRANSPORT: 'json', // render e-mails without sending
       EVIDENCE_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'), // fixed test key (spec #27)
       SMTP_HOST: '',
+      CALL_RING_SECONDS: '1', // missed-call test
     },
     // One shared database: run files one at a time
     fileParallelism: false,

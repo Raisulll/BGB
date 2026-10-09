@@ -8,10 +8,10 @@ export default function Card({ id, title, icon, actions, children, className = '
   return (
     <Tag id={id} className={cn('card', className)}>
       {hasHeader && (
-        <header className="flex flex-col gap-2 border-b border-gray-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-4">
+        <header className="flex flex-col gap-2 border-b border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
           {title && (
-            <h3 className="flex items-center text-sm font-semibold text-gray-800 sm:text-base">
-              {icon && <i className={`fas ${icon} mr-2 text-bgb-500`} />}
+            <h3 className="flex items-center text-base font-semibold text-slate-900">
+              {icon && <i className={`fas ${icon} mr-2 text-sm text-slate-500`} aria-hidden="true" />}
               {title}
             </h3>
           )}

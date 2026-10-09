@@ -37,33 +37,22 @@ export default function WorkQueue() {
     { to: '/incidents?overdue=true', icon: 'fa-stopwatch', label: t('queue.overdueArea'), n: data?.overdueInScope, tone: 'red' },
   ].filter(Boolean);
 
-  const TONES = {
-    amber: 'border-amber-200 bg-amber-50 text-amber-800',
-    red: 'border-red-200 bg-red-50 text-red-700',
-    purple: 'border-purple-200 bg-purple-50 text-purple-700',
-    slate: 'border-slate-200 bg-slate-50 text-slate-700',
-  };
+
 
   return (
-    <section className="card p-3 sm:p-4" aria-labelledby="queue-title">
-      <h2 id="queue-title" className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-800 sm:text-base">
-        <i className="fas fa-inbox text-bgb-500" /> {t('queue.title')}
+    <section className="card p-4" aria-labelledby="queue-title">
+      <h2 id="queue-title" className="mb-3 text-base font-semibold text-slate-900">
+        {t('queue.title')}
       </h2>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-5">
         {tiles.map((tile) => (
           <Link
             key={tile.to}
             to={tile.to}
-            className={cn(
-              'flex items-center gap-3 rounded-xl border p-3 transition-all hover:-translate-y-0.5 hover:shadow-md',
-              tile.n ? TONES[tile.tone] : 'border-gray-200 bg-white text-gray-400',
-            )}
+            className="block rounded-md border border-slate-200 p-3 transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bgb-700"
           >
-            <i className={`fas ${tile.icon} text-lg`} />
-            <div className="min-w-0">
-              <p className="text-xl font-black leading-none">{tile.n ?? '–'}</p>
-              <p className="mt-1 text-[11px] font-semibold leading-tight">{tile.label}</p>
-            </div>
+            <p className={cn('text-2xl font-semibold tabular-nums', tile.tone === 'red' && tile.n > 0 ? 'text-red-700' : 'text-slate-900')}>{tile.n ?? '–'}</p>
+            <p className="mt-0.5 text-sm text-slate-600">{tile.label}</p>
           </Link>
         ))}
       </div>

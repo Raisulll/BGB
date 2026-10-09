@@ -117,11 +117,11 @@ export default function MapView() {
             </select>
             <label className="flex items-center gap-2">
               <span className="w-10 shrink-0 text-xs font-medium text-gray-500">{t('incidents.dateFrom')}</span>
-              <input id="map-date-from" type="date" value={dateFrom} max={dateTo || undefined} onChange={(e) => setDateFrom(e.target.value)} className="form-input" />
+              <input id="map-date-from" type="date" value={dateFrom} max={dateTo || undefined} onChange={(e) => setDateFrom(e.target.value)} className="form-input min-w-0" />
             </label>
             <label className="flex items-center gap-2">
               <span className="w-10 shrink-0 text-xs font-medium text-gray-500">{t('incidents.dateTo')}</span>
-              <input id="map-date-to" type="date" value={dateTo} min={dateFrom || undefined} onChange={(e) => setDateTo(e.target.value)} className="form-input" />
+              <input id="map-date-to" type="date" value={dateTo} min={dateFrom || undefined} onChange={(e) => setDateTo(e.target.value)} className="form-input min-w-0" />
             </label>
           </div>
 
@@ -151,7 +151,7 @@ export default function MapView() {
       {/* Interactive GIS Map */}
       <Card bodyClassName="p-2 sm:p-4">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2 sm:mb-3">
-          <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1" role="group" aria-label={t('map.mode')}>
+          <div className="inline-flex rounded-md border border-gray-200 bg-gray-50 p-1" role="group" aria-label={t('map.mode')}>
             {MODES.map(([id, icon, label]) => (
               <button
                 key={id}
@@ -167,7 +167,7 @@ export default function MapView() {
           </div>
           <span className="text-xs text-gray-500">{t('map.shown', { n: filtered.length })}</span>
         </div>
-        <div className="h-[400px] overflow-hidden rounded-xl sm:h-[520px]">
+        <div className="h-[400px] overflow-hidden rounded-md sm:h-[520px]">
           <MapContainer center={[21.5, 92.0]} zoom={7} className="h-full w-full">
             <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
             {mode === 'clusters' && <ClusterLayer incidents={filtered} labels={layerLabels} />}
@@ -188,21 +188,21 @@ export default function MapView() {
                 <Tooltip direction="top" offset={[0, -10]} opacity={0.98} sticky>
                   <div className="p-1 space-y-1.5 min-w-[200px]">
                     <div className="flex items-center justify-between border-b border-gray-200 pb-1">
-                      <span className="font-extrabold text-xs text-bgb-900">{loc.bop}</span>
-                      <span className="rounded bg-bgb-100 px-1.5 py-0.5 text-[9px] font-bold text-bgb-800">
+                      <span className="font-semibold text-xs text-bgb-900">{loc.bop}</span>
+                      <span className="rounded bg-bgb-100 px-1.5 py-0.5 text-xs font-bold text-bgb-800">
                         {t('map.total', { n: loc.incidents.length })}
                       </span>
                     </div>
-                    <div className="text-[10px] font-extrabold uppercase text-gray-500 tracking-wider">
+                    <div className="text-xs font-semibold text-gray-500">
                       {t('map.recentTwo')}
                     </div>
                     <div className="space-y-1">
                       {loc.recentTwo.map((inc, i) => (
-                        <div key={inc.id} className="rounded bg-gray-50 p-1.5 border-l-2 border-bgb-600 text-[11px]">
+                        <div key={inc.id} className="rounded bg-gray-50 p-1.5 border-l-2 border-bgb-600 text-xs">
                           <div className="font-bold text-gray-900 leading-tight">
                             {i + 1}. {inc.title}
                           </div>
-                          <div className="mt-0.5 flex items-center justify-between text-[9px] text-gray-500">
+                          <div className="mt-0.5 flex items-center justify-between text-xs text-gray-500">
                             <span>{inc.id}</span>
                             <span className="font-semibold text-bgb-700">{formatDateDisplay(inc.date)}</span>
                           </div>
@@ -216,23 +216,23 @@ export default function MapView() {
                 <Popup>
                   <div className="min-w-[220px] max-w-[260px] p-1 space-y-2">
                     <div className="border-b border-gray-200 pb-1 flex items-center justify-between">
-                      <span className="font-extrabold text-xs text-bgb-900">{loc.bop}</span>
-                      <span className="text-[10px] font-bold text-gray-500">{t('map.lastTwo')}</span>
+                      <span className="font-semibold text-xs text-bgb-900">{loc.bop}</span>
+                      <span className="text-xs font-bold text-gray-500">{t('map.lastTwo')}</span>
                     </div>
 
                     <div className="space-y-2">
                       {loc.recentTwo.map((inc) => (
                         <div key={inc.id} className="rounded-lg bg-gray-50 p-2 border border-gray-200 space-y-1 shadow-sm">
-                          <div className="flex items-center justify-between text-[10px]">
+                          <div className="flex items-center justify-between text-xs">
                             <span className="font-mono font-bold text-bgb-700">{inc.id}</span>
                             <span className="font-semibold text-gray-500">{formatDateDisplay(inc.date)}</span>
                           </div>
                           <p className="text-xs font-bold text-gray-900 leading-tight">{inc.title}</p>
                           <div className="flex items-center justify-between pt-1 border-t border-gray-200/60">
-                            <span className="text-[10px] font-semibold text-gray-600">{inc.category}</span>
+                            <span className="text-xs font-semibold text-gray-600">{inc.category}</span>
                             <Link
                               to={`/incidents/${inc.id}`}
-                              className="text-[10px] font-bold text-bgb-700 hover:text-bgb-900 hover:underline"
+                              className="text-xs font-bold text-bgb-700 hover:text-bgb-900 hover:underline"
                             >
                               {t('map.viewDetails')} &rarr;
                             </Link>
@@ -249,7 +249,7 @@ export default function MapView() {
       </Card>
 
       {/* Incident Locations List */}
-      <Card title={t('map.locations')} bodyClassName="divide-y divide-gray-100">
+      <Card title={`${t('map.locations')} (${filtered.length})`} bodyClassName="max-h-[28rem] divide-y divide-slate-200 overflow-y-auto">
         {filtered.length === 0 ? (
           <p className="p-4 text-center text-sm text-gray-400">{t('map.noLocations')}</p>
         ) : (

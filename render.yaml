@@ -79,3 +79,11 @@ services:
       # Build-time: show the demo-account buttons on the login page
       - key: VITE_SHOW_DEMO_ACCOUNTS
         value: "true"
+      # Audio calls: a free hosted TURN relay for the demo (for example Metered's free tier), so calls
+      # connect across firewalls and mobile networks. Comma-separated turn:/turns: URLs + credentials
+      - key: TURN_URLS
+        sync: false
+      - key: TURN_USERNAME
+        sync: false
+      - key: TURN_CREDENTIAL
+        sync: false

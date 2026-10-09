@@ -48,14 +48,14 @@ export default function AdminOrg({ org, onChange }) {
               </p>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {Object.entries(bns).map(([bn, { BOPs }]) => (
-                  <div key={bn} className="rounded-xl border border-gray-200 bg-gray-50/60 p-3">
+                  <div key={bn} className="rounded-md border border-gray-200 bg-gray-50/60 p-3">
                     <p className="mb-1.5 text-xs font-bold text-gray-700">
                       <i className="fas fa-shield-alt mr-1.5 text-bgb-600" />
                       {bn}
                     </p>
                     <div className="flex flex-wrap gap-1">
                       {BOPs.map((b) => (
-                        <span key={b} className="rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] text-gray-600">
+                        <span key={b} className="rounded border border-gray-200 bg-white px-1.5 py-0.5 text-xs text-gray-600">
                           {b}
                         </span>
                       ))}
@@ -88,7 +88,7 @@ export default function AdminOrg({ org, onChange }) {
             <label htmlFor="org-bop" className="form-label">{t('common.bop')} *</label>
             <input id="org-bop" required value={form.bop} onChange={set('bop')} placeholder={t('org.bopPh')} className="form-input" />
           </div>
-          <p className="text-[11px] text-gray-500">{t('org.addOnly')}</p>
+          <p className="text-xs text-gray-500">{t('org.addOnly')}</p>
           <button type="submit" disabled={busy} className="btn btn-primary w-full">
             <i className={`fas ${busy ? 'fa-spinner fa-spin' : 'fa-plus'}`} /> {t('org.addBop')}
           </button>

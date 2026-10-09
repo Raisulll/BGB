@@ -99,12 +99,12 @@ export default function GlobalSearch() {
         aria-expanded={open && results.length > 0}
         aria-controls="global-search-results"
         aria-autocomplete="list"
-        className="w-full rounded-xl border border-slate-200/80 bg-slate-50 py-2 pl-8 pr-8 text-xs text-slate-800 placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+        className="w-full rounded-md border border-slate-200/80 bg-slate-50 py-2 pl-8 pr-8 text-xs text-slate-800 placeholder:text-slate-400 focus:border-bgb-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-bgb-500/20"
       />
-      <kbd className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-slate-200 bg-white px-1.5 text-[10px] font-semibold text-slate-400">/</kbd>
+      <kbd className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-slate-200 bg-white px-1.5 text-xs font-semibold text-slate-400">/</kbd>
 
       {open && q.length >= 2 && (
-        <div id="global-search-results" role="listbox" className="absolute left-0 top-11 z-50 w-[26rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+        <div id="global-search-results" role="listbox" className="absolute left-0 top-11 z-50 w-[26rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-md border border-slate-200 bg-white shadow-xl">
           {results.length ? (
             results.map((inc, i) => (
               <button
@@ -114,7 +114,7 @@ export default function GlobalSearch() {
                 aria-selected={i === active}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => go(`/incidents/${inc.id}`)}
-                className={cn('flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-emerald-50', i === active && 'bg-emerald-50')}
+                className={cn('flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-bgb-50', i === active && 'bg-bgb-50')}
               >
                 <span className="shrink-0 font-mono font-semibold text-bgb-700">{inc.id}</span>
                 <span className="min-w-0 flex-1 truncate text-slate-700">{inc.title}</span>

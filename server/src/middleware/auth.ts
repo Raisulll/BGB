@@ -17,10 +17,26 @@ const TOUCH_INTERVAL_MS = 60_000;
 async function authenticate(req: Request, allowPendingPasswordChange: boolean) {
   const header = req.get('authorization');
   if (!header?.startsWith('Bearer ')) throw unauthorized();
+  const { user, sessionId } = await authenticateToken(header.slice(7), {
+    allowPendingPasswordChange,
+    touch: !isBackgroundRequest(req),
+    ctx: requestContext(req),
+  });
+  req.user = user;
+  req.sessionId = sessionId;
+}
 
+/**
+ * The checks behind requireAuth, also used by the realtime channel: token signature, live session,
+ * active user, idle timeout. `touch: false` (realtime, background polling) never counts as activity.
+ */
+export async function authenticateToken(
+  token: string,
+  { allowPendingPasswordChange = false, touch = false, ctx }: { allowPendingPasswordChange?: boolean; touch?: boolean; ctx: ReturnType<typeof requestContext> },
+): Promise<{ user: Express.AuthUser; sessionId: string }> {
   let payload;
   try {
-    payload = verifyAccessToken(header.slice(7));
+    payload = verifyAccessToken(token);
   } catch {
     throw unauthorized('Invalid or expired access token', 'TOKEN_INVALID');
   }
@@ -39,11 +55,11 @@ async function authenticate(req: Request, allowPendingPasswordChange: boolean) {
       username: session.user.username,
       userId: session.user.id,
       details: `Session ended after ${sessionTimeoutMinutes} min of inactivity`,
-      ctx: requestContext(req),
+      ctx,
     });
     throw unauthorized('Session expired due to inactivity', 'SESSION_EXPIRED');
   }
-  if (now - session.lastSeenAt.getTime() > TOUCH_INTERVAL_MS && !isBackgroundRequest(req)) {
+  if (touch && now - session.lastSeenAt.getTime() > TOUCH_INTERVAL_MS) {
     await prisma.refreshToken.update({ where: { id: session.id }, data: { lastSeenAt: new Date(now) } });
   }
 
@@ -52,16 +68,18 @@ async function authenticate(req: Request, allowPendingPasswordChange: boolean) {
     throw new AppError(403, 'PASSWORD_CHANGE_REQUIRED', 'You must change your password before continuing');
   }
 
-  req.user = {
-    id: u.id,
-    username: u.username,
-    name: u.name,
-    role: u.role, // always the current DB role, not the one baked into the token
-    scope: u.scope,
-    email: u.email,
-    mustChangePassword: u.mustChangePassword,
+  return {
+    user: {
+      id: u.id,
+      username: u.username,
+      name: u.name,
+      role: u.role, // always the current DB role, not the one baked into the token
+      scope: u.scope,
+      email: u.email,
+      mustChangePassword: u.mustChangePassword,
+    },
+    sessionId: session.id,
   };
-  req.sessionId = session.id;
 }
 
 /** Standard guard for all protected routes. */

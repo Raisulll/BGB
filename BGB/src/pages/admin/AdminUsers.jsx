@@ -31,10 +31,11 @@ function scopeOptions(hierarchy, t) {
 
 function StatusPill({ u }) {
   const { t } = useI18n();
-  if (!u.isActive) return <span className="rounded-full border border-gray-300 bg-gray-100 px-2 py-0.5 text-[10px] font-bold text-gray-600">{t('users.status.deactivated')}</span>;
-  if (u.locked) return <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-700">{t('users.status.locked')}</span>;
-  if (u.mustChangePassword) return <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">{t('users.status.pwdDue')}</span>;
-  return <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">{t('users.status.active')}</span>;
+  const pill = 'whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium';
+  if (!u.isActive) return <span className={`${pill} border-slate-300 bg-slate-100 text-slate-700`}>{t('users.status.deactivated')}</span>;
+  if (u.locked) return <span className={`${pill} border-red-200 bg-red-50 text-red-800`}>{t('users.status.locked')}</span>;
+  if (u.mustChangePassword) return <span className={`${pill} border-amber-200 bg-amber-50 text-amber-800`}>{t('users.status.pwdDue')}</span>;
+  return <span className={`${pill} border-green-200 bg-green-50 text-green-800`}>{t('users.status.active')}</span>;
 }
 
 export default function AdminUsers({ roles, hierarchy }) {
@@ -123,7 +124,6 @@ export default function AdminUsers({ roles, hierarchy }) {
 
   const users = data?.data || [];
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
-  const btn = 'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold transition-colors disabled:opacity-50';
 
   return (
     <div className="space-y-4">
@@ -174,13 +174,10 @@ export default function AdminUsers({ roles, hierarchy }) {
                       <td className="td font-mono font-medium text-bgb-700">{u.id}</td>
                       <td className="td">
                         <p className="font-semibold text-gray-800">{u.name}</p>
-                        <p className="font-mono text-[11px] text-gray-500">{u.username}</p>
+                        <p className="font-mono text-xs text-gray-500">{u.username}</p>
                       </td>
                       <td className="td whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1 rounded-full border border-navy-200/50 bg-navy-50 px-2.5 py-0.5 text-xs font-semibold text-navy-700">
-                          <i className="fas fa-user-shield text-[10px]" />
-                          {tv('role', u.role)}
-                        </span>
+                        {tv('role', u.role)}
                       </td>
                       <td className="td hidden text-gray-600 md:table-cell">{u.scope}</td>
                       <td className="td">
@@ -189,27 +186,27 @@ export default function AdminUsers({ roles, hierarchy }) {
                       <td className="td hidden whitespace-nowrap text-xs text-gray-500 xl:table-cell">{u.lastLogin ? formatDateTime(u.lastLogin) : t('common.never')}</td>
                       <td className="td">
                         <div className="flex flex-wrap items-center justify-end gap-1.5">
-                          <button onClick={() => openEdit(u)} disabled={Boolean(busy)} className={`${btn} border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100`}>
-                            <i className="fas fa-edit text-[10px]" /> {t('common.edit')}
+                          <button onClick={() => openEdit(u)} disabled={Boolean(busy)} className="btn btn-sm btn-secondary">
+                            {t('common.edit')}
                           </button>
                           {u.locked && (
-                            <button onClick={() => act(u, 'unlock')} disabled={Boolean(busy)} className={`${btn} border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100`}>
-                              <i className="fas fa-unlock text-[10px]" /> {t('users.unlock')}
+                            <button onClick={() => act(u, 'unlock')} disabled={Boolean(busy)} className="btn btn-sm btn-secondary">
+                            {t('users.unlock')}
                             </button>
                           )}
                           {u.isActive && (
-                            <button onClick={() => act(u, 'reset')} disabled={Boolean(busy)} className={`${btn} border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100`}>
-                              <i className="fas fa-key text-[10px]" /> {t('users.resetPassword')}
+                            <button onClick={() => act(u, 'reset')} disabled={Boolean(busy)} className="btn btn-sm btn-secondary">
+                            {t('users.resetPassword')}
                             </button>
                           )}
                           {!self &&
                             (u.isActive ? (
-                              <button onClick={() => act(u, 'deactivate')} disabled={Boolean(busy)} className={`${btn} border-red-200 bg-red-50 text-red-700 hover:bg-red-100`}>
-                                <i className="fas fa-user-slash text-[10px]" /> {t('users.deactivate')}
+                              <button onClick={() => act(u, 'deactivate')} disabled={Boolean(busy)} className="btn btn-sm btn-danger-outline">
+                                {t('users.deactivate')}
                               </button>
                             ) : (
-                              <button onClick={() => act(u, 'activate')} disabled={Boolean(busy)} className={`${btn} border-gray-300 bg-white text-gray-700 hover:bg-gray-100`}>
-                                <i className="fas fa-user-check text-[10px]" /> {t('users.reactivate')}
+                              <button onClick={() => act(u, 'activate')} disabled={Boolean(busy)} className="btn btn-sm btn-secondary">
+                            {t('users.reactivate')}
                               </button>
                             ))}
                         </div>
@@ -266,7 +263,7 @@ export default function AdminUsers({ roles, hierarchy }) {
             <div>
               <label htmlFor="u-password" className="form-label">{t('users.initialPassword')}</label>
               <input id="u-password" type="password" value={form.password} onChange={set('password')} autoComplete="new-password" placeholder={t('users.passwordPh')} className="form-input" />
-              <p className="mt-1 text-[11px] text-gray-500">{t('users.passwordHint')}</p>
+              <p className="mt-1 text-xs text-gray-500">{t('users.passwordHint')}</p>
             </div>
           )}
           {!isNew && (form.role !== editing?.role || form.scope !== editing?.scope) && (

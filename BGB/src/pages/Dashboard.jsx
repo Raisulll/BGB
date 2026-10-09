@@ -135,66 +135,30 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Executive Command Banner */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-bgb-900 via-navy-900 to-bgb-800 p-4 sm:p-6 text-white shadow-xl">
-        <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-bgb-500/20 blur-2xl" />
-        <div className="pointer-events-none absolute -bottom-10 right-1/3 h-40 w-40 rounded-full bg-emerald-400/10 blur-2xl" />
-
-        <div className="relative z-10 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-3.5">
-            <div className="flex h-14 w-14 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-2xl bg-white/15 p-2.5 backdrop-blur-md ring-1 ring-white/30 shadow-lg">
-              <img src="/bgb.png" alt="BGB Logo" className="h-full w-auto object-contain drop-shadow-md" />
-            </div>
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-lg font-black tracking-wide text-white sm:text-2xl uppercase">
-                  {t('dash.title')}
-                </h1>
-                <span className="rounded-md bg-emerald-500/25 px-2 py-0.5 text-[10px] font-extrabold text-emerald-300 ring-1 ring-emerald-400/30 uppercase tracking-widest">
-                  {t('dash.badge')}
-                </span>
-              </div>
-              <p className="mt-0.5 text-xs sm:text-sm font-medium text-bgb-200">
-                {t('dash.welcome', { name: currentUser.name, role: tv('role', currentUser.role) })}
-              </p>
-              <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-bgb-300 font-mono">
-                <span className="flex items-center gap-1">
-                  <i className="fas fa-calendar-alt text-emerald-400" /> {formatDateDisplay(new Date())}
-                </span>
-                <span className="flex items-center gap-1 text-emerald-300">
-                  <i className="fas fa-sitemap text-emerald-400" /> {t('dash.scope', { scope: currentUser.scope })}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Action Navigation Buttons */}
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0">
-            {hasPermission(null, 'create') && (
-            <Link
-              to="/incidents/new"
-              className="btn bg-gradient-to-r from-bgb-500 to-emerald-600 hover:from-bgb-600 hover:to-emerald-700 text-white font-bold px-3.5 py-2 text-xs shadow-md rounded-xl transition-all border border-emerald-400/30"
-            >
-              <i className="fas fa-plus-circle mr-1.5" /> {t('dash.report')}
+      {/* Who and where, and the main actions */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-medium text-slate-900">{t('dash.welcome', { name: currentUser.name, role: tv('role', currentUser.role) })}</p>
+          <p className="text-xs text-slate-600">
+            {formatDateDisplay(new Date())} · {t('dash.scope', { scope: currentUser.scope })}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {hasPermission(null, 'create') && (
+            <Link to="/incidents/new" className="btn btn-primary">
+              <i className="fas fa-plus" aria-hidden="true" /> {t('dash.report')}
             </Link>
-            )}
-            {hasPermission(null, 'map') && (
-            <Link
-              to="/map"
-              className="btn bg-white/15 hover:bg-white/25 text-white font-bold px-3.5 py-2 text-xs backdrop-blur-md rounded-xl transition-all border border-white/20"
-            >
-              <i className="fas fa-map-marked-alt mr-1.5 text-emerald-300" /> {t('dash.map')}
+          )}
+          {hasPermission(null, 'map') && (
+            <Link to="/map" className="btn btn-secondary">
+              {t('dash.map')}
             </Link>
-            )}
-            {hasPermission(null, 'reports') && (
-            <Link
-              to="/reports"
-              className="btn bg-white/10 hover:bg-white/20 text-white font-bold px-3.5 py-2 text-xs backdrop-blur-md rounded-xl transition-all border border-white/15"
-            >
-              <i className="fas fa-file-export mr-1.5 text-bgb-300" /> {t('dash.reports')}
+          )}
+          {hasPermission(null, 'reports') && (
+            <Link to="/reports" className="btn btn-secondary">
+              {t('dash.reports')}
             </Link>
-            )}
-          </div>
+          )}
         </div>
       </div>
 
@@ -203,7 +167,7 @@ export default function Dashboard() {
 
       {/* Period for the figures below */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-1 rounded-xl border border-gray-200 bg-white p-1 shadow-sm" role="group" aria-label={t('dash.period')}>
+        <div className="flex flex-wrap items-center gap-1 rounded-md border border-slate-300 bg-white p-1" role="group" aria-label={t('dash.period')}>
           {PRESETS.map((p) => (
             <button
               key={p}
@@ -211,7 +175,7 @@ export default function Dashboard() {
               type="button"
               onClick={() => setPreset(p)}
               aria-pressed={preset === p}
-              className={cn('rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors', preset === p ? 'bg-bgb-700 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100')}
+              className={cn('rounded px-2.5 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bgb-700', preset === p ? 'bg-bgb-700 text-white' : 'text-slate-700 hover:bg-slate-100')}
             >
               {t(`dash.period_${p}`)}
             </button>
@@ -229,12 +193,12 @@ export default function Dashboard() {
 
       {/* Primary KPI Summary Grid */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 xl:grid-cols-5">
-        <StatCard label={t('dash.kpiTotal')} value={stats.total} icon="fa-folder-open" color="blue" />
-        <StatCard label={t('dash.kpiOpen')} value={stats.open} icon="fa-exclamation-circle" color="orange" />
-        <StatCard label={t('dash.kpiPending')} value={stats.pending} icon="fa-clock" color="yellow" />
-        <StatCard label={t('dash.kpiClosed')} value={stats.closed} icon="fa-check-circle" color="green" />
+        <StatCard label={t('dash.kpiTotal')} value={stats.total} />
+        <StatCard label={t('dash.kpiOpen')} value={stats.open} />
+        <StatCard label={t('dash.kpiPending')} value={stats.pending} />
+        <StatCard label={t('dash.kpiClosed')} value={stats.closed} />
         <div className="col-span-2 sm:col-span-1">
-          <StatCard label={t('dash.kpiCritical')} value={stats.critical} icon="fa-exclamation-triangle" color="red" />
+          <StatCard label={t('dash.kpiCritical')} value={stats.critical} alert />
         </div>
       </div>
 
@@ -246,15 +210,11 @@ export default function Dashboard() {
           title={t('dash.trendTitle')}
           icon="fa-chart-line"
           actions={
-            <div className="hidden sm:flex items-center gap-2 text-xs">
-              <span className="inline-flex items-center gap-1 font-semibold text-bgb-700 bg-bgb-50 px-2 py-0.5 rounded border border-bgb-200/60">
-                <i className="fas fa-calendar-check text-[10px]" /> {t('dash.current', { month: monthlyTrendData.currentMonthLabel, n: monthlyTrendData.currentTotal })}
-              </span>
-              <span className="inline-flex items-center gap-1 font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200/60">
-                <i className="fas fa-history text-[10px]" />{' '}
-                {range.dateFrom ? t('dash.rangeWindow', { from: formatDateDisplay(range.dateFrom), to: formatDateDisplay(range.dateTo || todayISO()) }) : t('dash.window')}
-              </span>
-            </div>
+            <p className="text-xs text-slate-600">
+              {range.dateFrom ? t('dash.rangeWindow', { from: formatDateDisplay(range.dateFrom), to: formatDateDisplay(range.dateTo || todayISO()) }) : t('dash.window')}
+              {' · '}
+              {t('dash.current', { month: monthlyTrendData.currentMonthLabel, n: monthlyTrendData.currentTotal })}
+            </p>
           }
         >
           <div className="h-64 sm:h-72">
@@ -292,28 +252,21 @@ export default function Dashboard() {
                 const totalInc = stats.total || 1;
                 const pct = Math.round((sec.count / totalInc) * 100);
                 return (
-                  <div key={sec.name} className="rounded-xl border border-gray-100 bg-gray-50/60 p-3">
-                    <div className="flex items-center justify-between text-xs font-bold text-gray-800">
-                      <span className="flex items-center gap-1.5">
-                        <i className="fas fa-layer-group text-bgb-600 text-xs" /> {sec.name}
+                  <div key={sec.name} className="border-b border-slate-200 pb-3 last:border-0 last:pb-0">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium text-slate-900">{sec.name}</span>
+                      <span className="tabular-nums text-slate-700">{t('dash.sectorCount', { n: sec.count })}</span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between text-xs text-slate-600">
+                      <span>
+                        {t('dash.riskScore')}: <span className="tabular-nums text-slate-800">{sec.riskScore}</span>
                       </span>
-                      <span className="font-mono text-bgb-700">{t('dash.sectorCount', { n: sec.count })}</span>
+                      <span className={sec.critical > 0 ? 'font-medium text-red-700' : 'text-slate-600'}>
+                        {sec.critical > 0 ? t('dash.highThreats', { n: sec.critical }) : t('dash.normal')}
+                      </span>
                     </div>
-                    <div className="mt-2 flex items-center justify-between text-[11px] text-gray-500">
-                      <span>{t('dash.riskScore')}: <strong className="text-gray-700 font-mono">{sec.riskScore}</strong></span>
-                      {sec.critical > 0 ? (
-                        <span className="font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded border border-red-200/60">
-                          {t('dash.highThreats', { n: sec.critical })}
-                        </span>
-                      ) : (
-                        <span className="text-emerald-600 font-semibold">{t('dash.normal')}</span>
-                      )}
-                    </div>
-                    <div className="mt-2 h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-bgb-600 rounded-full transition-all duration-500"
-                        style={{ width: `${Math.min(100, Math.max(10, pct))}%` }}
-                      />
+                    <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+                      <div className="h-full rounded-full bg-bgb-700" style={{ width: `${Math.min(100, Math.max(4, pct))}%` }} />
                     </div>
                   </div>
                 );
@@ -329,8 +282,8 @@ export default function Dashboard() {
             icon="fa-list-alt"
             bodyClassName=""
             actions={
-              <Link to="/incidents" className="text-xs sm:text-sm font-bold text-bgb-600 hover:text-bgb-800 hover:underline flex items-center gap-1">
-                {t('dash.viewAll')} <i className="fas fa-arrow-right text-xs" />
+              <Link to="/incidents" className="text-sm font-medium text-bgb-700 underline-offset-2 hover:underline">
+                {t('dash.viewAll')}
               </Link>
             }
           >

@@ -33,9 +33,11 @@ Tender/
         ├── App.jsx             ← Route definitions + RequireAuth + RequirePermission guards
         ├── index.css           ← Global styles (TailwindCSS v4 @import, custom CSS vars)
         ├── api/                ← REST client: client.js (token, refresh, errors, downloads)
-        │                         + auth, incidents, users, audit, notifications, reports, admin
+        │                         + auth, incidents, users, audit, notifications, reports, admin,
+        │                         messaging, calls; realtime.js (WebSocket /api/v1/ws)
         ├── context/
         │   ├── AppContext.jsx  ← Session, policy, form reference data, notification feed (API-backed)
+        │   ├── CommsContext.jsx← Realtime channel, unread messages, the live call (WebRTC); mounted in Layout
         │   └── ToastContext.jsx
         ├── utils/
         │   ├── helpers.js      ← Shared pure utilities (date/BST formatting, styles, file helpers)
@@ -55,6 +57,8 @@ Tender/
         │   ├── Analytics.jsx       → /analytics
         │   ├── Reports.jsx         → /reports
         │   ├── AuditTrail.jsx      → /audit
+        │   ├── Messages.jsx        → /messages and /messages/:id
+        │   ├── CallLog.jsx         → /calls
         │   └── admin/
         │       ├── Admin.jsx       → /admin (tab shell)
         │       └── AdminUsers / AdminPermissions / AdminCategories / AdminOrg / AdminWorkflow / AdminSettings
@@ -67,6 +71,7 @@ Tender/
         │   ├── incidents/
         │   │   └── IncidentList.jsx
         │   ├── dashboard/              ← Dashboard sub-components (charts, KPI cards, etc.)
+        │   ├── messaging/              ← CallPanel, Composer (text + voice recording), VoiceMessage, PeoplePicker, Avatar
         │   └── ui/
         │       ├── Badges.jsx          ← StatusBadge, SeverityBadge
         │       ├── Card.jsx
@@ -145,11 +150,11 @@ Plus: users act only within their scope, and nobody acts on an incident they fil
 
 | Role | pageIds granted |
 |---|---|
-| `HQ Administrator` | dashboard, incidents, create, map, analytics, reports, audit, admin |
-| `Sector Officer` | dashboard, incidents, create, map, analytics, reports |
-| `Battalion Operator` | dashboard, incidents, create, map |
-| `Verifier/Approver` | dashboard, incidents, map, analytics, reports |
-| `Auditor` | dashboard, incidents, analytics, reports, audit |
+| `HQ Administrator` | dashboard, incidents, create, map, analytics, reports, audit, admin, messages |
+| `Sector Officer` | dashboard, incidents, create, map, analytics, reports, messages |
+| `Battalion Operator` | dashboard, incidents, create, map, messages |
+| `Verifier/Approver` | dashboard, incidents, map, analytics, reports, messages |
+| `Auditor` | dashboard, incidents, analytics, reports, audit, messages |
 
 These are the factory defaults (`role_permissions`, editable in Admin > Permissions Matrix). The UI reads each user's effective pages from `currentUser.permissions`; the server enforces them on every request.
 
@@ -232,11 +237,16 @@ All dates **must** be displayed as `DD-MM-YYYY`. Use `formatDateDisplay()` from 
 - Use `/bgb.png` (official BGB crest) in: Login page, Header/Sidebar, printable reports.
 - Apply the text "CONFIDENTIAL // OPERATIONAL" classification banner to all generated reports.
 
-### Aesthetics / UX
-- **Military / command-center aesthetic**: dark/deep navy primary palette, amber/gold accents.
+### Aesthetics / UX — professional government system (Session 12 redesign)
+- **Restrained and official**: white surfaces on slate-50, slate neutrals, BGB green (`bgb-700`) only for the primary action, active navigation and brand. Red/amber/orange only for severity and alerts, never decoration.
+- **Every action is named**: buttons carry text (icons optional, leading). Icon-only buttons only for universal controls (close ×, menu, pagination arrows, dismiss). Never a thumbs-up or similar for workflow actions.
+- **Three button variants** (`index.css`): `btn-primary` (one per view), `btn-secondary` (white, bordered), `btn-danger-outline`; `btn-sm` in tables.
+- **No decoration**: no gradients, glow/blur blobs, pulsing/ping dots, hover lift/scale, "NEW"/"LIVE" tags, version badges in the chrome, marketing headings ("Command dashboard", "Tactical map").
+- **Sentence case** for labels and headings; ALL CAPS only for table headers and the CONFIDENTIAL banner. Text ≥ 12 px; `font-semibold` at most (no black/extrabold).
+- **One page title** (in the header); pages start with a toolbar, not a second title block.
+- Badges: -800 text on -50 with a -200 border (≥ 4.5:1). State never by colour alone (switches show On/Off; the permission matrix uses checkboxes).
 - **No emoji** anywhere in the UI — use FontAwesome icons exclusively.
-- Smooth micro-animations and transitions are encouraged (hover effects, sidebar transitions).
-- Responsive layout required: desktop, laptop, tablet.
+- Responsive layout required: desktop, laptop, tablet, phone (no horizontal page scroll).
 - Browser support: Chrome (current), Edge (current), Firefox (current).
 
 ### Localization
@@ -261,6 +271,8 @@ All dates **must** be displayed as `DD-MM-YYYY`. Use `formatDateDisplay()` from 
 | `/analytics` | `Analytics.jsx` | `analytics` |
 | `/reports` | `Reports.jsx` | `reports` |
 | `/audit` | `AuditTrail.jsx` | `audit` |
+| `/messages`, `/messages/:id` | `Messages.jsx` | `messages` |
+| `/calls` | `CallLog.jsx` | `messages` (the "All calls" tab also needs `admin` or `audit`) |
 | `/admin` | `Admin.jsx` | `admin` |
 
 All routes except `/login` are wrapped in `<RequireAuth>`. Permission-gated routes additionally use `<RequirePermission pageId="...">` which redirects to `/` on failure.
@@ -367,7 +379,7 @@ npm run preview
 8. **Leaflet CSS**: Already imported in `main.jsx`. Do not add redundant imports in page components.
 9. **Code splitting**: All page-level components must use `React.lazy()` + `<Suspense fallback={<Spinner fullScreen />}>` as established in `App.jsx`.
 10. **BGB branding**: Always include `/bgb.png` in Login, Header, and all printable report headers.
-11. **Military aesthetic**: Maintain the command-center look — deep navy/slate backgrounds, amber/gold accents, clean typography. No casual or consumer-app styling.
+11. **Government look**: follow §9 "Aesthetics / UX" — named (text) buttons, three button variants, no gradients/pulses/tags, sentence case, one title per page. No casual or consumer-app styling.
 12. **Report classification**: All generated/printed reports must include a `CONFIDENTIAL // OPERATIONAL` banner.
 13. **Organizational hierarchy**: Sector → Battalion → BOP. Always take units from the API (`meta.hierarchy` or `/admin/org-hierarchy`); never hard-code unit names.
 14. **Incident ID format**: `BIRDS-<year>-NNNN` (4-digit zero-padded sequence, e.g. `BIRDS-2026-1021`), allocated only by the server's per-year counter (see DOUBT-006). Never change this format — it is the unique reference number for TEC spec #15.
@@ -896,6 +908,25 @@ All endpoints require `Authorization: Bearer <access_token>` unless marked **Pub
 | Method | Path | Permission | Description | Spec |
 |---|---|---|---|---|
 | GET | `/gis/incidents` | map | Incidents with lat/lng for map markers | #8, #18 |
+
+---
+
+### 19.10 Messaging, calls and realtime (spec #58 extension)
+
+> **Implemented (Session 12)**. User request beyond the 58 specs (DOUBT-013). Details in `server/README.md`.
+
+| Method | Path | Permission | Description |
+|---|---|---|---|
+| GET | `/messaging/users`, `/messaging/unread` | messages | Directory; total unread |
+| GET/POST | `/messaging/conversations` | messages | List; open direct (one per pair) or create group |
+| GET | `/messaging/conversations/:id[/messages]` | messages | One conversation; history (`before`, `limit`) |
+| POST | `/messaging/conversations/:id/messages` / `/voice` | messages | Text; voice (encrypted, SHA-256) |
+| GET | `/messaging/conversations/:id/messages/:mid/audio` | messages | Voice audio (integrity-checked) |
+| POST | `/messaging/conversations/:id/read` / `/members` / `/leave` | messages | Read marker; group membership (audited) |
+| GET | `/calls`, `/calls/all`, `/calls/ice` | messages (+ admin or audit for `/all`) | Call log; every call; ICE servers |
+| WS | `/ws` | signed in + messages | Pushed messaging events and call signalling |
+
+Messages and the call log are permanent records (append-only `messages`; `CALL` audit entry per call). Audio of calls is never stored.
 
 ---
 

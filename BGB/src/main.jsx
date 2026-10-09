@@ -14,20 +14,6 @@ import { AppProvider } from './context/AppContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
 import { I18nProvider } from './i18n/I18nContext.jsx';
 
-// Auto-hiding scrollbar: show scrollbar thumb while scrolling, hide when idle
-let scrollTimeout;
-window.addEventListener(
-  'scroll',
-  () => {
-    document.body.classList.add('is-scrolling');
-    clearTimeout(scrollTimeout);
-    scrollTimeout = setTimeout(() => {
-      document.body.classList.remove('is-scrolling');
-    }, 1000);
-  },
-  { capture: true, passive: true },
-);
-
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>

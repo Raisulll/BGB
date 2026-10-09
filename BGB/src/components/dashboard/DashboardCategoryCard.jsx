@@ -6,16 +6,6 @@ import useMediaQuery from '../../hooks/useMediaQuery';
 import Card from '../ui/Card';
 import { useI18n } from '../../i18n/I18nContext';
 
-const CATEGORY_META = {
-  'Smuggling': { icon: 'fa-box-open', color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200' },
-  'Illegal Crossing': { icon: 'fa-walking', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200' },
-  'Arms & Ammunition': { icon: 'fa-crosshairs', color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200' },
-  'Human Trafficking': { icon: 'fa-users', color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-200' },
-  'Border Infrastructure': { icon: 'fa-tools', color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200' },
-  'Security Threat': { icon: 'fa-shield-alt', color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-200' },
-  'Other': { icon: 'fa-folder', color: 'text-slate-600', bg: 'bg-slate-50', border: 'border-slate-200' },
-};
-
 // `categories` is GET /reports/by-category: [{ category, count, highSeverity, subcategories: [{ name, count }] }]
 export default function DashboardCategoryCard({ categories = [] }) {
   const [viewMode, setViewMode] = useState('chart'); // 'chart' | 'list'
@@ -83,22 +73,20 @@ export default function DashboardCategoryCard({ categories = [] }) {
       title={t('dash.catTitle')}
       icon="fa-chart-pie"
       actions={
-        <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-xs font-semibold">
+        <div className="flex items-center gap-1 rounded-md border border-slate-300 bg-white p-0.5 text-xs font-medium" role="group" aria-label={t('dash.catTitle')}>
           <button
             onClick={() => { setViewMode('chart'); setActiveCategory(null); }}
-            className={`rounded-md px-2 py-0.5 transition-all ${
-              viewMode === 'chart' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'
-            }`}
+            aria-pressed={viewMode === 'chart'}
+            className={`rounded px-2.5 py-1 transition-colors ${viewMode === 'chart' ? 'bg-bgb-700 text-white' : 'text-slate-700 hover:bg-slate-100'}`}
           >
-            <i className="fas fa-chart-pie mr-1 text-[10px]" /> {t('dash.chart')}
+            {t('dash.chart')}
           </button>
           <button
             onClick={() => setViewMode('list')}
-            className={`rounded-md px-2 py-0.5 transition-all ${
-              viewMode === 'list' ? 'bg-white font-bold text-emerald-700 shadow-xs' : 'text-slate-500 hover:text-slate-800'
-            }`}
+            aria-pressed={viewMode === 'list'}
+            className={`rounded px-2.5 py-1 transition-colors ${viewMode === 'list' ? 'bg-bgb-700 text-white' : 'text-slate-700 hover:bg-slate-100'}`}
           >
-            <i className="fas fa-list-ul mr-1 text-[10px]" /> {t('dash.breakdown')}
+            {t('dash.breakdown')}
           </button>
         </div>
       }
@@ -111,27 +99,27 @@ export default function DashboardCategoryCard({ categories = [] }) {
 
           {/* Subcategory callout popover if category slice clicked */}
           {activeCategory && categoryStats.map[activeCategory] && (
-            <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 shadow-xs animate-fade-in">
+            <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-xs text-slate-900">{t('dash.catBreakdown', { name: activeCategory })}</span>
-                  <span className="text-[11px] text-slate-600">
+                  <span className="text-sm font-semibold text-slate-900">{t('dash.catBreakdown', { name: activeCategory })}</span>
+                  <span className="text-xs text-slate-600">
                     {t('dash.nIncidents', { n: categoryStats.map[activeCategory].count })}
                   </span>
                 </div>
                 <button
                   onClick={() => navigate(`/incidents?category=${encodeURIComponent(activeCategory)}`)}
-                  className="text-[11px] font-bold text-emerald-700 hover:underline flex items-center gap-1"
+                  className="text-xs font-medium text-bgb-700 underline-offset-2 hover:underline"
                 >
-                  {t('dash.viewDirectory')} <i className="fas fa-arrow-right text-[9px]" />
+                  {t('dash.viewDirectory')}
                 </button>
               </div>
 
               <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
                 {Object.entries(categoryStats.map[activeCategory].subcategories).map(([sub, cnt]) => (
-                  <div key={sub} className="flex items-center justify-between rounded-lg bg-white px-2.5 py-1 border border-slate-200/80">
-                    <span className="truncate text-slate-700 font-medium text-[11px]">{sub}</span>
-                    <span className="font-bold text-slate-900 text-[11px]">{cnt}</span>
+                  <div key={sub} className="flex items-center justify-between rounded border border-slate-200 bg-white px-2.5 py-1">
+                    <span className="truncate text-slate-700">{sub}</span>
+                    <span className="font-semibold tabular-nums text-slate-900">{cnt}</span>
                   </div>
                 ))}
               </div>
@@ -140,29 +128,25 @@ export default function DashboardCategoryCard({ categories = [] }) {
         </div>
       ) : (
         /* List & Progress Breakdown View */
-        <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1 scrollbar-none">
+        <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
           {categoryStats.list.map((cat) => {
-            const meta = CATEGORY_META[cat.name] || CATEGORY_META['Other'];
             const isExpanded = activeCategory === cat.name;
 
             return (
               <div
                 key={cat.name}
-                className="rounded-xl border border-slate-100 bg-slate-50/70 p-2.5 transition-all hover:border-slate-200"
+                className="rounded-md border border-slate-200 p-2.5"
               >
                 <div
                   onClick={() => setActiveCategory(isExpanded ? null : cat.name)}
                   className="flex cursor-pointer items-center justify-between"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border text-xs ${meta.bg} ${meta.color} ${meta.border}`}>
-                      <i className={`fas ${meta.icon}`} />
-                    </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <p className="truncate text-xs font-bold text-slate-900">{cat.name}</p>
+                        <p className="truncate text-sm font-medium text-slate-900">{cat.name}</p>
                         {cat.criticalCount > 0 && (
-                          <span className="rounded bg-red-100 px-1.5 py-0.2 text-[9px] font-bold text-red-700">
+                          <span className="rounded border border-red-200 bg-red-50 px-1.5 py-0.5 text-xs font-medium text-red-800">
                             {t('dash.urgent', { n: cat.criticalCount })}
                           </span>
                         )}
@@ -171,35 +155,37 @@ export default function DashboardCategoryCard({ categories = [] }) {
                         <div className="h-1.5 w-28 overflow-hidden rounded-full bg-slate-200">
                           <div className="h-full rounded-full transition-all duration-300" style={{ width: `${cat.percentage}%`, backgroundColor: cat.color }} />
                         </div>
-                        <span className="text-[10px] font-medium text-slate-500">{cat.percentage}%</span>
+                        <span className="text-xs text-slate-600">{cat.percentage}%</span>
                       </div>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2 text-right">
-                    <span className="text-xs font-black text-slate-900">{cat.count}</span>
-                    <i className={`fas fa-chevron-${isExpanded ? 'up' : 'down'} text-[10px] text-slate-400`} />
+                    <span className="text-sm font-semibold tabular-nums text-slate-900">{cat.count}</span>
+                    <i className={`fas fa-chevron-${isExpanded ? 'up' : 'down'} text-xs text-slate-500`} aria-hidden="true" />
                   </div>
                 </div>
 
                 {/* Subcategory Details when row expanded */}
                 {isExpanded && (
-                  <div className="mt-2.5 border-t border-slate-200/80 pt-2 space-y-1.5 animate-fade-in">
-                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  <div className="mt-2.5 space-y-1.5 border-t border-slate-200 pt-2">
+                    <div className="flex items-center justify-between text-xs font-medium text-slate-600">
                       <span>{t('dash.subcategories')}</span>
                       <button
                         onClick={() => navigate(`/incidents?category=${encodeURIComponent(cat.name)}`)}
-                        className="text-emerald-700 hover:underline capitalize"
+                        className="text-bgb-700 underline-offset-2 hover:underline"
                       >
-                        {t('dash.filterList')} &rarr;
+                        {t('dash.filterList')}
                       </button>
                     </div>
                     {Object.entries(cat.subcategories).map(([sub, count]) => {
                       const subPct = Math.round((count / cat.count) * 100);
                       return (
-                        <div key={sub} className="flex items-center justify-between text-xs rounded-lg bg-white px-2.5 py-1 border border-slate-100">
-                          <span className="text-slate-700 font-medium">{sub}</span>
-                          <span className="font-bold text-slate-900">{count} <span className="text-[10px] text-slate-400 font-normal">({subPct}%)</span></span>
+                        <div key={sub} className="flex items-center justify-between rounded border border-slate-200 bg-white px-2.5 py-1 text-xs">
+                          <span className="text-slate-700">{sub}</span>
+                          <span className="font-semibold tabular-nums text-slate-900">
+                            {count} <span className="font-normal text-slate-600">({subPct}%)</span>
+                          </span>
                         </div>
                       );
                     })}

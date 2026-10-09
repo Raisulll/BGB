@@ -47,30 +47,29 @@ export default function Admin() {
     <div className="space-y-4 sm:space-y-6">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          [t('admin.kpi.roles'), permissions.roles.length, 'text-bgb-700'],
-          [t('admin.kpi.grants'), `${grants} / ${permissions.roles.length * permissions.pageIds.length}`, 'text-blue-600'],
-          [t('admin.kpi.units'), t('admin.kpi.unitsValue', { s: Object.keys(org.hierarchy).length, b: org.units.length }), 'text-navy-800'],
-          [t('admin.kpi.timeout'), t('admin.kpi.minutes', { n: config.find((c) => c.key === 'session.timeout_minutes')?.value ?? '–' }), 'text-emerald-700'],
+          [t('admin.kpi.roles'), permissions.roles.length, 'text-slate-900'],
+          [t('admin.kpi.grants'), `${grants} / ${permissions.roles.length * permissions.pageIds.length}`, 'text-slate-900'],
+          [t('admin.kpi.units'), t('admin.kpi.unitsValue', { s: Object.keys(org.hierarchy).length, b: org.units.length }), 'text-slate-900'],
+          [t('admin.kpi.timeout'), t('admin.kpi.minutes', { n: config.find((c) => c.key === 'session.timeout_minutes')?.value ?? '–' }), 'text-slate-900'],
         ].map(([label, value, cls]) => (
-          <div key={label} className="rounded-xl border border-gray-100 bg-white p-3 shadow-sm sm:p-4">
-            <p className="text-xs text-gray-500">{label}</p>
-            <p className={`mt-1 text-lg font-bold sm:text-xl ${cls}`}>{value}</p>
+          <div key={label} className="card p-3 sm:p-4">
+            <p className="text-sm text-slate-600">{label}</p>
+            <p className={`mt-1 text-lg font-semibold tabular-nums sm:text-xl ${cls}`}>{value}</p>
           </div>
         ))}
       </div>
 
-      <div className="flex gap-2 overflow-x-auto border-b border-gray-200 pb-2 scrollbar-none" role="tablist">
+      <div className="flex gap-1 overflow-x-auto border-b border-slate-300" role="tablist">
         {TABS.map((item) => (
           <button
             key={item.id}
             role="tab"
             aria-selected={tab === item.id}
             onClick={() => setTab(item.id)}
-            className={`flex items-center gap-2 whitespace-nowrap rounded-lg px-4 py-2.5 text-xs font-bold transition-all sm:text-sm ${
-              tab === item.id ? 'bg-bgb-600 text-white shadow-md' : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+            className={`-mb-px flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bgb-700 ${
+              tab === item.id ? 'border-bgb-700 text-bgb-800' : 'border-transparent text-slate-600 hover:border-slate-400 hover:text-slate-900'
             }`}
           >
-            <i className={`fas ${item.icon} text-xs`} />
             {t(`admin.tab.${item.id}`)}
             {item.demo && <DemoBadge />}
           </button>

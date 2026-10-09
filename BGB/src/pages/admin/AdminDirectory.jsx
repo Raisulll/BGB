@@ -26,14 +26,14 @@ export default function AdminDirectory() {
       bodyClassName="space-y-3"
       className="border-violet-100"
     >
-      <div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs">
-        <span className="font-bold text-emerald-900">
+      <div className="flex items-center justify-between gap-3 rounded-md border border-bgb-200 bg-bgb-50 p-3 text-xs">
+        <span className="font-bold text-bgb-900">
           <i className="fas fa-user-lock mr-2" />
           {t('dir.activeMethod')}
         </span>
-        <span className="rounded-md border border-emerald-300 bg-white px-2 py-0.5 font-bold text-emerald-700">{t('dir.local')}</span>
+        <span className="rounded-md border border-bgb-300 bg-white px-2 py-0.5 font-bold text-bgb-700">{t('dir.local')}</span>
       </div>
-      <p className="text-[11px] text-gray-500">{t('dir.pending')}</p>
+      <p className="text-xs text-gray-500">{t('dir.pending')}</p>
       {FIELDS.map(([key, sample]) => (
         <div key={key} className="flex flex-col gap-1 rounded-lg bg-gray-50 px-3 py-2 text-xs sm:flex-row sm:items-center sm:justify-between">
           <span className="text-gray-600">{t(key)}</span>

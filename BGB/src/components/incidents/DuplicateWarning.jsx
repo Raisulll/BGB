@@ -25,7 +25,7 @@ export default function DuplicateWarning({ form, excludeId }) {
 
   if (!data?.length) return null;
   return (
-    <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 sm:p-4" role="status" aria-live="polite">
+    <div className="rounded-md border border-amber-300 bg-amber-50 p-3 sm:p-4" role="status" aria-live="polite">
       <p className="flex items-center gap-2 text-sm font-bold text-amber-900">
         <i className="fas fa-clone text-amber-600" />
         {t('dup.title', { n: data.length })}
@@ -39,7 +39,7 @@ export default function DuplicateWarning({ form, excludeId }) {
               <span className="min-w-0 flex-1 truncate font-medium text-gray-800">{r.title}</span>
               <span className="text-gray-500">{formatDateDisplay(r.date)}</span>
               <StatusBadge status={r.status} />
-              <span className="w-full text-[11px] font-semibold text-amber-700">{matchText(r.match, t)}</span>
+              <span className="w-full text-xs font-semibold text-amber-700">{matchText(r.match, t)}</span>
             </Link>
           </li>
         ))}

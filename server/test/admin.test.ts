@@ -64,7 +64,7 @@ describe('role permissions (spec #3)', () => {
 
   it('resets to factory defaults', async () => {
     const res = await admin.post('/api/v1/admin/roles/permissions/reset');
-    expect(res.body.permissions['Battalion Operator']).toEqual(['dashboard', 'incidents', 'create', 'map']);
+    expect(res.body.permissions['Battalion Operator']).toEqual(['dashboard', 'incidents', 'create', 'map', 'messages']);
     expect((await operator.get('/api/v1/gis/incidents')).status).toBe(200);
   });
 });

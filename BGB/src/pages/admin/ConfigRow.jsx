@@ -19,18 +19,15 @@ export default function ConfigRow({ item, row, onSave, busy }) {
   };
 
   return (
-    <div className="flex items-center justify-between gap-4 rounded-xl border border-gray-200/90 bg-gray-50/60 p-3.5 transition-all hover:border-bgb-300 hover:bg-white">
+    <div className="flex items-center justify-between gap-4 border-b border-slate-200 py-3 last:border-0">
       <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-bgb-200/60 bg-bgb-50 text-bgb-700">
-          <i className={`fas ${item.icon} text-sm`} />
-        </div>
         <div className="min-w-0">
-          <p className="text-xs font-bold text-gray-800">
+          <p className="text-sm font-medium text-slate-900">
             {label}
-            {item.pending && <span className="ml-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-800">{t('set.jobPending')}</span>}
+            {item.pending && <span className="ml-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-bold text-amber-800">{t('set.jobPending')}</span>}
             {item.demo && <DemoBadge className="ml-1.5" />}
           </p>
-          <p className="text-[11px] text-gray-500">
+          <p className="text-xs text-gray-500">
             {t(`set.hint.${row.key}`)}
             {!isBool && row.min !== undefined && ` ${t('set.range', { min: row.min, max: row.max })}`}
           </p>

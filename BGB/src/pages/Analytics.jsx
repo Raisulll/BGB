@@ -46,7 +46,7 @@ function riskLabel(ratio) {
   if (ratio >= 0.6) return { text: 'an.risk.critical', cls: 'bg-red-50 text-red-700 border-red-200/80' };
   if (ratio >= 0.4) return { text: 'an.risk.high', cls: 'bg-orange-50 text-orange-700 border-orange-200/80' };
   if (ratio >= 0.2) return { text: 'an.risk.moderate', cls: 'bg-amber-50 text-amber-700 border-amber-200/80' };
-  return { text: 'an.risk.normal', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200/80' };
+  return { text: 'an.risk.normal', cls: 'bg-bgb-50 text-bgb-700 border-bgb-200/80' };
 }
 
 async function loadAnalytics(filters, granularity) {
@@ -61,24 +61,14 @@ async function loadAnalytics(filters, granularity) {
   return { summary, trends, previous, severity, categories, sectors };
 }
 
-function Kpi({ title, value, icon, tone, badge, children }) {
-  const tones = {
-    emerald: 'border-emerald-100 from-emerald-50/60 text-emerald-800 bg-emerald-100 text-emerald-700',
-    red: 'border-red-100 from-red-50/60 text-red-800 bg-red-100 text-red-700',
-    blue: 'border-blue-100 from-blue-50/60 text-blue-800 bg-blue-100 text-blue-700',
-    amber: 'border-amber-100 from-amber-50/60 text-amber-800 bg-amber-100 text-amber-800',
-  }[tone].split(' ');
+// Same card style as the dashboard: neutral surface; the secondary figure is plain text
+function Kpi({ title, value, badge, children }) {
   return (
-    <div className={`rounded-2xl border ${tones[0]} bg-gradient-to-br ${tones[1]} to-white p-5 shadow-sm`}>
-      <div className="flex items-center justify-between">
-        <span className={`text-xs font-extrabold uppercase tracking-wider ${tones[2]}`}>{title}</span>
-        <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${tones[3]} ${tones[4]}`}>
-          <i className={`fas ${icon} text-sm`} />
-        </span>
-      </div>
-      <div className="mt-3 flex items-baseline gap-2">
-        <span className="text-3xl font-black text-gray-900">{value}</span>
-        {badge && <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${tones[3]} ${tones[4]}`}>{badge}</span>}
+    <div className="card p-4 sm:p-5">
+      <p className="text-sm text-slate-600">{title}</p>
+      <div className="mt-1 flex flex-wrap items-baseline gap-x-2">
+        <span className="text-3xl font-semibold tabular-nums text-slate-900">{value}</span>
+        {badge && <span className="text-sm text-slate-600">{badge}</span>}
       </div>
       {children}
     </div>
@@ -153,65 +143,60 @@ export default function Analytics() {
 
   return (
     <div className={`space-y-6 ${loading ? 'opacity-70 transition-opacity' : 'transition-opacity'}`}>
-      {/* Header & Filter Control Bar */}
-      <div className="flex flex-col gap-4 rounded-2xl border border-gray-200/80 bg-white p-5 shadow-sm xl:flex-row xl:items-center xl:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-bgb-200/60 bg-bgb-50 font-bold text-bgb-700">
-              <i className="fas fa-chart-line text-sm" />
-            </span>
-            <h1 className="text-xl font-black tracking-tight text-gray-900 sm:text-2xl">{t('an.title')}</h1>
-          </div>
-          <p className="mt-1 pl-11 text-xs font-medium text-gray-500 sm:text-sm">{t('an.subtitle')}</p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2.5">
-          <select value={sector} onChange={(e) => { setSector(e.target.value); setBattalion(''); }} className="form-input w-auto text-xs font-bold" aria-label={t('common.sector')}>
-            <option value="">{t('common.allSectors')}</option>
-            {Object.keys(hierarchy).map((s) => <option key={s}>{s}</option>)}
-          </select>
-          <select value={battalion} onChange={(e) => setBattalion(e.target.value)} disabled={!sector} className="form-input w-auto text-xs font-bold" aria-label={t('common.battalion')}>
-            <option value="">{t('common.allBattalions')}</option>
-            {battalions.map((b) => <option key={b}>{b}</option>)}
-          </select>
-          <div className="flex rounded-xl border border-gray-200 bg-gray-100 p-1">
-            {RANGES.map((r) => (
-              <button key={r.id} type="button" onClick={() => chosenRange(r)} className={`rounded-lg px-3 py-1 text-xs font-bold transition-all ${rangeId === r.id ? 'bg-bgb-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
-                {t(`an.range.${r.id}`)}
-              </button>
-            ))}
-          </div>
-          <select value={granularity} onChange={(e) => setGranularity(e.target.value)} className="form-input w-auto text-xs font-bold" aria-label={t('an.granularity')}>
-            {GRANULARITIES.map((g) => (
-              // The server caps a trend at 750 periods
-              <option key={g.id} value={g.id} disabled={g.id === 'day' && range.months > 24}>
-                {t(`an.gran.${g.id}`)}
-              </option>
-            ))}
-          </select>
-          {hasPermission(null, 'reports') && (
-            <button type="button" onClick={exportExcel} disabled={exporting} className="btn btn-primary rounded-xl px-3.5 py-2 text-xs font-bold shadow-sm">
-              <i className={`fas ${exporting ? 'fa-spinner fa-spin' : 'fa-file-excel'} text-xs`} /> {t('an.exportExcel')}
+      {/* Filters and export */}
+      <div className="card flex flex-wrap items-center gap-2.5 p-3 sm:p-4">
+        <select value={sector} onChange={(e) => { setSector(e.target.value); setBattalion(''); }} className="form-input w-auto" aria-label={t('common.sector')}>
+          <option value="">{t('common.allSectors')}</option>
+          {Object.keys(hierarchy).map((s) => <option key={s}>{s}</option>)}
+        </select>
+        <select value={battalion} onChange={(e) => setBattalion(e.target.value)} disabled={!sector} className="form-input w-auto" aria-label={t('common.battalion')}>
+          <option value="">{t('common.allBattalions')}</option>
+          {battalions.map((b) => <option key={b}>{b}</option>)}
+        </select>
+        <div className="flex rounded-md border border-slate-300 bg-white p-1" role="group" aria-label={t('an.range.label')}>
+          {RANGES.map((r) => (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => chosenRange(r)}
+              aria-pressed={rangeId === r.id}
+              className={`rounded px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bgb-700 ${rangeId === r.id ? 'bg-bgb-700 text-white' : 'text-slate-700 hover:bg-slate-100'}`}
+            >
+              {t(`an.range.${r.id}`)}
             </button>
-          )}
+          ))}
         </div>
+        <select value={granularity} onChange={(e) => setGranularity(e.target.value)} className="form-input w-auto" aria-label={t('an.granularity')}>
+          {GRANULARITIES.map((g) => (
+            // The server caps a trend at 750 periods
+            <option key={g.id} value={g.id} disabled={g.id === 'day' && range.months > 24}>
+              {t(`an.gran.${g.id}`)}
+            </option>
+          ))}
+        </select>
+        {hasPermission(null, 'reports') && (
+          <button type="button" onClick={exportExcel} disabled={exporting} className="btn btn-secondary sm:ml-auto">
+            {exporting && <i className="fas fa-spinner fa-spin" aria-hidden="true" />}
+            {t('an.exportExcel')}
+          </button>
+        )}
       </div>
 
       {/* KPI Stat Cards Grid */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
-        <Kpi title={t('an.kpiTotal')} value={summary.total} icon="fa-layer-group" tone="emerald" badge={change === null ? null : t('an.vsPrev', { sign: change >= 0 ? '+' : '', n: change, unit: gNoun })}>
-          <p className="mt-1 text-xs font-medium text-gray-500">{t('an.kpiTotalHint')}</p>
+        <Kpi title={t('an.kpiTotal')} value={summary.total} badge={change === null ? null : t('an.vsPrev', { sign: change >= 0 ? '+' : '', n: change, unit: gNoun })}>
+          <p className="mt-1 text-xs text-slate-600">{t('an.kpiTotalHint')}</p>
         </Kpi>
-        <Kpi title={t('an.kpiHigh')} value={critical} icon="fa-shield-virus" tone="red" badge={t('an.ofTotal', { n: Math.round((critical / (summary.total || 1)) * 100) })}>
-          <p className="mt-1 text-xs font-medium text-gray-500">{t('an.stillOpen', { n: summary.highSeverityOpen })}</p>
+        <Kpi title={t('an.kpiHigh')} value={critical} badge={t('an.ofTotal', { n: Math.round((critical / (summary.total || 1)) * 100) })}>
+          <p className="mt-1 text-xs text-slate-600">{t('an.stillOpen', { n: summary.highSeverityOpen })}</p>
         </Kpi>
-        <Kpi title={t('an.kpiResolution')} value={`${resolutionRate}%`} icon="fa-check-circle" tone="blue" badge={t('an.approvedClosed', { n: resolved })}>
+        <Kpi title={t('an.kpiResolution')} value={`${resolutionRate}%`} badge={t('an.approvedClosed', { n: resolved })}>
           <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
-            <div className="h-full rounded-full bg-blue-600 transition-all duration-500" style={{ width: `${resolutionRate}%` }} />
+            <div className="h-full rounded-full bg-bgb-700" style={{ width: `${resolutionRate}%` }} />
           </div>
         </Kpi>
-        <Kpi title={t('an.kpiPending')} value={summary.pendingReview} icon="fa-clock" tone="amber" badge={summary.returned ? t('an.returned', { n: summary.returned }) : null}>
-          <p className="mt-1 text-xs font-medium text-gray-500">{t('an.kpiPendingHint')}</p>
+        <Kpi title={t('an.kpiPending')} value={summary.pendingReview} badge={summary.returned ? t('an.returned', { n: summary.returned }) : null}>
+          <p className="mt-1 text-xs text-slate-600">{t('an.kpiPendingHint')}</p>
         </Kpi>
       </div>
 
@@ -282,7 +267,7 @@ export default function Analytics() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs sm:text-sm">
-              <thead className="border-b border-gray-200 bg-gray-50 text-xs font-extrabold uppercase text-gray-500">
+              <thead className="border-b border-gray-200 bg-gray-50 text-xs font-semibold uppercase text-gray-500">
                 <tr>
                   <th className="px-4 py-3">{t('common.sector')}</th>
                   <th className="px-4 py-3">{t('an.thTotal')}</th>

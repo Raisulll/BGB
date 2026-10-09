@@ -28,7 +28,7 @@ function DemoCard({ title, icon, spec, children, actions }) {
       title={
         <span className="flex flex-wrap items-center gap-2">
           {title} <DemoBadge />
-          <span className="text-[10px] font-medium text-gray-400">{t('ops.spec', { n: spec })}</span>
+          <span className="text-xs font-medium text-gray-400">{t('ops.spec', { n: spec })}</span>
         </span>
       }
       icon={icon}
@@ -50,7 +50,7 @@ function KV({ label, children }) {
   );
 }
 
-const STATUS_DOT = { ok: 'bg-emerald-500', standby: 'bg-amber-400' };
+const STATUS_DOT = { ok: 'bg-bgb-500', standby: 'bg-amber-400' };
 
 export default function AdminOperations({ config, onChange }) {
   const { showToast } = useToast();
@@ -212,7 +212,7 @@ export default function AdminOperations({ config, onChange }) {
         >
           <KV label={t('ops.streams')}>{t('ops.streamsValue')}</KV>
           <KV label={t('ops.rotation')}>{t('ops.rotationValue')}</KV>
-          <p className="pt-1 text-[11px] font-bold uppercase tracking-wider text-gray-500">{t('ops.last24')}</p>
+          <p className="pt-1 text-xs font-bold text-gray-500">{t('ops.last24')}</p>
           <div className="grid grid-cols-3 gap-2 text-center">
             {[
               ['ops.errors', '0'],
@@ -221,7 +221,7 @@ export default function AdminOperations({ config, onChange }) {
             ].map(([label, v]) => (
               <div key={label} className="rounded-lg bg-gray-50 p-2">
                 <Sample>{v}</Sample>
-                <p className="mt-1 text-[10px] text-gray-500">{t(label)}</p>
+                <p className="mt-1 text-xs text-gray-500">{t(label)}</p>
               </div>
             ))}
           </div>

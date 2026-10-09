@@ -1,0 +1,118 @@
+import { env } from '../../config/env.js';
+import { logger } from '../../config/logger.js';
+import { prisma } from '../../db.js';
+import { publish } from '../../realtime/bus.js';
+import { onClientClose, onClientMessage, onEvent, type Client } from '../../realtime/hub.js';
+import { createCall, finalise, getCall, isBusy, toCallDto, transition } from './calls.service.js';
+
+// Call signalling over the realtime channel. Flow:
+//   caller  call.invite {to}        -> server records "ringing", callee gets call.incoming
+//   callee  call.accept {callId}    -> "answered"; caller gets call.accepted and sends the WebRTC offer
+//   either  call.signal {callId, data} (offer / answer / ICE candidates) -> relayed to the other party
+//   either  call.end / call.decline / call.cancel -> final state, both sides get call.ended
+// Unanswered calls are missed after CALL_RING_SECONDS. A socket that closes ends the calls it was part of.
+const RING_MS = env.CALL_RING_SECONDS * 1000;
+
+const tracked = new WeakMap<Client, Set<number>>(); // calls each socket is part of
+const track = (c: Client, id: number) => (tracked.get(c) ?? tracked.set(c, new Set()).get(c)!).add(id);
+const untrack = (c: Client, id: number) => tracked.get(c)?.delete(id);
+
+const toUser = (to: string, payload: Record<string, unknown>) => publish({ type: 'call', to, payload });
+const reply = (c: Client, payload: Record<string, unknown>) => c.ws.send(JSON.stringify(payload));
+
+async function ended(callId: number, ctx: Client['ctx']) {
+  const call = await getCall(callId);
+  if (!call) return;
+  await finalise(call, ctx);
+  const payload = { type: 'call.ended', callId, status: call.status, reason: call.endReason };
+  await toUser(call.callerId, payload);
+  await toUser(call.calleeId, payload);
+}
+
+export function registerCallRealtime() {
+  // Bus "call" events -> the addressed user's sockets on this process
+  onEvent((event, send) => {
+    if (event.type === 'call') send(event.to, event.payload);
+  });
+
+  onClientMessage('call.', async (client, msg) => {
+    const callId = Number(msg.callId);
+    switch (msg.type) {
+      case 'call.invite': {
+        const to = String(msg.to ?? '');
+        const callee = await prisma.user.findFirst({ where: { id: to, isActive: true }, select: { id: true } });
+        if (!callee || callee.id === client.userId) return reply(client, { type: 'call.error', code: 'INVALID_CALLEE' });
+        if (await isBusy(client.userId)) return reply(client, { type: 'call.error', code: 'ALREADY_IN_CALL' });
+        if (await isBusy(to)) {
+          const failed = await createCall(client.userId, to, 'failed', 'busy');
+          await finalise(failed, client.ctx);
+          return reply(client, { type: 'call.busy', call: toCallDto(failed, client.userId) });
+        }
+        const call = await createCall(client.userId, to);
+        track(client, call.id);
+        reply(client, { type: 'call.ringing', call: toCallDto(call, client.userId) });
+        await toUser(to, { type: 'call.incoming', call: toCallDto(call, to) });
+        setTimeout(async () => {
+          const missed = await transition(call.id, ['ringing'], 'missed', 'no answer').catch(() => null);
+          if (missed) await ended(call.id, client.ctx);
+        }, RING_MS).unref();
+        return;
+      }
+      case 'call.accept': {
+        const call = await getCall(callId);
+        if (!call || call.calleeId !== client.userId) return;
+        const updated = await transition(callId, ['ringing'], 'answered');
+        if (!updated) return reply(client, { type: 'call.ended', callId, status: call.status });
+        track(client, callId);
+        await toUser(call.callerId, { type: 'call.accepted', callId });
+        // The callee's other tabs stop ringing
+        await toUser(call.calleeId, { type: 'call.taken', callId });
+        return;
+      }
+      case 'call.decline':
+      case 'call.cancel':
+      case 'call.end': {
+        const call = await getCall(callId);
+        if (!call || (call.callerId !== client.userId && call.calleeId !== client.userId)) return;
+        const isCaller = call.callerId === client.userId;
+        let done = null;
+        if (msg.type === 'call.decline' && !isCaller) done = await transition(callId, ['ringing'], 'declined');
+        else if (msg.type === 'call.cancel' && isCaller) done = await transition(callId, ['ringing'], 'cancelled');
+        else if (msg.type === 'call.end') {
+          done =
+            (await transition(callId, ['answered'], 'ended', isCaller ? 'caller hung up' : 'callee hung up')) ??
+            (isCaller ? await transition(callId, ['ringing'], 'cancelled') : null);
+        }
+        untrack(client, callId);
+        if (done) await ended(callId, client.ctx);
+        return;
+      }
+      case 'call.signal': {
+        // WebRTC offer/answer/ICE candidate, relayed as-is to the other participant of a live call
+        const call = await getCall(callId);
+        if (!call || !['ringing', 'answered'].includes(call.status)) return;
+        if (call.callerId !== client.userId && call.calleeId !== client.userId) return;
+        const other = call.callerId === client.userId ? call.calleeId : call.callerId;
+        if (typeof msg.data !== 'object' || msg.data === null || JSON.stringify(msg.data).length > 32_000) return;
+        await toUser(other, { type: 'call.signal', callId, data: msg.data });
+        return;
+      }
+    }
+  });
+
+  // A socket that goes away takes its calls with it
+  onClientClose((client) => {
+    const ids = tracked.get(client);
+    if (!ids?.size) return;
+    for (const id of ids) {
+      void (async () => {
+        const call = await getCall(id);
+        if (!call) return;
+        const isCaller = call.callerId === client.userId;
+        const done =
+          (await transition(id, ['answered'], 'ended', 'connection lost')) ?? (isCaller ? await transition(id, ['ringing'], 'cancelled', 'connection lost') : null);
+        if (done) await ended(id, client.ctx);
+      })().catch((err) => logger.warn('Ending call after disconnect failed', { err: String(err) }));
+    }
+  });
+}

@@ -23,8 +23,8 @@ export default function ReasonDialog({ open, title, label, confirmLabel, confirm
   const trimmed = reason.trim();
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/60 p-3 backdrop-blur-xs sm:items-center" onClick={() => !busy && onCancel()}>
-      <div role="dialog" aria-modal="true" aria-labelledby="reason-dialog-title" className="w-full max-w-md animate-pop-in rounded-2xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/60 p-3 sm:items-center" onClick={() => !busy && onCancel()}>
+      <div role="dialog" aria-modal="true" aria-labelledby="reason-dialog-title" className="w-full max-w-md animate-pop-in rounded-lg bg-white p-5 shadow-lg" onClick={(e) => e.stopPropagation()}>
         <h2 id="reason-dialog-title" className="mb-3 text-base font-bold text-gray-800">
           {title}
         </h2>

@@ -17,15 +17,15 @@ export const ROLE_DESCRIPTIONS: Record<string, string> = {
   [ROLES.AUDITOR]: 'Read-only access to records, reports and the audit trail',
 };
 
-export const PAGE_IDS = ['dashboard', 'incidents', 'create', 'map', 'analytics', 'reports', 'audit', 'admin'] as const;
+export const PAGE_IDS = ['dashboard', 'incidents', 'create', 'map', 'analytics', 'reports', 'audit', 'admin', 'messages'] as const;
 export type PageId = (typeof PAGE_IDS)[number];
 
 export const DEFAULT_PERMISSIONS: Record<string, PageId[]> = {
-  [ROLES.HQ_ADMIN]: ['dashboard', 'incidents', 'create', 'map', 'analytics', 'reports', 'audit', 'admin'],
-  [ROLES.SECTOR_OFFICER]: ['dashboard', 'incidents', 'create', 'map', 'analytics', 'reports'],
-  [ROLES.BATTALION_OPERATOR]: ['dashboard', 'incidents', 'create', 'map'],
-  [ROLES.VERIFIER]: ['dashboard', 'incidents', 'map', 'analytics', 'reports'],
-  [ROLES.AUDITOR]: ['dashboard', 'incidents', 'analytics', 'reports', 'audit'],
+  [ROLES.HQ_ADMIN]: ['dashboard', 'incidents', 'create', 'map', 'analytics', 'reports', 'audit', 'admin', 'messages'],
+  [ROLES.SECTOR_OFFICER]: ['dashboard', 'incidents', 'create', 'map', 'analytics', 'reports', 'messages'],
+  [ROLES.BATTALION_OPERATOR]: ['dashboard', 'incidents', 'create', 'map', 'messages'],
+  [ROLES.VERIFIER]: ['dashboard', 'incidents', 'map', 'analytics', 'reports', 'messages'],
+  [ROLES.AUDITOR]: ['dashboard', 'incidents', 'analytics', 'reports', 'audit', 'messages'],
 };
 
 // Capability groups used by the workflow endpoints (Phase 2)

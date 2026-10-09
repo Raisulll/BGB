@@ -51,7 +51,7 @@ export default function ChangePassword() {
   return (
     <div className="mx-auto max-w-lg space-y-4">
       {forced && (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        <div className="flex items-start gap-3 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
           <i className="fas fa-exclamation-triangle mt-0.5" />
           <p>{t('password.forced')}</p>
         </div>

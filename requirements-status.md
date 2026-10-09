@@ -75,7 +75,7 @@
 | 55 | Customization (forms, workflows, hierarchy) | `IN PROGRESS` | Both | Categories, hierarchy, permissions and policies configurable in the Admin UI (Session 9). Custom form fields / workflow stages are not configurable |
 | 56 | Deployment (installation + commissioning) | `IN PROGRESS` | Infra+Docs | README deployment guide done; full install guide §27.5 planned. TEC demo hosting: Render + Supabase (DOUBT-010). Built and tested locally in Session 12 (`render.yaml`, SPA served by the API, S3 driver, Supabase access SQL, step-by-step guide in `server/docs/installation-guide/demo-hosting-render-supabase.md`); not deployed yet |
 | 57 | Acceptance Testing (UAT) | `NOT STARTED` | Docs | Test case document + UAT run planned §29 |
-| 58 | Future Expansion (GIS, mobile, surveillance) | `FRONTEND DONE` | Both | Leaflet GIS done; modular architecture supports expansion |
+| 58 | Future Expansion (GIS, mobile, surveillance) | `FRONTEND DONE` | Both | Leaflet GIS done; modular architecture supports expansion. Session 12 extension (owner request, DOUBT-013): direct/group messaging, voice messages, 1:1 WebRTC audio calls and call log over a realtime WebSocket channel (PostgreSQL LISTEN/NOTIFY bus for multi-process); permission `messages`; server tests + headless browser suite pass |
 
 ---
 

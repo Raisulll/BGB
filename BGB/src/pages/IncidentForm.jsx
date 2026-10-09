@@ -6,7 +6,7 @@ import * as incidentsApi from '../api/incidents';
 import { errorMessage } from '../api/client';
 import useApi from '../hooks/useApi';
 import useUnsavedChanges from '../hooks/useUnsavedChanges';
-import { cn, FILE_ICONS, fileKind, formatDateTime, formatFileSize, todayISO } from '../utils/helpers';
+import { cn, FILE_ICONS, fileKind, formatDateTime, formatFileSize, SEVERITY_HEX, todayISO } from '../utils/helpers';
 import Card from '../components/ui/Card';
 import EvidenceMedia, { LocalMedia, PREVIEW_TYPES } from '../components/incidents/EvidenceMedia';
 import ReasonBanner from '../components/incidents/ReasonBanner';
@@ -62,11 +62,11 @@ function Field({ label, required, error, children, className = '' }) {
   const { t } = useI18n();
   return (
     <div className={className}>
-      <label className="form-label text-xs font-bold text-gray-700 mb-1">
-        {label} {required && <span className="text-red-500">*</span>}
+      <label className="mb-1 block text-sm font-medium text-slate-800">
+        {label} {required && <span className="text-red-700" aria-hidden="true">*</span>}
       </label>
       {children}
-      {error && <p className="mt-1 text-xs font-bold text-red-600">{error === true ? t('common.required') : error}</p>}
+      {error && <p className="mt-1 text-xs font-medium text-red-700">{error === true ? t('common.required') : error}</p>}
     </div>
   );
 }
@@ -153,8 +153,8 @@ function IncidentFormBody({ existing, initialStep }) {
   const bind = (key) => ({ id: `inc-${key}`, value: form[key], onChange: (e) => update(key, e.target.value) });
   const inputCls = (key) =>
     cn(
-      'form-input text-xs font-semibold focus:ring-2 focus:ring-bgb-600/20',
-      errors[key] && 'border-red-500 bg-red-50/50 focus:border-red-500 focus:ring-red-500/20',
+      'form-input',
+      errors[key] && 'border-red-600 focus:border-red-600 focus:ring-red-600/20',
     );
 
   const applyPreset = (preset) => {
@@ -309,66 +309,26 @@ function IncidentFormBody({ existing, initialStep }) {
       {/* A returned report: what the reviewer asked to change */}
       {existing && <ReasonBanner incident={existing} />}
 
-      {/* Step Progress Header Bar */}
-      <div className="rounded-2xl border border-gray-200/80 bg-white p-4 shadow-sm">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h2 className="text-lg sm:text-xl font-black text-gray-900 tracking-tight">
-              {existing ? t('form.editTitle', { id: existing.id }) : t('form.newTitle')}
-            </h2>
-            <p className="text-xs text-gray-500 font-medium">
-              {t('form.subtitle')}
-            </p>
-          </div>
-          <div className="hidden sm:block text-right">
-            <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 border border-emerald-200">
-              <i className="fas fa-shield-alt mr-1" /> {t('form.badge')}
-            </span>
-          </div>
-        </div>
+      {existing && <h2 className="text-lg font-semibold text-slate-900">{t('form.editTitle', { id: existing.id })}</h2>}
 
-        {/* Step Tabs Indicator */}
-        <div className="grid grid-cols-3 gap-2 border-t border-gray-100 pt-3 text-xs font-bold">
-          <button
-            type="button"
-            onClick={() => setActiveStep(1)}
-            className={`flex items-center justify-center gap-2 rounded-xl py-2.5 px-3 transition-all ${
-              activeStep === 1
-                ? 'bg-bgb-600 text-white shadow-md'
-                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-[10px]">1</span>
-            <span className="truncate">{t('form.step1')}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveStep(2)}
-            className={`flex items-center justify-center gap-2 rounded-xl py-2.5 px-3 transition-all ${
-              activeStep === 2
-                ? 'bg-bgb-600 text-white shadow-md'
-                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-[10px]">2</span>
-            <span className="truncate">{t('form.step2')}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveStep(3)}
-            className={`flex items-center justify-center gap-2 rounded-xl py-2.5 px-3 transition-all ${
-              activeStep === 3
-                ? 'bg-bgb-600 text-white shadow-md'
-                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-[10px]">3</span>
-            <span className="truncate">{t('form.step3')}</span>
-          </button>
-        </div>
-      </div>
+      {/* Steps */}
+      <ol className="grid grid-cols-3 gap-2 text-sm" aria-label={t('form.steps')}>
+        {[1, 2, 3].map((n) => (
+          <li key={n}>
+            <button
+              type="button"
+              onClick={() => setActiveStep(n)}
+              aria-current={activeStep === n ? 'step' : undefined}
+              className={`flex w-full items-center gap-2 rounded-md border px-3 py-2.5 text-left font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bgb-700 ${
+                activeStep === n ? 'border-bgb-700 bg-bgb-700 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${activeStep === n ? 'bg-white text-bgb-800' : 'bg-slate-100 text-slate-700'}`}>{n}</span>
+              <span className="truncate">{t(`form.step${n}`)}</span>
+            </button>
+          </li>
+        ))}
+      </ol>
 
       {/* Main Form Body */}
       <Card bodyClassName="p-5 sm:p-7">
@@ -388,10 +348,8 @@ function IncidentFormBody({ existing, initialStep }) {
           {activeStep === 1 && (
             <div className="space-y-5 animate-fade-in">
               <div className="border-b border-gray-100 pb-3">
-                <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
-                  <i className="fas fa-tags text-bgb-600" /> {t('form.basicTitle')}
-                </h3>
-                <p className="text-xs text-gray-500 font-medium">{t('form.basicHint')}</p>
+                <h3 className="text-base font-semibold text-slate-900">{t('form.basicTitle')}</h3>
+                <p className="text-sm text-slate-600">{t('form.basicHint')}</p>
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -412,41 +370,33 @@ function IncidentFormBody({ existing, initialStep }) {
                 </Field>
               </div>
 
-              {/* Threat Severity Selector Pills */}
-              <div>
-                <label className="form-label text-xs font-bold text-gray-700 mb-1.5 block">
-                  {t('form.severityLabel')} <span className="text-red-500">*</span>
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              {/* Severity: one of four, chosen like a radio group */}
+              <fieldset>
+                <legend className="mb-1.5 block text-sm font-medium text-slate-800">
+                  {t('form.severityLabel')} <span className="text-red-700" aria-hidden="true">*</span>
+                </legend>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup">
                   {severities.map((sev) => {
                     const selected = form.severity === sev;
-                    const styles = {
-                      Low: 'border-green-300 bg-green-50 text-green-800 hover:bg-green-100',
-                      Medium: 'border-yellow-300 bg-yellow-50 text-yellow-800 hover:bg-yellow-100',
-                      High: 'border-orange-300 bg-orange-50 text-orange-800 hover:bg-orange-100',
-                      Critical: 'border-red-300 bg-red-50 text-red-800 hover:bg-red-100',
-                    };
-                    const selectedStyles = {
-                      Low: 'bg-green-600 text-white ring-2 ring-green-600/30 border-green-600',
-                      Medium: 'bg-yellow-500 text-white ring-2 ring-yellow-500/30 border-yellow-500',
-                      High: 'bg-orange-600 text-white ring-2 ring-orange-600/30 border-orange-600',
-                      Critical: 'bg-red-600 text-white ring-2 ring-red-600/30 border-red-600',
-                    };
                     return (
                       <button
                         key={sev}
                         type="button"
+                        role="radio"
+                        aria-checked={selected}
                         onClick={() => update('severity', sev)}
-                        className={`rounded-xl border p-3 text-center text-xs font-extrabold transition-all shadow-sm ${
-                          selected ? selectedStyles[sev] : styles[sev]
+                        className={`flex items-center gap-2 rounded-md border px-3 py-2.5 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bgb-700 ${
+                          selected ? 'border-2 border-bgb-700 bg-bgb-50 font-semibold text-slate-900' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
                         }`}
                       >
-                        {t('form.threat', { sev: tv('severity', sev) })}
+                        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: SEVERITY_HEX[sev] }} aria-hidden="true" />
+                        {tv('severity', sev)}
+                        {selected && <i className="fas fa-check ml-auto text-xs text-bgb-700" aria-hidden="true" />}
                       </button>
                     );
                   })}
                 </div>
-              </div>
+              </fieldset>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 pt-2">
                 <Field label={t('common.category')} required error={errors.category}>
@@ -480,9 +430,9 @@ function IncidentFormBody({ existing, initialStep }) {
                 <button
                   type="button"
                   onClick={() => setActiveStep(2)}
-                  className="btn btn-primary py-2.5 px-5 text-xs font-bold shadow-md"
+                  className="btn btn-primary"
                 >
-                  {t('form.toLocation')} <i className="fas fa-arrow-right ml-1" />
+                  {t('form.toLocation')}
                 </button>
               </div>
             </div>
@@ -493,10 +443,8 @@ function IncidentFormBody({ existing, initialStep }) {
             <div className="space-y-5 animate-fade-in">
               <div className="border-b border-gray-100 pb-3 flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
-                    <i className="fas fa-map-marked-alt text-bgb-600" /> {t('form.locTitle')}
-                  </h3>
-                  <p className="text-xs text-gray-500 font-medium">{t('form.locHint')}</p>
+                  <h3 className="text-base font-semibold text-slate-900">{t('form.locTitle')}</h3>
+                <p className="text-sm text-slate-600">{t('form.locHint')}</p>
                 </div>
                 <button
                   type="button"
@@ -509,7 +457,7 @@ function IncidentFormBody({ existing, initialStep }) {
 
               {/* Quick Preset Buttons */}
               <div>
-                <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block mb-1.5">
+                <label className="text-xs font-bold text-gray-500 block mb-1.5">
                   {t('form.presets')}
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -601,16 +549,16 @@ function IncidentFormBody({ existing, initialStep }) {
                 <button
                   type="button"
                   onClick={() => setActiveStep(1)}
-                  className="btn btn-ghost py-2.5 px-4 text-xs font-semibold"
+                  className="btn btn-secondary"
                 >
-                  <i className="fas fa-arrow-left mr-1" /> {t('common.back')}
+                  {t('common.back')}
                 </button>
                 <button
                   type="button"
                   onClick={() => setActiveStep(3)}
-                  className="btn btn-primary py-2.5 px-5 text-xs font-bold shadow-md"
+                  className="btn btn-primary"
                 >
-                  {t('form.toDetails')} <i className="fas fa-arrow-right ml-1" />
+                  {t('form.toDetails')}
                 </button>
               </div>
             </div>
@@ -620,10 +568,8 @@ function IncidentFormBody({ existing, initialStep }) {
           {activeStep === 3 && (
             <div className="space-y-5 animate-fade-in">
               <div className="border-b border-gray-100 pb-3">
-                <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
-                  <i className="fas fa-align-left text-bgb-600" /> {t('form.detailsTitle')}
-                </h3>
-                <p className="text-xs text-gray-500 font-medium">{t('form.detailsHint')}</p>
+                <h3 className="text-base font-semibold text-slate-900">{t('form.detailsTitle')}</h3>
+                <p className="text-sm text-slate-600">{t('form.detailsHint')}</p>
               </div>
 
               <Field label={t('form.narrative')} required error={errors.description}>
@@ -657,13 +603,13 @@ function IncidentFormBody({ existing, initialStep }) {
                 <button
                   type="button"
                   onClick={() => fileRef.current?.click()}
-                  className="w-full rounded-2xl border-2 border-dashed border-gray-300 p-6 text-center transition-all hover:border-bgb-500 hover:bg-bgb-50/50"
+                  className="w-full rounded-lg border-2 border-dashed border-gray-300 p-6 text-center transition-all hover:border-bgb-500 hover:bg-bgb-50/50"
                 >
                   <i className="fas fa-cloud-upload-alt mb-2 text-3xl text-bgb-600" />
                   <p className="text-xs text-gray-700 font-bold">
                     <span className="text-bgb-700 underline">{t('form.uploadCta')}</span>
                   </p>
-                  <p className="mt-1 text-[11px] text-gray-400 font-medium">{t('form.uploadTypes', { mb: MAX_FILE_MB })}</p>
+                  <p className="mt-1 text-xs text-gray-400 font-medium">{t('form.uploadTypes', { mb: MAX_FILE_MB })}</p>
                 </button>
                 <input ref={fileRef} type="file" className="hidden" multiple accept={ALLOWED_TYPES.join(',')} onChange={handleFiles} />
 
@@ -672,7 +618,7 @@ function IncidentFormBody({ existing, initialStep }) {
                     {savedEvidence.map((ev) => {
                       const fi = FILE_ICONS[fileKind(ev.mimeType)] || FILE_ICONS.file;
                       return (
-                        <li key={`saved-${ev.id}`} className="rounded-xl bg-emerald-50/50 p-2.5 border border-emerald-200">
+                        <li key={`saved-${ev.id}`} className="rounded-md bg-bgb-50/50 p-2.5 border border-bgb-200">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3 min-w-0">
                               <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${fi.cls}`}>
@@ -680,13 +626,13 @@ function IncidentFormBody({ existing, initialStep }) {
                               </div>
                               <div className="min-w-0">
                                 <p className="truncate text-xs font-bold text-gray-800">{ev.name}</p>
-                                <p className="text-[10px] text-gray-500 font-mono">
+                                <p className="text-xs text-gray-500 font-mono">
                                   {formatFileSize(ev.size)} &bull; {t('form.uploadedAt', { date: formatDateTime(ev.uploadedAt) })}
                                 </p>
                               </div>
                             </div>
-                            <button type="button" onClick={() => removeSaved(ev)} className="btn btn-ghost p-1 text-red-500 hover:text-red-700" title={t('form.removeFile')} aria-label={t('detail.removeAria', { name: ev.name })}>
-                              <i className="fas fa-trash-alt text-xs" />
+                            <button type="button" onClick={() => removeSaved(ev)} className="btn btn-sm btn-danger-outline" title={t('form.removeFile')} aria-label={t('detail.removeAria', { name: ev.name })}>
+                              {t('common.remove')}
                             </button>
                           </div>
                           {ev.available && PREVIEW_TYPES.has(ev.mimeType) && <EvidenceMedia incidentId={existing.id} evidence={ev} size="small" />}
@@ -696,7 +642,7 @@ function IncidentFormBody({ existing, initialStep }) {
                     {files.map((f, idx) => {
                       const fi = FILE_ICONS[fileKind(f.type)] || FILE_ICONS.file;
                       return (
-                        <li key={`${f.name}-${idx}`} className="rounded-xl bg-gray-50 p-2.5 border border-gray-200">
+                        <li key={`${f.name}-${idx}`} className="rounded-md bg-gray-50 p-2.5 border border-gray-200">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3 min-w-0">
                               <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${fi.cls}`}>
@@ -704,11 +650,11 @@ function IncidentFormBody({ existing, initialStep }) {
                               </div>
                               <div className="min-w-0">
                                 <p className="truncate text-xs font-bold text-gray-800">{f.name}</p>
-                                <p className="text-[10px] text-gray-500 font-mono">{formatFileSize(f.size)} &bull; {t('form.uploadsOnSave')}</p>
+                                <p className="text-xs text-gray-500 font-mono">{formatFileSize(f.size)} &bull; {t('form.uploadsOnSave')}</p>
                               </div>
                             </div>
-                            <button type="button" onClick={() => removeFile(idx)} className="btn btn-ghost p-1 text-red-500 hover:text-red-700" title={t('form.removeFile')} aria-label={t('detail.removeAria', { name: f.name })}>
-                              <i className="fas fa-times text-xs" />
+                            <button type="button" onClick={() => removeFile(idx)} className="btn btn-sm btn-danger-outline" title={t('form.removeFile')} aria-label={t('detail.removeAria', { name: f.name })}>
+                              {t('common.remove')}
                             </button>
                           </div>
                           {PREVIEW_TYPES.has(f.type) && <LocalMedia file={f} />}
@@ -723,20 +669,17 @@ function IncidentFormBody({ existing, initialStep }) {
                 <button
                   type="button"
                   onClick={() => setActiveStep(2)}
-                  className="btn btn-ghost py-2.5 px-4 text-xs font-semibold"
+                  className="btn btn-secondary"
                 >
-                  <i className="fas fa-arrow-left mr-1" /> {t('common.back')}
+                  {t('common.back')}
                 </button>
               </div>
             </div>
           )}
 
           {/* Form Action Controls (Always visible at bottom) */}
-          <div className="flex flex-col-reverse gap-2 border-t-2 border-gray-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
-            <Link
-              to={existing ? `/incidents/${existing.id}` : '/incidents'}
-              className="btn btn-ghost text-xs font-semibold text-gray-600"
-            >
+          <div className="flex flex-col-reverse gap-2 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
+            <Link to={existing ? `/incidents/${existing.id}` : '/incidents'} className="btn btn-ghost">
               {t('common.cancel')}
             </Link>
 
@@ -745,18 +688,18 @@ function IncidentFormBody({ existing, initialStep }) {
                 type="button"
                 onClick={() => save('Draft')}
                 disabled={Boolean(saving)}
-                className="btn bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200 py-2.5 px-4 text-xs font-bold"
+                className="btn btn-secondary"
               >
-                <i className={`fas ${saving === 'Draft' ? 'fa-spinner fa-spin' : 'fa-save'} mr-1`} /> {t('form.saveDraft')}
+                {saving === 'Draft' && <i className="fas fa-spinner fa-spin" aria-hidden="true" />}
+                {t('form.saveDraft')}
               </button>
-              <button
-                type="submit"
-                disabled={Boolean(saving)}
-                className="btn btn-primary py-2.5 px-6 text-xs font-extrabold shadow-lg bg-gradient-to-r from-bgb-700 to-bgb-600 hover:from-bgb-800 hover:to-bgb-700"
-              >
-                <i className={`fas ${saving === 'Submitted' ? 'fa-spinner fa-spin' : 'fa-paper-plane'} mr-1.5`} />{' '}
-                {existing?.status === 'Returned' ? t('form.resubmit') : t('form.submit')}
-              </button>
+              {/* Submitting is the last step; earlier steps lead to it with Next */}
+              {activeStep === 3 && (
+                <button type="submit" disabled={Boolean(saving)} className="btn btn-primary">
+                  {saving === 'Submitted' && <i className="fas fa-spinner fa-spin" aria-hidden="true" />}
+                  {existing?.status === 'Returned' ? t('form.resubmit') : t('form.submit')}
+                </button>
+              )}
             </div>
           </div>
         </form>
