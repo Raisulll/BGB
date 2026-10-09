@@ -49,7 +49,7 @@ describe('evidence encryption at rest (spec #27)', () => {
   it('refuses a ciphertext altered on disk (download 409, verify fails, audited)', async () => {
     const { item, row } = await uploadPdf();
     const onDisk = await readFile(filePath(row.storagePath));
-    onDisk[onDisk.length - 1] ^= 0xff; // flip one bit of the ciphertext
+    onDisk[onDisk.length - 1] = onDisk.at(-1)! ^ 0xff; // flip the last byte of the ciphertext
     await writeFile(filePath(row.storagePath), onDisk);
 
     const dl = await operator.get(item.downloadUrl);

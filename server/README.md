@@ -2,7 +2,7 @@
 
 Backend for the Border Incident Reporting & Documentation System. Node.js + Express 5 + PostgreSQL + Prisma 7, TypeScript (ESM). See the root `CLAUDE.md` §16–§30 for the full plan.
 
-**Status:** every API group in CLAUDE.md §19 is implemented except backups and server-side PDF. 90 automated tests. The React frontend (`../BGB`) runs entirely on this API.
+**Status:** every API group in CLAUDE.md §19 is implemented except backups and server-side PDF. 106 automated tests. OpenAPI 3.1 docs at `/api/docs` (see below). The React frontend (`../BGB`) runs entirely on this API.
 
 ## Quick start (local development)
 
@@ -46,6 +46,19 @@ Development uses a project-local PostgreSQL 18 cluster (`server/.pgdata`, port 5
 | `typecheck` | Typecheck source, tests and configs |
 
 Production: `npm run build && pm2 start ecosystem.config.cjs` (cluster mode, §26).
+
+## API documentation (specs #31, #52)
+
+The OpenAPI 3.1 description is hand-written in `docs/api/openapi.yaml`. With the dev server running:
+
+- Swagger UI: http://localhost:4000/api/docs (also via the web app's dev proxy: http://localhost:5173/api/docs)
+- JSON: `GET /api/v1/openapi.json` (public, no sign-in)
+
+To try authenticated routes: run `POST /auth/login`, copy `accessToken` from the response, and paste it into **Authorize**. The token is kept in memory only and is lost on reload.
+
+Both routes are on by default outside production and off in production. Set `API_DOCS=true` to publish them on a production build (e.g. for the TEC demo), or `API_DOCS=false` to turn them off in development.
+
+**When you add or change a route, update `openapi.yaml` in the same change.** `test/openapi.test.ts` fails if the file isn't valid OpenAPI 3.1, or if its paths and methods differ from the routers. Quote any value inside `{ … }` that contains a comma: unquoted, `{ description: a, b }` silently becomes an extra key `b`.
 
 ## Auth API (`/api/v1/auth`)
 

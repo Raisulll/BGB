@@ -49,6 +49,10 @@ const schema = z.object({
   // Links in e-mails point here (the SPA origin)
   APP_BASE_URL: z.string().url().default('http://localhost:5173'),
 
+  // Specs #31, #52 — OpenAPI document (/api/v1/openapi.json) + Swagger UI (/api/docs).
+  // Default: on except in production, where the route map is published only when chosen (e.g. TEC demo).
+  API_DOCS: z.enum(['true', 'false']).optional(),
+
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'http', 'debug']).default('info'),
   LOG_DIR: z.string().default('logs'),
 });
@@ -67,6 +71,7 @@ if (!parsed.success) {
 export const env = {
   ...parsed.data,
   MAIL_TRANSPORT: parsed.data.MAIL_TRANSPORT ?? (parsed.data.SMTP_HOST ? 'smtp' : 'none'),
+  API_DOCS: parsed.data.API_DOCS ? parsed.data.API_DOCS === 'true' : parsed.data.NODE_ENV !== 'production',
 };
 export const isProduction = env.NODE_ENV === 'production';
 export const corsOrigins = env.CORS_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean);

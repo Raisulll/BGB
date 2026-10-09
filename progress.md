@@ -380,3 +380,35 @@ Added after the session summary: deferred items now appear in **Admin › Operat
 6. UAT test cases (spec #57, `docs/uat/test-cases.xlsx`), training material outline (spec #53)
 7. S3/MinIO storage driver (spec #33) when an instance is available; customization of form fields (spec #55) if wanted
 8. Consider re-dating seed data; add the Playwright e2e tests to the repo
+
+---
+## Session 11 — 2026-10-09 (+06:00)
+
+### What was done
+- **OpenAPI 3.1 spec fixed** (`server/docs/api/openapi.yaml`): three unquoted values containing commas inside `{ … }` (the shared `Q` parameter, the audit `q` parameter, the audit `actions` list). One failed schema validation; the other two silently produced bogus extra keys. Now valid (`@apidevtools/swagger-parser`), 45 paths / 56 operations
+- **Served** (`server/src/apiDocs.ts`): `GET /api/v1/openapi.json` (public) + Swagger UI at `/api/docs` (`swagger-ui-express` 5.0.1; YAML read with `yaml` 2.9.1). New env `API_DOCS` (unset = on except in production). Swagger UI doesn't persist the pasted token
+- **`test/openapi.test.ts`** (3 tests): spec is valid OpenAPI 3.1; its method+path set equals the routers' routes in both directions; JSON and UI are served
+- Fixed a pre-existing typecheck error in `test/encryption.test.ts` (`noUncheckedIndexedAccess`); `npm run typecheck` was failing in the last commit
+- Verified: typecheck clean, build clean, 106 tests; Swagger UI rendered in headless Chrome under the Helmet CSP with all 56 operations and no console errors
+- Docs: `server/README.md` (API documentation section), `.env.example`, CLAUDE.md §1/§11/§27.3, requirements-status (#31 → DONE, #52 note)
+
+### Decisions & rationale
+- Keep the YAML hand-written (not generated from Zod) and guard it with a route-coverage test: no new build step, and drift fails CI
+- API docs off by default in production: the document maps every route. `API_DOCS=true` publishes them deliberately (e.g. TEC demo)
+
+### Problems / notes
+- **Flaky test**: `mail-archive.test.ts` › "queues mail for reviewers on submission…" failed in 1 of 3 full runs (passed alone and in the other runs). Not related to this change: no mail worker runs during tests. Needs investigation
+- §27.3 "example request/response for every endpoint" is not complete (27 examples)
+- `npm run db:start` on Windows keeps the calling shell attached to Postgres's output; harmless
+
+### Blockers / waiting on
+- Unchanged: hosting decision (DOUBT-010), SMTP, AD/LDAP (DOUBT-002), AV (DOUBT-009), user target (DOUBT-001)
+
+### Next session — TODO
+1. Investigate the flaky mail test
+2. Decide demo hosting (DOUBT-010), then the deployment pack: Nginx TLS + `/api` proxy, PM2 review, installation guide (specs #56, #27)
+3. `BGB/README.md`: Bangla + `i18n:check`
+4. Security docs (#49/#50): OWASP assessment, `npm audit` evidence, ZAP scan
+5. Documentation set (#52): user manual, admin manual, DB schema/ERD; fill in remaining OpenAPI examples
+6. UAT test cases (#57), training outline (#53)
+7. Re-date seed data; move Playwright e2e tests into the repo

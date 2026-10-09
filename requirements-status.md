@@ -12,7 +12,7 @@
 > - `SEE DOUBT` — ambiguity logged in `doubt.md`
 >
 > **Update rule**: Update this file immediately whenever a spec item changes state.  
-> Last updated: **2026-10-09** (Session 10 — Bangla, e-mail, archiving, evidence encryption)
+> Last updated: **2026-10-09** (Session 11 — OpenAPI docs)
 
 ---
 
@@ -48,7 +48,7 @@
 | 28 | Session Security (timeout, concurrent control) | `DONE` | Both | Server idle timeout + single session; client idle sign-out audited as SESSION_TIMEOUT; background polling doesn't keep sessions alive (Session 9) |
 | 29 | Password Security (policy + lockout) | `DONE` | Both | Server policy + lockout; change-password page, forced change after reset, admin reset with one-time temporary password (Session 9) |
 | 30 | Database (enterprise RDBMS) | `DONE` | Backend | PostgreSQL + Prisma 7; 3 migrations, integrity CHECKs and append-only triggers |
-| 31 | REST API / Integration interface | `IN PROGRESS` | Backend | All §19 groups live + archive/mail admin routes (Session 10). OpenAPI 3.1 spec drafted in `server/docs/api/openapi.yaml` but not yet valid/served (next session) |
+| 31 | REST API / Integration interface | `DONE` | Backend | All §19 groups live + archive/mail admin routes (Session 10). OpenAPI 3.1 in `server/docs/api/openapi.yaml`, served at `/api/v1/openapi.json` + Swagger UI `/api/docs` (on outside production, `API_DOCS`); a test keeps it valid and in step with the routers (Session 11). Backup routes deferred with #34 |
 | 32 | AD/LDAP Integration | `NOT STARTED` | Backend | Deferred until BGB provides directory details (user decision 2026-10-09, DOUBT-002). Shown in Admin › Security & System with a DEMO badge |
 | 33 | File Storage (centralized + configurable retention) | `IN PROGRESS` | Backend | Storage interface + local-disk driver with quotas (Session 6). S3/MinIO driver and retention job pending |
 | 34 | Backup (automated scheduled) | `NOT STARTED` | Backend | Deferred: not needed for the demo version (user decision 2026-10-09). Production plan unchanged: `node-cron` + `pg_dump` §22 Shown in Admin › Operations with a DEMO badge (not functional). |
@@ -69,7 +69,7 @@
 | 49 | Security Hardening (OWASP Top 10) | `IN PROGRESS` | Backend | Helmet, CORS whitelist, rate limits, Zod validation, pinned RS256, generic login errors, `npm audit` clean (Session 4). ZAP scan Phase 4 |
 | 50 | Vulnerability Assessment | `NOT STARTED` | Backend | OWASP ZAP + npm audit before UAT §20; report in `docs/security/` |
 | 51 | Source Code Ownership | `DONE` | Both | Full source in this repository |
-| 52 | Documentation (all manuals) | `IN PROGRESS` | Docs | CLAUDE.md + README done; 7 document sets planned §27 |
+| 52 | Documentation (all manuals) | `IN PROGRESS` | Docs | CLAUDE.md + READMEs done; API documentation (OpenAPI 3.1 + Swagger UI) done (Session 11). Remaining sets §27: user, admin, DB schema, installation, backup/recovery, security |
 | 53 | Training | `NOT STARTED` | Docs | 3 training courses + slides planned §28 |
 | 54 | Warranty & Support (1 year) | `NOT STARTED` | `N/A (INFRA)` | Commercial commitment — not a code task |
 | 55 | Customization (forms, workflows, hierarchy) | `IN PROGRESS` | Both | Categories, hierarchy, permissions and policies configurable in the Admin UI (Session 9). Custom form fields / workflow stages are not configurable |
@@ -83,8 +83,8 @@
 
 | Status | Count |
 |---|---|
-| `DONE` | 36 |
+| `DONE` | 37 |
 | `FRONTEND DONE` | 1 |
-| `IN PROGRESS` | 9 |
+| `IN PROGRESS` | 8 |
 | `NOT STARTED` | 12 |
 | **Total** | **58** |

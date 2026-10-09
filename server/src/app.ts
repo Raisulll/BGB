@@ -2,6 +2,7 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
+import { openApiRouter, swaggerUiRouter } from './apiDocs.js';
 import { corsOrigins, env } from './config/env.js';
 import { prisma } from './db.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
@@ -48,6 +49,9 @@ export function createApp() {
     }
   });
 
+  // Public: the API description (specs #31, #52); off by default in production
+  if (env.API_DOCS) api.use(openApiRouter());
+
   api.use('/auth', authRouter);
   // Before the incidents router, whose /:id/:action route would otherwise capture /evidence
   api.use('/incidents/:id/evidence', evidenceRouter);
@@ -60,6 +64,7 @@ export function createApp() {
   api.use('/reports', reportsRouter);
 
   app.use('/api/v1', api);
+  if (env.API_DOCS) app.use('/api/docs', swaggerUiRouter());
   app.use(notFoundHandler);
   app.use(errorHandler);
 

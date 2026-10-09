@@ -3,7 +3,7 @@
 
 > **Project**: BIRDS Phase II — HQ Border Guard Bangladesh (BGB)
 > **Frontend root**: `BGB/` (React + Vite SPA)
-> **Status**: Backend API (`server/`) implemented; the frontend runs entirely on it, in English and Bangla (Sessions 9–10). Demo version: backups, DR, HA, load tests, log rotation and AD/LDAP are deferred and shown as DEMO in the UI. Remaining: OpenAPI docs, deployment pack, documentation set, UAT. See `progress.md` for the next steps.
+> **Status**: Backend API (`server/`) implemented; the frontend runs entirely on it, in English and Bangla (Sessions 9–10). Demo version: backups, DR, HA, load tests, log rotation and AD/LDAP are deferred and shown as DEMO in the UI. OpenAPI docs at `/api/docs` (Session 11). Remaining: deployment pack, documentation set, UAT. See `progress.md` for the next steps.
 
 ---
 
@@ -302,7 +302,7 @@ Each item maps to the 58 specs in `projectDetails.md`. **`requirements-status.md
 | 28 | Session timeout + concurrent session control | DONE | Server idle timeout + single session; client idle sign-out; background polling doesn't count as activity |
 | 29 | Password policy (length, complexity, lockout) | DONE | Server policy + lockout; change-password and admin reset with forced change in the UI |
 | 30 | Enterprise relational database | DONE | PostgreSQL + Prisma |
-| 31 | Secure REST API | PARTIAL | All §19 groups live except backups and server-side PDF; OpenAPI docs pending |
+| 31 | Secure REST API | DONE | All §19 groups live except backups (deferred) and server-side PDF; OpenAPI 3.1 at `/api/docs` |
 | 32 | AD/LDAP integration | PENDING | Integration hook architecture needed |
 | 33 | Centralized file storage + retention policy | PARTIAL | Local dataUrl in demo; needs cloud/server storage |
 | 34 | Automated scheduled backup | PENDING | Backend infrastructure requirement |
@@ -1030,11 +1030,11 @@ All endpoints require `Authorization: Bearer <access_token>` unless marked **Pub
 - [ ] Changing own password
 
 ### 27.3 API Documentation  (`docs/api/`)
-- [ ] **OpenAPI 3.1 YAML** spec covering all endpoints in Section 19
-- [ ] Swagger UI served at `/api/docs` in development mode
-- [ ] Authentication section (JWT Bearer, token refresh flow)
-- [ ] Error response format (standard JSON error envelope)
-- [ ] Rate limiting headers documented
+- [x] **OpenAPI 3.1 YAML** spec covering all endpoints in Section 19 (`server/docs/api/openapi.yaml`; `test/openapi.test.ts` checks validity + route coverage)
+- [x] Swagger UI served at `/api/docs` in development mode (production: `API_DOCS=true`)
+- [x] Authentication section (JWT Bearer, token refresh flow)
+- [x] Error response format (standard JSON error envelope)
+- [x] Rate limiting headers documented
 - [ ] Example request/response for every endpoint
 
 ### 27.4 Database Documentation  (`docs/db-schema/`)

@@ -657,7 +657,7 @@ paths:
       description: Newest first. Viewing or searching (page 1) is itself logged as VIEW_AUDIT_LOG; an identical repeat within 60 s is not.
       x-permission: audit
       parameters:
-        - { name: q, in: query, schema: { type: string }, description: Username, details or IP }
+        - { name: q, in: query, schema: { type: string }, description: 'Username, details or IP' }
         - { name: action, in: query, schema: { type: string }, description: Comma-separated action names }
         - { name: username, in: query, schema: { type: string } }
         - { name: dateFrom, in: query, schema: { type: string, format: date }, description: Bangladesh calendar day }
@@ -675,7 +675,7 @@ paths:
                   - type: object
                     properties:
                       data: { type: array, items: { $ref: '#/components/schemas/AuditEntry' } }
-                      actions: { type: array, items: { type: string }, description: All action names, for filters }
+                      actions: { type: array, items: { type: string }, description: 'All action names, for filters' }
   /audit/verify:
     get:
       tags: [Audit]
@@ -1032,7 +1032,7 @@ components:
     IncidentId: { name: id, in: path, required: true, schema: { type: string, pattern: '^BIRDS-\d{4}-\d{4,}$', example: BIRDS-2026-1001 } }
     Page: { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
     PageSize: { name: pageSize, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 25 } }
-    Q: { name: q, in: query, schema: { type: string, maxLength: 200 }, description: Reference number, title, description or location }
+    Q: { name: q, in: query, schema: { type: string, maxLength: 200 }, description: 'Reference number, title, description or location' }
     Status: { name: status, in: query, schema: { type: string, example: 'Submitted,Reviewed' }, description: Comma-separated statuses }
     Severity: { name: severity, in: query, schema: { type: string, example: 'High,Critical' }, description: Comma-separated severities }
     Category: { name: category, in: query, schema: { type: string } }
