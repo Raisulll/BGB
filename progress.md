@@ -526,3 +526,29 @@ Added after the session summary: deferred items now appear in **Admin › Operat
 2. The Render free plan sleeps after 15 min idle: a sleeping service can't ring anyone, so test calls with both users signed in
 3. Ask BGB the DOUBT-013 questions (records rules for messages; allowed STUN/TURN servers)
 
+
+---
+## Session — 2026-10-11 10:58 (BST)
+
+### What was done
+- Checked why the messaging release isn't visible on Render. The code is deployed: `origin/master` = local `8ecbc2a`, the live bundle contains the Messages/Call log code, and `/api/v1/messaging/*` returns 401/403, not 404. Profile, overdue and the relative seed dates work on live.
+- Root cause: the Supabase database **doesn't have migration `20261009135617_messaging_and_calls`**. That migration grants the `messages` page to every role; live `auditor` permissions don't include `messages`, so the sidebar hides Messages and Call log, and the API returns 403. Test sign-in as `auditor` on live (LOGIN/LOGOUT audit entries).
+
+- Owner then migrated Supabase and tested a live call; it dropped. Live call #1: `ended`, reason `connection lost`, after 29 s, so a participant's realtime socket closed and the server ended the call at once, though the WebRTC audio is browser to browser. A 150 s probe socket on live stayed open (Render's proxy answers the server's pings itself), so stable sockets don't drop; blips do (network, sleep, phone lock, a session revoked by signing in elsewhere). Live `/calls/ice` has no TURN (`relay: false`).
+- **Fix: calls survive a reconnect.** Server: on socket close a call waits `CALL_RECONNECT_SECONDS` (new env, default 30, 1–120) instead of ending; client message `call.resume {callId}` reattaches it (`call.resumed`; `call.ended` if it's already over); cross-process via a new bus event `call.resumed`, and a log line when a participant drops. Browser (`CommsContext.jsx`): sends `call.resume` whenever the channel comes back during a call; a drop before the invite was confirmed ends the attempt with the offline toast; on `pagehide` it sends end/cancel/decline so closing a tab still ends the call at once; on a failed WebRTC connection the caller restarts ICE once (callee waits 15 s for it) before giving up.
+- Docs: README Calls, OpenAPI Calls tag, `.env.example`. Tests: the disconnect test now covers resume, end after the wait, and resume after the end; **148/148**. Headless Chrome, two users, real WebRTC call on a local build: callee's socket closed twice mid-call → reconnects, call and timer continue, remote audio track live, hang-up after resume ends both, tab close ends the other side in ~50 ms (script `call-drop.mjs` in this session's scratchpad).
+
+- **Messenger-style messaging (owner request).** `Messages.jsx`: list with large tinted avatars, pill search, "preview · time" line, bold + count badge when unread; thread on white with rounded bubbles (own green on the right, others grey on the left), runs of one sender within 5 min share joined corners and one small avatar at the end of the run, sender name above a run in groups, time separator on a new day or after a 15 min gap, full time as tooltip + screen-reader text. `Avatar.jsx`: muted tint per name (green/sky/indigo/teal/slate/violet; never red/amber/orange). `VoiceMessage.jsx`: own player (play/pause, progress bar with seek, time) instead of the browser control; audio still fetched on first play.
+- **Voice in one step**: microphone starts recording, Send stops and sends at once, bin icon cancels; no review step (owner's choice). The 5-minute limit sends what was recorded. Composer is a pill text box that grows with the text, between round microphone and send buttons. CLAUDE.md §9 now allows icon-only buttons in the chat bar.
+- i18n: + `msg.cancelRecording`, `msg.pauseVoice`, `msg.sendingVoice`; `msg.recordHint` reworded; removed unused `msg.stop`, `msg.reviewRecording`, `msg.discard` (1104 keys, check passes).
+- **Louder call tones** (`utils/tones.js`): incoming ring is now a trilling double ring (square wave alternating 1046/1318 Hz at 16 Hz, two 0.45 s bursts every 2.6 s) through a compressor with make-up gain. Measured with an OfflineAudioContext render: RMS 0.051 → 0.390 (about +18 dB), peak 0.87 (no clipping). Ringback 0.033 → 0.197 RMS.
+- Verified on a local build: messaging UI suite (`msg-ui.mjs`, 9 checks: bubble colour, joined corners, left/right, one-step voice send, live arrival and playback with progress, cancel sends nothing, 390 px without overflow) and the call-drop suite again; screenshots in this session's scratchpad `shots/`.
+- TURN for the owner: Metered (metered.ca) free plan: sign up → TURN server → create a credential → copy the iceServers it shows into `TURN_URLS` (comma-separated turn:/turns: URLs), `TURN_USERNAME`, `TURN_CREDENTIAL`. Free allowance figures differ between Metered's pages, so check the dashboard.
+
+### Blockers / waiting on
+- Not committed or deployed yet (owner to confirm)
+
+### Next session — TODO
+1. Commit, push, manual deploy on Render (no migration this time; `CALL_RECONNECT_SECONDS` optional)
+2. Set `TURN_URLS` / `TURN_USERNAME` / `TURN_CREDENTIAL` on Render: without TURN, calls between strict networks (some mobile carriers, office firewalls) fail to connect at all
+3. If live calls still drop, Render logs now show "Call participant disconnected; waiting for reconnect" with the user id

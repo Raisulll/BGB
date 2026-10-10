@@ -78,6 +78,9 @@ const schema = z.object({
   TURN_CREDENTIAL: z.string().optional(),
   // How long an incoming call rings before it counts as missed
   CALL_RING_SECONDS: z.coerce.number().int().min(1).max(120).default(30),
+  // How long a call waits for a participant whose realtime connection dropped (network blip, phone
+  // screen lock) to reconnect before it ends as "connection lost". The audio keeps flowing meanwhile
+  CALL_RECONNECT_SECONDS: z.coerce.number().int().min(1).max(120).default(30),
 
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'http', 'debug']).default('info'),
   LOG_DIR: z.string().default('logs'),

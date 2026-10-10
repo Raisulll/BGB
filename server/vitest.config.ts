@@ -16,6 +16,7 @@ export default defineConfig({
       EVIDENCE_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'), // fixed test key (spec #27)
       SMTP_HOST: '',
       CALL_RING_SECONDS: '1', // missed-call test
+      CALL_RECONNECT_SECONDS: '1', // dropped-connection test
     },
     // One shared database: run files one at a time
     fileParallelism: false,

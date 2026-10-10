@@ -70,10 +70,13 @@ tags:
     description: |
       1:1 audio calls with WebRTC. Signalling runs over the realtime channel. Client messages:
       `call.invite` {to}, `call.accept` / `call.decline` / `call.cancel` / `call.end` {callId},
-      `call.signal` {callId, data} (SDP offer/answer, ICE candidates, relayed to the other party).
+      `call.signal` {callId, data} (SDP offer/answer, ICE candidates, relayed to the other party),
+      `call.resume` {callId} (after the socket reconnected during a call).
       Server messages: `call.ringing`, `call.incoming`, `call.accepted`, `call.taken`, `call.busy`,
-      `call.signal`, `call.ended` {callId, status, reason}, `call.error`. Calls ring for
-      CALL_RING_SECONDS (default 30) before they are missed. Audio is never stored; each finished
+      `call.signal`, `call.resumed` {callId, status}, `call.ended` {callId, status, reason},
+      `call.error`. Calls ring for CALL_RING_SECONDS (default 30) before they are missed. When a
+      participant's socket closes, the call waits CALL_RECONNECT_SECONDS (default 30) for a
+      `call.resume` before it ends as "connection lost". Audio is never stored; each finished
       call is audited (CALL) and listed in the call log.
   - name: System
 

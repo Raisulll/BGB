@@ -10,12 +10,20 @@ import { createCall, finalise, getCall, isBusy, toCallDto, transition } from './
 //   callee  call.accept {callId}    -> "answered"; caller gets call.accepted and sends the WebRTC offer
 //   either  call.signal {callId, data} (offer / answer / ICE candidates) -> relayed to the other party
 //   either  call.end / call.decline / call.cancel -> final state, both sides get call.ended
-// Unanswered calls are missed after CALL_RING_SECONDS. A socket that closes ends the calls it was part of.
+// Unanswered calls are missed after CALL_RING_SECONDS. When a participant's socket closes, the call
+// waits CALL_RECONNECT_SECONDS for that user to reconnect and send call.resume {callId}; only then
+// does it end as "connection lost". The audio is browser to browser and survives a signalling blip.
 const RING_MS = env.CALL_RING_SECONDS * 1000;
+const RECONNECT_MS = env.CALL_RECONNECT_SECONDS * 1000;
 
 const tracked = new WeakMap<Client, Set<number>>(); // calls each socket is part of
 const track = (c: Client, id: number) => (tracked.get(c) ?? tracked.set(c, new Set()).get(c)!).add(id);
 const untrack = (c: Client, id: number) => tracked.get(c)?.delete(id);
+
+// Calls waiting for a dropped participant, by "callId:userId". The resume may reach another process
+// (PM2 cluster), so it is announced on the bus and every process clears its own timer.
+const dropped = new Map<string, NodeJS.Timeout>();
+const droppedKey = (callId: number, userId: string) => `${callId}:${userId}`;
 
 const toUser = (to: string, payload: Record<string, unknown>) => publish({ type: 'call', to, payload });
 const reply = (c: Client, payload: Record<string, unknown>) => c.ws.send(JSON.stringify(payload));
@@ -33,6 +41,11 @@ export function registerCallRealtime() {
   // Bus "call" events -> the addressed user's sockets on this process
   onEvent((event, send) => {
     if (event.type === 'call') send(event.to, event.payload);
+    else if (event.type === 'call.resumed') {
+      const key = droppedKey(event.callId, event.userId);
+      clearTimeout(dropped.get(key));
+      dropped.delete(key);
+    }
   });
 
   onClientMessage('call.', async (client, msg) => {
@@ -87,6 +100,17 @@ export function registerCallRealtime() {
         if (done) await ended(callId, client.ctx);
         return;
       }
+      case 'call.resume': {
+        // A participant's socket reconnected during a call: attach the call to the new socket
+        const call = await getCall(callId);
+        if (!call || (call.callerId !== client.userId && call.calleeId !== client.userId)) return;
+        if (!['ringing', 'answered'].includes(call.status)) {
+          return reply(client, { type: 'call.ended', callId, status: call.status, reason: call.endReason });
+        }
+        if (call.status === 'answered' || call.callerId === client.userId) track(client, callId);
+        await publish({ type: 'call.resumed', callId, userId: client.userId });
+        return reply(client, { type: 'call.resumed', callId, status: call.status });
+      }
       case 'call.signal': {
         // WebRTC offer/answer/ICE candidate, relayed as-is to the other participant of a live call
         const call = await getCall(callId);
@@ -100,19 +124,28 @@ export function registerCallRealtime() {
     }
   });
 
-  // A socket that goes away takes its calls with it
+  // A socket that goes away ends its calls unless the user reconnects in time
   onClientClose((client) => {
     const ids = tracked.get(client);
     if (!ids?.size) return;
     for (const id of ids) {
-      void (async () => {
-        const call = await getCall(id);
-        if (!call) return;
-        const isCaller = call.callerId === client.userId;
-        const done =
-          (await transition(id, ['answered'], 'ended', 'connection lost')) ?? (isCaller ? await transition(id, ['ringing'], 'cancelled', 'connection lost') : null);
-        if (done) await ended(id, client.ctx);
-      })().catch((err) => logger.warn('Ending call after disconnect failed', { err: String(err) }));
+      const key = droppedKey(id, client.userId);
+      clearTimeout(dropped.get(key));
+      logger.info('Call participant disconnected; waiting for reconnect', { callId: id, userId: client.userId });
+      const timer = setTimeout(() => {
+        dropped.delete(key);
+        void (async () => {
+          const call = await getCall(id);
+          if (!call) return;
+          const isCaller = call.callerId === client.userId;
+          const done =
+            (await transition(id, ['answered'], 'ended', 'connection lost')) ??
+            (isCaller ? await transition(id, ['ringing'], 'cancelled', 'connection lost') : null);
+          if (done) await ended(id, client.ctx);
+        })().catch((err) => logger.warn('Ending call after disconnect failed', { err: String(err) }));
+      }, RECONNECT_MS);
+      timer.unref();
+      dropped.set(key, timer);
     }
   });
 }

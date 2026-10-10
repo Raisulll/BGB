@@ -16,9 +16,13 @@ import CallPanel from '../components/messaging/CallPanel';
 //   caller: getUserMedia -> call.invite -> call.ringing ... call.accepted -> offer
 //   callee: call.incoming -> getUserMedia -> call.accept -> answer
 //   both:   ICE candidates via call.signal; call.ended from the server closes everything.
+// A dropped realtime connection doesn't end the call: after reconnecting the browser sends
+// call.resume and the server keeps the call (CALL_RECONNECT_SECONDS). If the audio path itself
+// fails, the caller restarts ICE once before the call is given up.
 
 const CommsContext = createContext(null);
 const UNREAD_POLL_MS = 60_000;
+const ICE_RESTART_WAIT_MS = 15_000; // how long the callee waits for the caller's ICE restart
 
 export function CommsProvider({ children }) {
   const { currentUser, hasPermission } = useApp();
@@ -38,6 +42,7 @@ export function CommsProvider({ children }) {
   const toneRef = useRef(null);
   const abandonedRef = useRef(false); // hung up before the server confirmed the invite
   const audioRef = useRef(null);
+  const iceRef = useRef({ restarted: false, timer: null }); // ICE restart after a failed audio path
 
   const updateCall = useCallback((next) => {
     callRef.current = typeof next === 'function' ? next(callRef.current) : next;
@@ -88,6 +93,8 @@ export function CommsProvider({ children }) {
 
   const cleanup = useCallback(() => {
     stopTone();
+    clearTimeout(iceRef.current.timer);
+    iceRef.current = { restarted: false, timer: null };
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     if (pcRef.current) {
@@ -143,13 +150,31 @@ export function CommsProvider({ children }) {
           audioRef.current.play?.().catch(() => {});
         }
       };
-      pc.onconnectionstatechange = () => {
+      const giveUp = () => {
+        sendRealtime({ type: 'call.end', callId });
+        showToast(t('calls.connectionFailed'), 'error');
+        cleanup();
+      };
+      pc.onconnectionstatechange = async () => {
+        // "disconnected" is often momentary (network change); WebRTC recovers by itself
         if (pc.connectionState === 'connected') {
+          clearTimeout(iceRef.current.timer);
+          iceRef.current.timer = null;
           updateCall((c) => (c && !c.answeredAt ? { ...c, phase: 'active', answeredAt: Date.now() } : c));
         } else if (pc.connectionState === 'failed') {
-          sendRealtime({ type: 'call.end', callId });
-          showToast(t('calls.connectionFailed'), 'error');
-          cleanup();
+          if (iceRef.current.restarted || iceRef.current.timer) return giveUp();
+          if (callRef.current?.role === 'caller') {
+            // Only the caller renegotiates, so the two sides never send offers at the same time
+            iceRef.current.restarted = true;
+            try {
+              await pc.setLocalDescription(await pc.createOffer({ iceRestart: true }));
+              sendRealtime({ type: 'call.signal', callId, data: { sdp: pc.localDescription.toJSON() } });
+            } catch {
+              giveUp();
+            }
+          } else {
+            iceRef.current.timer = setTimeout(giveUp, ICE_RESTART_WAIT_MS);
+          }
         }
       };
       // Anything that arrived while the connection was being set up
@@ -166,7 +191,7 @@ export function CommsProvider({ children }) {
       if (callRef.current) return showToast(t('calls.alreadyInCall'), 'warning');
       if (!realtimeReady()) return showToast(t('msg.offline'), 'error');
       abandonedRef.current = false;
-      updateCall({ phase: 'starting', other: person, muted: false });
+      updateCall({ phase: 'starting', role: 'caller', other: person, muted: false });
       try {
         streamRef.current = await getMic();
       } catch (err) {
@@ -255,7 +280,7 @@ export function CommsProvider({ children }) {
         }
         case 'call.incoming': {
           if (c) return; // the server marks busy users; a second tab of a busy user just ignores it
-          updateCall({ id: msg.call.id, phase: 'incoming', other: msg.call.other, muted: false });
+          updateCall({ id: msg.call.id, phase: 'incoming', role: 'callee', other: msg.call.other, muted: false });
           toneRef.current = startTone('ring');
           return;
         }
@@ -308,6 +333,33 @@ export function CommsProvider({ children }) {
       }
     });
   }, [enabled, applySignal, cleanup, createPeer, showToast, t, updateCall]);
+
+  // Realtime connection dropped and came back: reattach the live call to the new connection.
+  // A drop before the server confirmed the invite loses the call (its reply went to the old socket).
+  useEffect(() => {
+    if (!enabled) return;
+    return onRealtimeStatus((up) => {
+      const c = callRef.current;
+      if (!c) return;
+      if (up && c.id) sendRealtime({ type: 'call.resume', callId: c.id });
+      else if (!up && !c.id) {
+        cleanup();
+        showToast(t('msg.offline'), 'error');
+      }
+    });
+  }, [enabled, cleanup, showToast, t]);
+
+  // Closing or reloading the tab ends the call at once instead of after the reconnect wait
+  useEffect(() => {
+    const onPageHide = () => {
+      const c = callRef.current;
+      if (!c?.id) return;
+      if (c.phase === 'incoming') sendRealtime({ type: 'call.decline', callId: c.id });
+      else sendRealtime({ type: c.phase === 'outgoing' ? 'call.cancel' : 'call.end', callId: c.id });
+    };
+    window.addEventListener('pagehide', onPageHide);
+    return () => window.removeEventListener('pagehide', onPageHide);
+  }, []);
 
   // Signing out or losing the permission ends any live call in this tab
   useEffect(() => {

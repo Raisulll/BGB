@@ -139,15 +139,32 @@ describe('calls', () => {
     expect(note?.message).toContain(operator.user.name);
   });
 
-  it('ends a call when a participant disconnects', async () => {
+  it('keeps a call through a reconnect, and ends it when a participant stays away', async () => {
     const caller = await connect(operator.token);
     const callee = await connect(sector.token);
     caller.send({ type: 'call.invite', to: sector.user.id });
     const id = ((await callee.type('call.incoming')) as { call: { id: number } }).call.id;
     callee.send({ type: 'call.accept', callId: id });
     await caller.type('call.accepted');
+
+    // A blip: the callee's socket drops and a new one resumes the call within CALL_RECONNECT_SECONDS (1 in tests)
     callee.ws.close();
-    expect(await caller.type('call.ended')).toMatchObject({ callId: id, status: 'ended', reason: 'connection lost' });
+    const back = await connect(sector.token);
+    back.send({ type: 'call.resume', callId: id });
+    expect(await back.type('call.resumed')).toMatchObject({ callId: id, status: 'answered' });
+    await new Promise((r) => setTimeout(r, 1500));
+    expect((await prisma.call.findUnique({ where: { id } }))?.status).toBe('answered');
+    caller.send({ type: 'call.signal', callId: id, data: { candidate: { candidate: 'candidate:2' } } });
+    await back.type('call.signal');
+
+    // Gone for good: ended after the wait
+    back.ws.close();
+    expect(await caller.type('call.ended', 4000)).toMatchObject({ callId: id, status: 'ended', reason: 'connection lost' });
+
+    // Resuming a call that has ended just reports the end
+    const late = await connect(sector.token);
+    late.send({ type: 'call.resume', callId: id });
+    expect(await late.type('call.ended')).toMatchObject({ callId: id, status: 'ended' });
   });
 
   it('gives browsers the ICE servers, and the full log to auditors only', async () => {

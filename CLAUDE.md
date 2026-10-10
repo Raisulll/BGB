@@ -239,7 +239,7 @@ All dates **must** be displayed as `DD-MM-YYYY`. Use `formatDateDisplay()` from 
 
 ### Aesthetics / UX — professional government system (Session 12 redesign)
 - **Restrained and official**: white surfaces on slate-50, slate neutrals, BGB green (`bgb-700`) only for the primary action, active navigation and brand. Red/amber/orange only for severity and alerts, never decoration.
-- **Every action is named**: buttons carry text (icons optional, leading). Icon-only buttons only for universal controls (close ×, menu, pagination arrows, dismiss). Never a thumbs-up or similar for workflow actions.
+- **Every action is named**: buttons carry text (icons optional, leading). Icon-only buttons only for universal controls (close ×, menu, pagination arrows, dismiss) and the chat message bar and voice player in Messages (microphone, send, cancel recording, play/pause; owner asked for a Messenger-style chat), each with `aria-label` and tooltip. Never a thumbs-up or similar for workflow actions.
 - **Three button variants** (`index.css`): `btn-primary` (one per view), `btn-secondary` (white, bordered), `btn-danger-outline`; `btn-sm` in tables.
 - **No decoration**: no gradients, glow/blur blobs, pulsing/ping dots, hover lift/scale, "NEW"/"LIVE" tags, version badges in the chrome, marketing headings ("Command dashboard", "Tactical map").
 - **Sentence case** for labels and headings; ALL CAPS only for table headers and the CONFIDENTIAL banner. Text ≥ 12 px; `font-semibold` at most (no black/extrabold).

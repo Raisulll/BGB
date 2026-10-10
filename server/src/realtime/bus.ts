@@ -13,7 +13,8 @@ export type BusEvent =
   | { type: 'message.new'; conversationId: number; messageId: number; recipients: string[] }
   | { type: 'conversation.changed'; conversationId: number; recipients: string[] }
   | { type: 'read'; conversationId: number; userId: string }
-  | { type: 'call'; to: string; payload: Record<string, unknown> };
+  | { type: 'call'; to: string; payload: Record<string, unknown> }
+  | { type: 'call.resumed'; callId: number; userId: string };
 
 type Handler = (event: BusEvent) => void;
 const handlers = new Set<Handler>();

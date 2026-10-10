@@ -47,7 +47,7 @@ function ConversationList({ list, activeId, myId, onNewDirect, onNewGroup }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="space-y-2 border-b border-slate-200 p-3">
+      <div className="space-y-3 p-3">
         <div className="flex gap-2">
           <button type="button" onClick={onNewDirect} className="btn btn-primary btn-sm flex-1">
             <i className="fas fa-pen" aria-hidden="true" />
@@ -58,36 +58,50 @@ function ConversationList({ list, activeId, myId, onNewDirect, onNewGroup }) {
             {t('msg.newGroup')}
           </button>
         </div>
-        <label htmlFor="conv-filter" className="sr-only">
-          {t('msg.filterConversations')}
-        </label>
-        <input id="conv-filter" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('msg.filterConversations')} className="form-input" />
+        <div className="relative">
+          <i className="fas fa-magnifying-glass pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-xs text-slate-500" aria-hidden="true" />
+          <label htmlFor="conv-filter" className="sr-only">
+            {t('msg.filterConversations')}
+          </label>
+          <input
+            id="conv-filter"
+            type="search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder={t('msg.filterConversations')}
+            className="h-10 w-full rounded-full border-0 bg-slate-100 pr-4 pl-9 text-sm text-slate-900 placeholder:text-slate-500 focus:bg-white focus:ring-2 focus:ring-bgb-600 focus:outline-none"
+          />
+        </div>
       </div>
 
-      <ul className="min-h-0 flex-1 divide-y divide-slate-100 overflow-y-auto" aria-label={t('msg.conversations')}>
+      <ul className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 pb-2" aria-label={t('msg.conversations')}>
         {shown.length === 0 && <li className="p-6 text-center text-sm text-slate-500">{list.length ? t('msg.noMatch') : t('msg.noConversations')}</li>}
         {shown.map((c) => (
           <li key={c.id}>
             <Link
               to={`/messages/${c.id}`}
               aria-current={c.id === activeId ? 'page' : undefined}
-              className={cn('flex items-center gap-3 px-3 py-3 hover:bg-slate-50', c.id === activeId && 'bg-bgb-50 hover:bg-bgb-50')}
+              className={cn('flex items-center gap-3 rounded-lg px-2 py-2.5 hover:bg-slate-100', c.id === activeId && 'bg-bgb-50 hover:bg-bgb-50')}
             >
-              <Avatar name={c.title} group={c.kind === 'group'} />
+              <Avatar name={c.title} group={c.kind === 'group'} size="lg" />
               <span className="min-w-0 flex-1">
-                <span className="flex items-baseline justify-between gap-2">
-                  <span className={cn('truncate text-sm text-slate-900', c.unread ? 'font-semibold' : 'font-medium')}>{c.title}</span>
-                  <span className="shrink-0 text-xs text-slate-500">{shortTime(c.lastMessageAt)}</span>
-                </span>
-                <span className="flex items-center justify-between gap-2">
-                  <span className={cn('truncate text-xs', c.unread ? 'text-slate-800' : 'text-slate-500')}>{preview(c.lastMessage, t, myId)}</span>
-                  {c.unread > 0 && (
-                    <span className="shrink-0 rounded-full bg-bgb-700 px-1.5 text-xs font-semibold text-white" aria-label={t('msg.unreadCount', { n: c.unread })}>
-                      {c.unread}
-                    </span>
-                  )}
+                <span className={cn('block truncate text-sm text-slate-900', c.unread ? 'font-semibold' : 'font-medium')}>{c.title}</span>
+                <span className={cn('flex min-w-0 items-center gap-1 text-xs', c.unread ? 'font-semibold text-slate-900' : 'text-slate-500')}>
+                  <span className="truncate">{preview(c.lastMessage, t, myId)}</span>
+                  <span className="shrink-0" aria-hidden="true">
+                    ·
+                  </span>
+                  <span className="shrink-0">{shortTime(c.lastMessageAt)}</span>
                 </span>
               </span>
+              {c.unread > 0 && (
+                <span
+                  className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-bgb-700 px-1.5 text-[11px] font-semibold text-white"
+                  aria-label={t('msg.unreadCount', { n: c.unread })}
+                >
+                  {c.unread}
+                </span>
+              )}
             </Link>
           </li>
         ))}
@@ -99,24 +113,42 @@ function ConversationList({ list, activeId, myId, onNewDirect, onNewGroup }) {
 // ---------------------------------------------------------------------------
 // Thread
 // ---------------------------------------------------------------------------
-function MessageBubble({ m, mine, showSender }) {
+// Consecutive messages from one sender within this gap form one run (one avatar, joined corners)
+const RUN_GAP_MS = 5 * 60_000;
+// A gap this long shows the time again between messages
+const TIME_GAP_MS = 15 * 60_000;
+
+function MessageBubble({ m, mine, first, last, showSender }) {
+  const { t } = useI18n();
   if (m.kind === 'system') {
     return (
-      <li className="my-2 text-center">
-        <span className="inline-block rounded-md bg-slate-100 px-2.5 py-1 text-xs text-slate-600">
+      <li className="my-3 text-center">
+        <span className="text-xs text-slate-500">
           {m.body} · {formatDateTime(m.createdAt).slice(11)}
         </span>
       </li>
     );
   }
+  const time = formatDateTime(m.createdAt, { withSeconds: true });
   return (
-    <li className={cn('flex', mine ? 'justify-end' : 'justify-start')}>
-      <div className={cn('max-w-[85%] rounded-lg px-3 py-2 sm:max-w-[70%]', mine ? 'bg-bgb-700 text-white' : 'border border-slate-200 bg-white text-slate-900')}>
-        {showSender && !mine && <p className="mb-0.5 text-xs font-semibold text-bgb-800">{m.sender.name}</p>}
-        {m.kind === 'voice' ? <VoiceMessage voice={m.voice} mine={mine} /> : <p className="whitespace-pre-wrap break-words text-sm">{m.body}</p>}
-        <p className={cn('mt-1 text-right text-[11px]', mine ? 'text-white/75' : 'text-slate-500')} title={formatDateTime(m.createdAt, { withSeconds: true })}>
-          {formatDateTime(m.createdAt).slice(11)}
-        </p>
+    <li className={cn('flex items-end gap-2', mine ? 'justify-end' : 'justify-start', first ? 'mt-3' : 'mt-0.5')}>
+      {!mine && (last ? <Avatar name={m.sender.name} size="xs" className="mb-0.5" /> : <span className="w-7 shrink-0" aria-hidden="true" />)}
+      <div className={cn('flex max-w-[78%] flex-col sm:max-w-[65%]', mine ? 'items-end' : 'items-start')}>
+        {showSender && !mine && first && <p className="mb-0.5 px-3 text-xs text-slate-500">{m.sender.name}</p>}
+        <div
+          title={time}
+          className={cn(
+            'rounded-[1.125rem] px-3 py-2',
+            mine ? 'bg-bgb-700 text-white' : 'bg-slate-100 text-slate-900',
+            !first && (mine ? 'rounded-tr-md' : 'rounded-tl-md'),
+            !last && (mine ? 'rounded-br-md' : 'rounded-bl-md'),
+          )}
+        >
+          <span className="sr-only">
+            {mine ? t('msg.you') : m.sender.name}, {time}:{' '}
+          </span>
+          {m.kind === 'voice' ? <VoiceMessage voice={m.voice} mine={mine} /> : <p className="whitespace-pre-wrap break-words text-sm leading-5">{m.body}</p>}
+        </div>
       </div>
     </li>
   );
@@ -258,16 +290,29 @@ function Thread({ conversation, myId, onChanged, onBack }) {
     }
   };
 
-  // Day separators
+  // Time separators (new day, or a long gap) and runs of messages from one sender
   const rows = useMemo(() => {
+    const list = messages || [];
+    const at = (m) => new Date(m.createdAt).getTime();
+    const breaksBefore = (prev, m) => !prev || formatDateDisplay(prev.createdAt) !== formatDateDisplay(m.createdAt) || at(m) - at(prev) >= TIME_GAP_MS;
+    const sameRun = (a, b) => a.kind !== 'system' && b.kind !== 'system' && a.sender?.id === b.sender?.id && at(b) - at(a) < RUN_GAP_MS;
     const out = [];
-    let day = null;
-    for (const m of messages || []) {
-      const d = formatDateDisplay(m.createdAt);
-      if (d !== day) out.push({ day: d, key: `d-${m.id}` });
-      day = d;
-      out.push({ m, key: m.id });
-    }
+    list.forEach((m, i) => {
+      const prev = list[i - 1];
+      const next = list[i + 1];
+      const sep = breaksBefore(prev, m);
+      if (sep) {
+        const newDay = !prev || formatDateDisplay(prev.createdAt) !== formatDateDisplay(m.createdAt);
+        const clock = formatDateTime(m.createdAt).slice(11);
+        out.push({ sep: newDay ? `${formatDateDisplay(m.createdAt)} ${clock}` : clock, key: `s-${m.id}` });
+      }
+      out.push({
+        m,
+        key: m.id,
+        first: sep || !sameRun(prev, m),
+        last: !next || breaksBefore(m, next) || !sameRun(m, next),
+      });
+    });
     return out;
   }, [messages]);
 
@@ -299,7 +344,7 @@ function Thread({ conversation, myId, onChanged, onBack }) {
       </div>
 
       {/* Messages */}
-      <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto bg-slate-50 px-3 py-3">
+      <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto bg-white px-3 py-3">
         {error ? (
           <ErrorState message={error} />
         ) : !messages ? (
@@ -315,14 +360,14 @@ function Thread({ conversation, myId, onChanged, onBack }) {
               </div>
             )}
             {messages.length === 0 && <p className="mt-10 text-center text-sm text-slate-500">{t('msg.startHint')}</p>}
-            <ol className="space-y-2" aria-label={t('msg.messagesIn', { name: conversation.title })} aria-live="polite">
+            <ol aria-label={t('msg.messagesIn', { name: conversation.title })} aria-live="polite">
               {rows.map((r) =>
-                r.day ? (
-                  <li key={r.key} className="py-1 text-center text-xs font-medium text-slate-500" role="separator">
-                    {r.day}
+                r.sep ? (
+                  <li key={r.key} className="mt-4 mb-1 text-center text-xs font-medium text-slate-500" role="separator">
+                    {r.sep}
                   </li>
                 ) : (
-                  <MessageBubble key={r.key} m={r.m} mine={r.m.sender?.id === myId} showSender={conversation.kind === 'group'} />
+                  <MessageBubble key={r.key} m={r.m} first={r.first} last={r.last} mine={r.m.sender?.id === myId} showSender={conversation.kind === 'group'} />
                 ),
               )}
             </ol>
@@ -330,7 +375,7 @@ function Thread({ conversation, myId, onChanged, onBack }) {
         )}
       </div>
 
-      <p className="border-t border-slate-200 bg-white px-3 pt-2 text-[11px] text-slate-500">
+      <p className="bg-white px-4 pb-1 text-center text-[11px] text-slate-500">
         <i className="fas fa-lock mr-1" aria-hidden="true" />
         {t('msg.recordNotice')}
       </p>
