@@ -4,6 +4,7 @@ import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import { useI18n } from '../i18n/I18nContext';
 import LanguageSwitcher from '../components/layout/LanguageSwitcher';
+import useOnline from '../hooks/useOnline';
 
 const DEMO_ACCOUNTS = [
   { key: 'admin', username: 'hq_admin', password: 'Admin@123' },
@@ -20,6 +21,7 @@ export default function Login() {
   const { login } = useApp();
   const { showToast } = useToast();
   const { t } = useI18n();
+  const online = useOnline();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -88,6 +90,12 @@ export default function Login() {
             <h2 className="text-2xl font-semibold">{t('login.signInTitle')}</h2>
             <p className="mt-1 text-sm text-slate-600">{t('login.signInHint')}</p>
 
+            {!online && (
+              <p role="status" className="mt-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                <i className="fas fa-wifi mr-2" aria-hidden="true" />
+                {t('pwa.offlineSignIn')}
+              </p>
+            )}
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
               <div>
                 <label htmlFor="login-username" className="mb-1 block text-sm font-medium text-slate-800">

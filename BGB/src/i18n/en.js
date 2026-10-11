@@ -1053,6 +1053,16 @@ export default {
     "thisDevice": "This device",
     "unknownDevice": "Unknown device"
   },
+  "pwa": {
+    "install": "Install app",
+    "iosNote": "BIRDS then opens from your home screen like any other app. You still sign in as usual.",
+    "iosStep1": "In Safari, tap the Share button",
+    "iosStep2": "Choose \"Add to Home Screen\".",
+    "iosStep3": "Tap \"Add\".",
+    "iosTitle": "Install BIRDS on this iPhone or iPad",
+    "offline": "You are offline. Pages you open need a connection; nothing is lost, try again when the network is back.",
+    "offlineSignIn": "You are offline. Signing in needs a connection to the BIRDS server."
+  },
   "queue": {
     "action": "Need my action",
     "actionOverdue": "Of those, overdue",

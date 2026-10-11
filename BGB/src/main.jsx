@@ -13,6 +13,9 @@ import App from './App.jsx';
 import { AppProvider } from './context/AppContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
 import { I18nProvider } from './i18n/I18nContext.jsx';
+import { setupPwa } from './utils/pwa.js';
+
+setupPwa();
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

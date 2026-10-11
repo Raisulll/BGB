@@ -45,7 +45,7 @@ export default function CallPanel({ call, onAccept, onDecline, onHangUp, onToggl
       role={incoming ? 'alertdialog' : 'status'}
       aria-live="assertive"
       aria-label={incoming ? t('calls.incomingFrom', { name: other?.name }) : t('calls.callWith', { name: other?.name })}
-      className="fixed inset-x-3 bottom-3 z-[95] rounded-lg border border-slate-300 bg-white p-4 shadow-xl sm:inset-x-auto sm:right-5 sm:bottom-5 sm:w-80 print:hidden"
+      className="fixed inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-[95] rounded-lg border border-slate-300 bg-white p-4 shadow-xl sm:inset-x-auto sm:right-5 sm:bottom-5 sm:w-80 print:hidden"
     >
       <div className="flex items-center gap-3">
         <Avatar name={other?.name} size="lg" />

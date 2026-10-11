@@ -4,6 +4,7 @@ import { useApp } from '../../context/AppContext';
 import GlobalSearch from './GlobalSearch';
 import NotificationsMenu from './NotificationsMenu';
 import LanguageSwitcher from './LanguageSwitcher';
+import InstallAppItem, { IosInstallHelp } from './InstallAppItem';
 import { useI18n } from '../../i18n/I18nContext';
 
 function getPageDetails(pathname) {
@@ -33,6 +34,7 @@ export default function Header({ onToggleSidebar, collapsed }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [iosHelp, setIosHelp] = useState(false);
   const userMenuRef = useRef(null);
   const [timeStr, setTimeStr] = useState('');
 
@@ -149,6 +151,7 @@ export default function Header({ onToggleSidebar, collapsed }) {
               >
                 {t('header.changePassword')}
               </button>
+              <InstallAppItem onDone={() => setUserMenuOpen(false)} onIosHelp={() => setIosHelp(true)} />
               <div className="my-1 border-t border-slate-200" />
               <button role="menuitem" onClick={handleLogout} className="block w-full px-4 py-2 text-left text-sm font-medium text-red-700 hover:bg-red-50">
                 {t('header.signOut')}
@@ -157,6 +160,7 @@ export default function Header({ onToggleSidebar, collapsed }) {
           )}
         </div>
       </div>
+      {iosHelp && <IosInstallHelp onClose={() => setIosHelp(false)} />}
     </header>
   );
 }

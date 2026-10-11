@@ -27,7 +27,9 @@ Tender/
     ├── package.json
     ├── vercel.json             ← SPA rewrite rule for Vercel deployment
     ├── public/
-    │   └── bgb.png             ← Official BGB emblem (use in all headers & reports)
+    │   ├── bgb.png             ← Official BGB emblem (use in all headers & reports)
+    │   ├── manifest.webmanifest, icons/  ← installable app (PWA): name, colours, home-screen icons
+    │   └── sw.js               ← service worker: caches app files only, NEVER /api (see §15)
     └── src/
         ├── main.jsx            ← Entry: BrowserRouter → ToastProvider → AppProvider → App
         ├── App.jsx             ← Route definitions + RequireAuth + RequirePermission guards
@@ -408,6 +410,7 @@ When adding a new feature, verify against this checklist:
 ## 15. Production Deployment Notes
 
 - **Hosting**: Vercel (config in `BGB/vercel.json`) or any static host with SPA rewrite support.
+- **Installable app (PWA, specs #41/#58)**: `sw.js` and `manifest.webmanifest` must be served with `Cache-Control: no-cache` (Express `spa.ts` does; set the same in Nginx) and over HTTPS. The worker caches only the app (network-first page loads, cache-first `/assets/*`); it must never cache `/api/*`. Bump the cache names in `sw.js` only to force-clear old caches. Registered in production builds only (`utils/pwa.js`).
 - **Environment**: All routes rewrite to `index.html` (SPA routing).
 - **Backend**: A Node.js/Express or .NET REST API must be added for persistence, AD/LDAP, file storage, and scheduled backup (specs #2, #4, #30–#36, #44–#50).
 - **Database**: Enterprise RDBMS (PostgreSQL or Microsoft SQL Server) recommended to satisfy spec #30.

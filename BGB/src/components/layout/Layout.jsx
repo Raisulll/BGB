@@ -3,6 +3,8 @@ import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import useIdleLogout from '../../hooks/useIdleLogout';
+import useOnline from '../../hooks/useOnline';
+import { useI18n } from '../../i18n/I18nContext';
 import { CommsProvider } from '../../context/CommsContext';
 
 const DESKTOP_QUERY = '(min-width: 768px)';
@@ -11,6 +13,8 @@ export default function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const { pathname } = useLocation();
+  const { t } = useI18n();
+  const online = useOnline();
   useIdleLogout();
 
   // Close mobile drawer & scroll to top on navigation
@@ -38,7 +42,8 @@ export default function Layout() {
 
   return (
     <CommsProvider>
-      <div className="flex h-dvh overflow-hidden bg-slate-100/60">
+      {/* Safe-area padding: the installed app runs full screen under the iPhone notch and home bar */}
+      <div className="flex h-dvh overflow-hidden bg-slate-100/60 pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]">
         {/* Mobile overlay */}
         <div
           onClick={() => setMobileOpen(false)}
@@ -57,6 +62,12 @@ export default function Layout() {
 
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <Header onToggleSidebar={toggleSidebar} collapsed={collapsed} />
+          {!online && (
+            <p role="status" className="border-b border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-900 print:hidden">
+              <i className="fas fa-wifi mr-2" aria-hidden="true" />
+              {t('pwa.offline')}
+            </p>
+          )}
           <main id="main-scroll" className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6 print:overflow-visible print:p-0">
             <div key={pathname} className="mx-auto w-full max-w-screen-2xl animate-fade-in">
               <Outlet />
