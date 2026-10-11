@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CircleMarker, MapContainer, Popup, TileLayer, Tooltip } from 'react-leaflet';
-import { TILE_ATTRIBUTION, TILE_URL } from '../lib/leaflet';
+import { BD_LIMIT, BD_VIEW, TILE_ATTRIBUTION, TILE_URL } from '../lib/leaflet';
+import BangladeshFrame from '../components/map/BangladeshFrame';
 import { useApp } from '../context/AppContext';
 import * as incidentsApi from '../api/incidents';
 import useApi from '../hooks/useApi';
@@ -167,9 +168,11 @@ export default function MapView() {
           </div>
           <span className="text-xs text-gray-500">{t('map.shown', { n: filtered.length })}</span>
         </div>
-        <div className="h-[400px] overflow-hidden rounded-md sm:h-[520px]">
-          <MapContainer center={[21.5, 92.0]} zoom={7} className="h-full w-full">
-            <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
+        <div className="h-[440px] overflow-hidden rounded-md sm:h-[620px]">
+          {/* Quarter-step zoom so Bangladesh fills the map instead of jumping between whole levels */}
+          <MapContainer bounds={BD_VIEW} maxBounds={BD_LIMIT} maxBoundsViscosity={1} zoomSnap={0.25} zoomDelta={0.5} className="h-full w-full">
+            <BangladeshFrame />
+            <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} bounds={BD_LIMIT} noWrap />
             {mode === 'clusters' && <ClusterLayer incidents={filtered} labels={layerLabels} />}
             {mode === 'heat' && <HeatLayer incidents={filtered} />}
             {mode === 'points' && locationGroups.map((loc) => (

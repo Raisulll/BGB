@@ -13,3 +13,15 @@ L.Icon.Default.mergeOptions({
 
 export const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 export const TILE_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+
+// Spec #18 — BIRDS maps show Bangladesh and the strip of India and Myanmar along its border, not
+// whole countries. VIEW frames Bangladesh (about 50 km past its extremes: 20.6-26.6 N, 88.0-92.7 E);
+// LIMIT is how far the map can be panned or zoomed out. Tiles outside LIMIT are never downloaded.
+export const BD_VIEW = [
+  [20.15, 87.55],
+  [27.1, 93.2],
+];
+export const BD_LIMIT = [
+  [19.7, 87.0],
+  [27.6, 93.75],
+];

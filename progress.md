@@ -575,6 +575,8 @@ Added after the session summary: deferred items now appear in **Admin › Operat
 - **3.** The "Turn on notifications" suggestion now shows on every page (Layout), not only Messages.
 - 3 i18n keys (1173). OpenAPI: decline route, call payload. Server **159/159** (`push.test.ts` +1: decline with token only). Real FCM test `push-ring.mjs`: Decline/Answer actions present, notification re-shown (timestamp moves), then "Missed call". Call-drop suite clean; messaging suite 3/4 runs clean (one timing flake in the test's own check right after a voice send).
 
+- **GIS map framed on Bangladesh (owner request).** `lib/leaflet.js` `BD_VIEW` (Bangladesh + ~50 km: 20.15-27.1 N, 87.55-93.2 E) and `BD_LIMIT` (19.7-27.6 N, 87.0-93.75 E); `components/map/BangladeshFrame.jsx`: can't zoom out past the whole of Bangladesh for the map's size (recomputed on resize), `maxBounds` with viscosity 1, and a light mask with a thin edge over everything outside the frame (tiles are square and reach past it). Tile layers load only tiles touching the frame (`bounds`, `noWrap`). GIS page: opens fitted to Bangladesh with quarter-step zoom, map 440 px / 620 px from `sm`. Incident page's small map uses the same frame. Verified (`map-frame.mjs`, desktop 1440 and phone 390): zoom-out stops at Bangladesh, dragging to India/Bay of Bengal stays in the frame, no tile requested entirely outside it.
+
 ### Blockers / waiting on
 - Owner: on each phone, tap "Turn on notifications" (iPhone: install BIRDS to the home screen first, iOS 16.4+); report which phones/browsers the silent calls were on
 

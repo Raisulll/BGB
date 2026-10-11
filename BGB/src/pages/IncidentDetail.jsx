@@ -1,7 +1,8 @@
 import { useCallback, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet';
-import { TILE_ATTRIBUTION, TILE_URL } from '../lib/leaflet';
+import { BD_LIMIT, TILE_ATTRIBUTION, TILE_URL } from '../lib/leaflet';
+import BangladeshFrame from '../components/map/BangladeshFrame';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import * as incidentsApi from '../api/incidents';
@@ -366,8 +367,9 @@ export default function IncidentDetail() {
             {inc.lat != null && inc.lng != null && (
               <Card title={t('detail.location')} icon="fa-map-marker-alt" bodyClassName="p-2 sm:p-4">
                 <div className="h-64 overflow-hidden rounded-lg sm:h-80">
-                  <MapContainer center={[inc.lat, inc.lng]} zoom={13} scrollWheelZoom={false} className="h-full w-full">
-                    <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
+                  <MapContainer center={[inc.lat, inc.lng]} zoom={13} scrollWheelZoom={false} maxBounds={BD_LIMIT} maxBoundsViscosity={1} className="h-full w-full">
+                    <BangladeshFrame />
+                    <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} bounds={BD_LIMIT} noWrap />
                     <Marker position={[inc.lat, inc.lng]}>
                       <Popup>
                         <b>{inc.id}</b>
