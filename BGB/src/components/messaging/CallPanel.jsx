@@ -24,7 +24,7 @@ function Timer({ since }) {
  * The live call: incoming (answer / decline), ringing, connecting and in-call (mute / hang up).
  * Fixed at the bottom right so it stays visible while the user moves between pages.
  */
-export default function CallPanel({ call, onAccept, onDecline, onHangUp, onToggleMute }) {
+export default function CallPanel({ call, soundBlocked, audioHealth, onEnableSound, onAccept, onDecline, onHangUp, onToggleMute }) {
   const { t, tv } = useI18n();
   const { phase, other, muted, answeredAt } = call;
   const incoming = phase === 'incoming';
@@ -60,6 +60,20 @@ export default function CallPanel({ call, onAccept, onDecline, onHangUp, onToggl
           </p>
         </div>
       </div>
+
+      {/* Sound problems, in plain words */}
+      {soundBlocked && (
+        <button type="button" onClick={onEnableSound} className="btn btn-primary mt-3 w-full">
+          <i className="fas fa-volume-high" aria-hidden="true" />
+          {t('calls.turnOnSound')}
+        </button>
+      )}
+      {phase === 'active' && audioHealth && (!audioHealth.incoming || !audioHealth.outgoing) && (
+        <p role="alert" className="mt-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          {!audioHealth.incoming && <span className="block">{t('calls.noSoundIn', { name: other?.name })}</span>}
+          {!audioHealth.outgoing && !muted && <span className="block">{t('calls.noSoundOut')}</span>}
+        </p>
+      )}
 
       <div className="mt-3 flex gap-2">
         {incoming ? (

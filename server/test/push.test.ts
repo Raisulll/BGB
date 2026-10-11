@@ -1,6 +1,7 @@
 import type { AddressInfo } from 'node:net';
 import { createServer, type Server } from 'node:http';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import request from 'supertest';
 import WebSocket from 'ws';
 
 // Web push: device registration, who gets pushed (live sessions only), payloads without message
@@ -148,7 +149,8 @@ describe('call pushes', () => {
     await until(() => sent.some((s) => s.endpoint === vf && s.payload.kind === 'call'));
     const ring = sent.find((s) => s.payload.kind === 'call')!;
     const callId = ring.payload.callId as number;
-    expect(ring.payload).toEqual({ kind: 'call', callId, callerName: operator.user.name });
+    expect(ring.payload).toMatchObject({ kind: 'call', callId, callerName: operator.user.name, ringSeconds: 1 });
+    expect(ring.payload.declineToken).toMatch(/^\d+\.[A-Za-z0-9_-]{43}$/);
     expect(ring.options).toMatchObject({ urgency: 'high', TTL: 1, topic: `call-${callId}` });
 
     // The verifier opens BIRDS from the notification: the ringing call arrives on connect
@@ -160,6 +162,34 @@ describe('call pushes', () => {
     // Not answered within CALL_RING_SECONDS (1 in tests): a missed-call push replaces the ringing one
     await until(() => sent.some((s) => s.payload.kind === 'call-ended'), 5000);
     expect(sent.find((s) => s.payload.kind === 'call-ended')!.payload).toEqual({ kind: 'call-ended', callId, callerName: operator.user.name, missed: true });
+    caller.ws.close();
+  });
+
+  it('declines from the notification with the token of that call only', async () => {
+    const vf = endpoint('vf-decline');
+    await verifier.post(`${P}/subscriptions`, { endpoint: vf, keys });
+    const caller = await socket(operator.token);
+    const ring = async () => {
+      sent.length = 0;
+      caller.send({ type: 'call.invite', to: verifier.user.id });
+      await until(() => sent.some((s) => s.endpoint === vf && s.payload.kind === 'call'));
+      return sent.find((s) => s.payload.kind === 'call')!.payload as { callId: number; declineToken: string };
+    };
+    const decline = (id: number, token: string) => request(app).post(`/api/v1/calls/${id}/decline`).send({ token });
+
+    const first = await ring();
+    // Tampered, or used for another call: refused
+    const [exp, sig] = first.declineToken.split('.');
+    expect((await decline(first.callId, `${exp}.${sig!.slice(0, -2)}AA`)).status).toBe(403);
+    expect((await decline(first.callId, `${Number(exp) + 1000}.${sig}`)).status).toBe(403);
+    expect((await decline(first.callId + 1000, first.declineToken)).status).toBe(403);
+    // The real one declines the call, and the caller is told
+    expect((await decline(first.callId, first.declineToken)).status).toBe(204);
+    await until(() => caller.inbox.some((m) => m.type === 'call.ended' && m.callId === first.callId));
+    expect(caller.inbox.find((m) => m.type === 'call.ended' && m.callId === first.callId)).toMatchObject({ status: 'declined' });
+    // Only once
+    expect((await decline(first.callId, first.declineToken)).status).toBe(204);
+    expect((await prisma.call.findUnique({ where: { id: first.callId } }))?.status).toBe('declined');
     caller.ws.close();
   });
 });

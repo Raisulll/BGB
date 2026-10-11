@@ -13,7 +13,6 @@ import { closeNotifications } from '../utils/push';
 import Avatar from '../components/messaging/Avatar';
 import Composer from '../components/messaging/Composer';
 import GroupDialog from '../components/messaging/GroupDialog';
-import { PushPrompt } from '../components/messaging/PushSettings';
 import PeoplePicker from '../components/messaging/PeoplePicker';
 import VoiceMessage from '../components/messaging/VoiceMessage';
 import { formatDuration } from '../components/messaging/CallPanel';
@@ -552,7 +551,6 @@ export default function Messages() {
 
   return (
     <div className="space-y-3">
-      <PushPrompt />
       {offline && (
         <p role="status" className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
           <i className="fas fa-plug mr-2" aria-hidden="true" />

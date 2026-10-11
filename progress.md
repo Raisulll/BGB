@@ -564,7 +564,22 @@ Added after the session summary: deferred items now appear in **Admin › Operat
 - Tests: `push.test.ts` (4: registration + validation + audit + no takeover; message push to others only, no text, stops after sign-out; dead device deleted; call push, replay on connect, missed-call push) with the sender replaced; `vitest.config.ts` generates a throwaway VAPID pair per run (no key in the repo) → **158/158**. Real end to end in Chrome through FCM (`push-e2e.mjs`, 8 checks: turn on, message notification with BIRDS closed, no text, "2 new messages", incoming call, same notification becomes "Missed call", Bangla) and `push-tap.mjs` (tap navigates without reload; opening BIRDS while a call rings shows Answer). Call and messaging suites re-run clean. Note: the first subscription in a fresh Chrome profile took ~28 s (FCM registration); the button now says "Turning on…".
 - Deploy needs: `npm run keys:vapid` → `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` on Render, and `npm run db:deploy` on Supabase (one new migration).
 
+
+---
+## Session — 2026-10-11 (continued) — owner's three issues after deploying
+
+### What was done
+- Checked live first: push enabled, TURN configured (`relay: true`), new code deployed; calls #9 and #10 answered for 40-55 s (connected, so signalling and ICE work); **no device on live had push turned on** (no `push_subscriptions` rows, no `PUSH_SUBSCRIBE` audit). That explains "no notification outside the app" and "nothing while BIRDS is in the background" (phones suspend background tabs and their sound; only push reaches them).
+- **1. Connected but no sound.** Most likely cause: mobile browsers (iPhone above all) only play audio that a tap started; the remote stream was attached in `ontrack` and `play()` failures were swallowed. `CommsContext.jsx`: the Call/Answer tap now starts the `<audio>` element (playsinline) on an empty MediaStream before anything is awaited, and the remote track is added to that same stream; if the browser still blocks it, the panel shows **Turn on sound**. While active, `getStats()` every 2 s checks audio bytes in/out; after ~6 s without, the panel says "No sound is arriving from X" / "Your microphone is not sending sound". Verified under Chrome's `document-user-activation-required` policy (`call-audio.mjs`): both sides play, bytes flow both ways, no warnings. Not reproducible in Chrome: iOS Safari's own rule; the owner should retest on the same phones.
+- **2. Messenger-like call outside the app.** Call notification now rings again every 4 s (renotify: sound + vibration) for the ring time, requires interaction, and has **Decline** / **Answer** (Android/desktop). Decline works without signing in: `POST /calls/:id/decline { token }`, token in the push = HMAC(callId:callee:exp) keyed from the VAPID private key; refuses tampered/expired/other-call tokens. Answer opens `/messages?answer=<id>`; the app answers when the replayed call arrives (also when BIRDS was open in the background). A full-screen lock-screen call UI isn't possible for a web app (needs a native app); stated in DOUBT-015.
+- **3.** The "Turn on notifications" suggestion now shows on every page (Layout), not only Messages.
+- 3 i18n keys (1173). OpenAPI: decline route, call payload. Server **159/159** (`push.test.ts` +1: decline with token only). Real FCM test `push-ring.mjs`: Decline/Answer actions present, notification re-shown (timestamp moves), then "Missed call". Call-drop suite clean; messaging suite 3/4 runs clean (one timing flake in the test's own check right after a voice send).
+
+### Blockers / waiting on
+- Owner: on each phone, tap "Turn on notifications" (iPhone: install BIRDS to the home screen first, iOS 16.4+); report which phones/browsers the silent calls were on
+
 ### Next session — TODO
-1. Commit, push; generate VAPID keys and set them on Render; `npm run db:deploy` on Supabase; deploy on Render; turn notifications on from the profile page on a phone (iPhone: install first) and test a call with the app closed
+1. Commit, push; `npm run db:deploy` on Supabase if the push migration isn't there yet; deploy on Render
+2. On the phones: turn notifications on, retest a call (both directions) and a call with BIRDS closed; if "No sound is arriving" shows, note which side
 2. Set the TURN variables on Render if not done
 3. Confirm DOUBT-014 assumptions with the owner

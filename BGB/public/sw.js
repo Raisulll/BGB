@@ -95,6 +95,8 @@ const TEXT = {
     messageBody: (p, n) => (n > 1 ? `${n} new messages` : p.voice ? 'Voice message' : 'New message'),
     call: 'Incoming call',
     callBody: (p) => `${p.callerName} is calling you`,
+    answer: 'Answer',
+    decline: 'Decline',
     missed: 'Missed call',
     missedBody: (p) => `Missed call from ${p.callerName}`,
   },
@@ -103,11 +105,14 @@ const TEXT = {
     messageBody: (p, n) => (n > 1 ? `${n}টি নতুন বার্তা` : p.voice ? 'ভয়েস বার্তা' : 'নতুন বার্তা'),
     call: 'ইনকামিং কল',
     callBody: (p) => `${p.callerName} আপনাকে কল করছেন`,
+    answer: 'ধরুন',
+    decline: 'কাটুন',
     missed: 'মিসড কল',
     missedBody: (p) => `${p.callerName}-এর মিসড কল`,
   },
 };
-const RING_MS = 35_000; // a ringing notification closes itself after the server's ring time
+const RING_REPEAT_MS = 4000; // a ringing call notification sounds and vibrates again this often
+const handledCalls = new Set(); // answered/declined from the notification: stop ringing
 
 async function language() {
   const hit = await (await caches.open(PREFS_CACHE)).match('/__lang');
@@ -150,18 +155,31 @@ async function showPush(payload) {
   if (payload.kind === 'call') {
     if (await appInFront()) return; // the app is ringing already
     const tag = `call-${payload.callId}`;
-    await self.registration.showNotification(t.call, {
+    const ringUntil = Date.now() + (payload.ringSeconds || 30) * 1000;
+    const options = {
       body: t.callBody(payload),
       tag,
-      renotify: true,
+      renotify: true, // each repeat sounds and vibrates again, like a phone ringing
       requireInteraction: true,
-      vibrate: [400, 200, 400, 200, 400, 200, 400],
+      vibrate: [600, 300, 600, 300, 600],
       icon,
       badge,
-      data: { url: '/messages', callId: payload.callId },
-    });
-    // Stop "ringing" when the call can't be answered any more
-    await new Promise((r) => setTimeout(r, RING_MS));
+      actions: [
+        { action: 'decline', title: t.decline },
+        { action: 'answer', title: t.answer },
+      ],
+      data: { url: '/messages', callId: payload.callId, declineToken: payload.declineToken },
+    };
+    await self.registration.showNotification(t.call, options);
+    // Keep ringing until the call is answered, declined, missed or the notification is swiped away
+    while (Date.now() + RING_REPEAT_MS < ringUntil) {
+      await new Promise((r) => setTimeout(r, RING_REPEAT_MS));
+      if (handledCalls.has(payload.callId)) return;
+      const [shown] = await self.registration.getNotifications({ tag });
+      if (!shown || shown.data?.missed || (await appInFront())) return;
+      await self.registration.showNotification(t.call, options);
+    }
+    await new Promise((r) => setTimeout(r, Math.max(0, ringUntil - Date.now()) + 2000));
     const still = await self.registration.getNotifications({ tag });
     still.filter((n) => !n.data?.missed).forEach((n) => n.close());
     return;
@@ -191,7 +209,23 @@ self.addEventListener('push', (event) => {
 // Tapping a notification opens BIRDS on the right page (an open window is reused)
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = new URL(event.notification.data?.url || '/', self.location.origin).href;
+  const data = event.notification.data || {};
+  if (data.callId) handledCalls.add(data.callId);
+
+  // Decline without opening BIRDS: the push carried a token for exactly this call
+  if (event.action === 'decline' && data.callId && data.declineToken) {
+    event.waitUntil(
+      fetch(`/api/v1/calls/${data.callId}/decline`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: data.declineToken }),
+      }).catch(() => {}),
+    );
+    return;
+  }
+  // Answer: open BIRDS and answer as soon as the call reaches the app
+  const target = event.action === 'answer' && data.callId ? `/messages?answer=${data.callId}` : data.url || '/';
+  const url = new URL(target, self.location.origin).href;
   event.waitUntil(
     (async () => {
       const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });

@@ -289,6 +289,8 @@ export default {
     "mute": "Mute",
     "muted": "Muted",
     "noMicSupport": "This browser cannot use a microphone here. Calls need a secure (HTTPS) connection.",
+    "noSoundIn": "No sound is arriving from {name}. Their microphone may be off or blocked.",
+    "noSoundOut": "Your microphone is not sending sound. Check that BIRDS may use the microphone.",
     "ringing": "Ringing",
     "starting": "Starting call",
     "tab": {
@@ -303,6 +305,7 @@ export default {
       "missedIncoming": "Missed call from {name}.",
       "noAnswer": "{name} did not answer."
     },
+    "turnOnSound": "Turn on sound",
     "unmute": "Unmute"
   },
   "cat": {

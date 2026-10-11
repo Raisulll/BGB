@@ -1,3 +1,4 @@
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { env } from '../../config/env.js';
 import { logger } from '../../config/logger.js';
 import { prisma } from '../../db.js';
@@ -27,6 +28,32 @@ const dropped = new Map<string, NodeJS.Timeout>();
 const droppedKey = (callId: number, userId: string) => `${callId}:${userId}`;
 
 const toUser = (to: string, payload: Record<string, unknown>) => publish({ type: 'call', to, payload });
+
+// "Decline" on the call notification: the service worker has no sign-in, so the push carries a
+// token that allows exactly one thing: declining this call as its callee, until shortly after it
+// stops ringing. Signed with a key derived from the VAPID private key (push exists only with it).
+const declineKey = () => createHash('sha256').update(`birds-call-decline:${env.VAPID_PRIVATE_KEY ?? ''}`).digest();
+const sign = (text: string) => createHmac('sha256', declineKey()).update(text).digest('base64url');
+
+export function declineToken(callId: number, calleeId: string) {
+  const exp = Date.now() + RING_MS + 60_000;
+  return `${exp}.${sign(`${callId}:${calleeId}:${exp}`)}`;
+}
+
+/** Declines a ringing call with a token from its push. False if the token or call doesn't fit. */
+export async function declineWithToken(callId: number, token: string, ctx: Client['ctx']) {
+  const call = await getCall(callId);
+  if (!call || !env.VAPID_PRIVATE_KEY) return false;
+  const [expText, sig] = token.split('.');
+  const exp = Number(expText);
+  if (!sig || !Number.isFinite(exp) || exp < Date.now()) return false;
+  const expected = Buffer.from(sign(`${callId}:${call.calleeId}:${exp}`));
+  const given = Buffer.from(sig);
+  if (expected.length !== given.length || !timingSafeEqual(expected, given)) return false;
+  const done = await transition(callId, ['ringing'], 'declined', 'declined from notification');
+  if (done) await ended(callId, ctx);
+  return true;
+}
 const reply = (c: Client, payload: Record<string, unknown>) => c.ws.send(JSON.stringify(payload));
 
 async function ended(callId: number, ctx: Client['ctx']) {
@@ -77,7 +104,11 @@ export function registerCallRealtime() {
         reply(client, { type: 'call.ringing', call: toCallDto(call, client.userId) });
         await toUser(to, { type: 'call.incoming', call: toCallDto(call, to) });
         // Devices where BIRDS is closed ring through a notification; opening it replays the call
-        void pushToUsers([to], { kind: 'call', callId: call.id, callerName: client.name }, { ttlSeconds: env.CALL_RING_SECONDS, urgency: 'high', topic: `call-${call.id}` });
+        void pushToUsers(
+          [to],
+          { kind: 'call', callId: call.id, callerName: client.name, ringSeconds: env.CALL_RING_SECONDS, declineToken: declineToken(call.id, to) },
+          { ttlSeconds: env.CALL_RING_SECONDS, urgency: 'high', topic: `call-${call.id}` },
+        );
         setTimeout(async () => {
           const missed = await transition(call.id, ['ringing'], 'missed', 'no answer').catch(() => null);
           if (missed) await ended(call.id, client.ctx);

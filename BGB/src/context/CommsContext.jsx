@@ -21,10 +21,18 @@ import CallPanel from '../components/messaging/CallPanel';
 // A dropped realtime connection doesn't end the call: after reconnecting the browser sends
 // call.resume and the server keeps the call (CALL_RECONNECT_SECONDS). If the audio path itself
 // fails, the caller restarts ICE once before the call is given up.
+//
+// Sound: phones only let a page play audio that a tap started. The Call/Answer tap starts the
+// <audio> element on an empty stream; the other side's track is added to that same stream when it
+// arrives, so it plays without another tap. If the browser still blocks it, the panel offers
+// "Turn on sound". While the call is up, the connection's statistics show whether audio actually
+// flows each way, and the panel says when it doesn't.
 
 const CommsContext = createContext(null);
 const UNREAD_POLL_MS = 60_000;
 const ICE_RESTART_WAIT_MS = 15_000; // how long the callee waits for the caller's ICE restart
+const STATS_MS = 2000;
+const SILENT_CHECKS = 3; // ~6 s without audio bytes counts as "no sound"
 
 export function CommsProvider({ children }) {
   const { currentUser, hasPermission } = useApp();
@@ -37,6 +45,8 @@ export function CommsProvider({ children }) {
   const [connected, setConnected] = useState(realtimeReady());
   const [unread, setUnread] = useState(0);
   const [call, setCall] = useState(null); // { id?, phase, other, answeredAt?, muted }
+  const [soundBlocked, setSoundBlocked] = useState(false);
+  const [audioHealth, setAudioHealth] = useState(null); // { incoming: bool, outgoing: bool } once measured
 
   const callRef = useRef(null);
   const pcRef = useRef(null);
@@ -45,6 +55,9 @@ export function CommsProvider({ children }) {
   const toneRef = useRef(null);
   const abandonedRef = useRef(false); // hung up before the server confirmed the invite
   const audioRef = useRef(null);
+  const remoteRef = useRef(null); // the MediaStream the <audio> element plays
+  const answerRef = useRef(null); // call id to answer as soon as it rings (Answer on the notification)
+  const acceptRef = useRef(null);
   const iceRef = useRef({ restarted: false, timer: null }); // ICE restart after a failed audio path
 
   const updateCall = useCallback((next) => {
@@ -77,10 +90,31 @@ export function CommsProvider({ children }) {
     const onMessage = (e) => {
       if (e.data?.type !== 'navigate') return;
       const url = new URL(e.data.url, window.location.origin);
-      if (url.origin === window.location.origin) navigate(url.pathname + url.search);
+      if (url.origin !== window.location.origin) return;
+      const answer = Number(url.searchParams.get('answer')) || null;
+      url.searchParams.delete('answer');
+      if (answer) {
+        // Answer on the notification while BIRDS was open in the background
+        const c = callRef.current;
+        if (c?.id === answer && c.phase === 'incoming') acceptRef.current?.();
+        else answerRef.current = answer;
+      }
+      navigate(url.pathname + url.search);
     };
     navigator.serviceWorker.addEventListener('message', onMessage);
     return () => navigator.serviceWorker.removeEventListener('message', onMessage);
+  }, [navigate]);
+
+  // Opened from the notification's Answer: answer that call when it arrives (the server replays a
+  // ringing call to a socket that connects), then drop the parameter from the address
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const answer = Number(params.get('answer')) || null;
+    if (!answer) return;
+    answerRef.current = answer;
+    params.delete('answer');
+    const rest = params.toString();
+    navigate(window.location.pathname + (rest ? `?${rest}` : ''), { replace: true });
   }, [navigate]);
 
   // ---------- Unread count (sidebar) ----------
@@ -130,8 +164,29 @@ export function CommsProvider({ children }) {
     pcRef.current = null;
     queueRef.current = [];
     if (audioRef.current) audioRef.current.srcObject = null;
+    remoteRef.current = null;
+    setSoundBlocked(false);
+    setAudioHealth(null);
     updateCall(null);
   }, [updateCall]);
+
+  // Must run inside the Call/Answer tap, before anything is awaited
+  const unlockAudio = useCallback(() => {
+    const el = audioRef.current;
+    if (!el) return;
+    remoteRef.current = new MediaStream();
+    el.srcObject = remoteRef.current;
+    el.muted = false;
+    el.play?.().catch(() => {});
+  }, []);
+
+  /** "Turn on sound" in the panel (a tap, so the browser allows it). */
+  const enableSound = useCallback(() => {
+    audioRef.current
+      ?.play?.()
+      .then(() => setSoundBlocked(false))
+      .catch(() => setSoundBlocked(true));
+  }, []);
 
   const getMic = useCallback(async () => {
     if (!navigator.mediaDevices?.getUserMedia) throw new Error(t('calls.noMicSupport'));
@@ -169,10 +224,14 @@ export function CommsProvider({ children }) {
         if (e.candidate) sendRealtime({ type: 'call.signal', callId, data: { candidate: e.candidate.toJSON() } });
       };
       pc.ontrack = (e) => {
-        if (audioRef.current) {
-          audioRef.current.srcObject = e.streams[0];
-          audioRef.current.play?.().catch(() => {});
-        }
+        const el = audioRef.current;
+        if (!el) return;
+        const remote = remoteRef.current ?? (remoteRef.current = new MediaStream());
+        if (!remote.getTracks().includes(e.track)) remote.addTrack(e.track);
+        if (el.srcObject !== remote) el.srcObject = remote;
+        el.play?.()
+          .then(() => setSoundBlocked(false))
+          .catch(() => setSoundBlocked(true));
       };
       const giveUp = () => {
         sendRealtime({ type: 'call.end', callId });
@@ -214,6 +273,7 @@ export function CommsProvider({ children }) {
     async (person) => {
       if (callRef.current) return showToast(t('calls.alreadyInCall'), 'warning');
       if (!realtimeReady()) return showToast(t('msg.offline'), 'error');
+      unlockAudio();
       abandonedRef.current = false;
       updateCall({ phase: 'starting', role: 'caller', other: person, muted: false });
       try {
@@ -233,12 +293,13 @@ export function CommsProvider({ children }) {
         showToast(t('msg.offline'), 'error');
       }
     },
-    [cleanup, getMic, showToast, t, updateCall],
+    [cleanup, getMic, showToast, t, unlockAudio, updateCall],
   );
 
   const acceptCall = useCallback(async () => {
     const c = callRef.current;
     if (!c || c.phase !== 'incoming') return;
+    unlockAudio();
     stopTone();
     updateCall({ ...c, phase: 'connecting' });
     try {
@@ -250,7 +311,36 @@ export function CommsProvider({ children }) {
       return showToast(err.message || t('calls.connectionFailed'), 'error');
     }
     sendRealtime({ type: 'call.accept', callId: c.id });
-  }, [cleanup, createPeer, getMic, showToast, t, updateCall]);
+  }, [cleanup, createPeer, getMic, showToast, t, unlockAudio, updateCall]);
+  acceptRef.current = acceptCall;
+
+  // Is audio flowing? Bytes received/sent on the audio streams, every couple of seconds
+  const active = call?.phase === 'active';
+  useEffect(() => {
+    if (!active) return;
+    let last = { in: -1, out: -1 };
+    let silent = { in: 0, out: 0 };
+    const id = setInterval(async () => {
+      const pc = pcRef.current;
+      if (!pc) return;
+      let bytesIn = 0;
+      let bytesOut = 0;
+      try {
+        (await pc.getStats()).forEach((r) => {
+          if (r.kind !== 'audio') return;
+          if (r.type === 'inbound-rtp') bytesIn += r.bytesReceived || 0;
+          if (r.type === 'outbound-rtp') bytesOut += r.bytesSent || 0;
+        });
+      } catch {
+        return;
+      }
+      silent = { in: bytesIn > last.in ? 0 : silent.in + 1, out: bytesOut > last.out ? 0 : silent.out + 1 };
+      last = { in: bytesIn, out: bytesOut };
+      setAudioHealth({ incoming: silent.in < SILENT_CHECKS, outgoing: silent.out < SILENT_CHECKS });
+      if (audioRef.current?.paused && remoteRef.current?.getTracks().length) setSoundBlocked(true);
+    }, STATS_MS);
+    return () => clearInterval(id);
+  }, [active]);
 
   const declineCall = useCallback(() => {
     const c = callRef.current;
@@ -306,6 +396,11 @@ export function CommsProvider({ children }) {
           if (c) return; // the server marks busy users; a second tab of a busy user just ignores it
           updateCall({ id: msg.call.id, phase: 'incoming', role: 'callee', other: msg.call.other, muted: false });
           closeNotifications(`call-${msg.call.id}`); // the app rings now
+          if (answerRef.current === msg.call.id) {
+            answerRef.current = null;
+            acceptRef.current?.();
+            return;
+          }
           toneRef.current = startTone('ring');
           return;
         }
@@ -400,8 +495,19 @@ export function CommsProvider({ children }) {
   return (
     <CommsContext.Provider value={value}>
       {children}
-      <audio ref={audioRef} autoPlay className="hidden" />
-      {call && <CallPanel call={call} onAccept={acceptCall} onDecline={declineCall} onHangUp={hangUp} onToggleMute={toggleMute} />}
+      <audio ref={audioRef} autoPlay playsInline className="hidden" />
+      {call && (
+        <CallPanel
+          call={call}
+          soundBlocked={soundBlocked}
+          audioHealth={audioHealth}
+          onEnableSound={enableSound}
+          onAccept={acceptCall}
+          onDecline={declineCall}
+          onHangUp={hangUp}
+          onToggleMute={toggleMute}
+        />
+      )}
     </CommsContext.Provider>
   );
 }

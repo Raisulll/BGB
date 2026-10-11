@@ -4,6 +4,8 @@ import Sidebar from './Sidebar';
 import Header from './Header';
 import useIdleLogout from '../../hooks/useIdleLogout';
 import useOnline from '../../hooks/useOnline';
+import { useApp } from '../../context/AppContext';
+import { PushPrompt } from '../messaging/PushSettings';
 import { useI18n } from '../../i18n/I18nContext';
 import { CommsProvider } from '../../context/CommsContext';
 
@@ -15,6 +17,7 @@ export default function Layout() {
   const { pathname } = useLocation();
   const { t } = useI18n();
   const online = useOnline();
+  const { currentUser, hasPermission } = useApp();
   useIdleLogout();
 
   // Close mobile drawer & scroll to top on navigation
@@ -69,6 +72,12 @@ export default function Layout() {
             </p>
           )}
           <main id="main-scroll" className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6 print:overflow-visible print:p-0">
+            {/* Calls and messages reach this device only once notifications are on (shown on every page until done or dismissed) */}
+            {hasPermission(currentUser, 'messages') && (
+              <div className="mx-auto mb-3 w-full max-w-screen-2xl print:hidden">
+                <PushPrompt />
+              </div>
+            )}
             <div key={pathname} className="mx-auto w-full max-w-screen-2xl animate-fade-in">
               <Outlet />
             </div>

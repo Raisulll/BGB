@@ -87,7 +87,8 @@ tags:
       sign-in session it was made in: signing out, being signed out elsewhere, deactivation or
       session expiry stop pushes to it. Payloads are encrypted to the browser and carry names
       only, never message text: `message` {conversationId, senderName, groupTitle, voice},
-      `call` {callId, callerName} (urgency high, TTL = ring time), `call-ended` {callId,
+      `call` {callId, callerName, ringSeconds, declineToken} (urgency high, TTL = ring time; the
+      notification has Answer and Decline and rings again every few seconds), `call-ended` {callId,
       callerName, missed} for a call that was never answered. Devices the push service reports
       gone (404/410) are deleted.
   - name: System
@@ -1403,6 +1404,18 @@ paths:
         content: { application/json: { schema: { type: object, required: [endpoint], properties: { endpoint: { type: string, format: uri } } } } }
       responses:
         '200': { $ref: '#/components/responses/PushActive' }
+  /calls/{id}/decline:
+    parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+    post:
+      tags: [Calls]
+      summary: Decline a ringing call from its notification (no sign-in; the token from the call push allows only this, until shortly after the call stops ringing)
+      security: []
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [token], properties: { token: { type: string } } } } }
+      responses:
+        '204': { description: Declined (or already over) }
+        '403': { description: 'Token invalid, expired or for another call' }
   /calls:
     get:
       tags: [Calls]
