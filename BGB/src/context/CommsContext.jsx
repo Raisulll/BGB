@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import * as callsApi from '../api/calls';
 import * as messagingApi from '../api/messaging';
 import { connectRealtime, disconnectRealtime, onRealtime, onRealtimeStatus, realtimeReady, sendRealtime } from '../api/realtime';
@@ -6,6 +7,7 @@ import { useApp } from './AppContext';
 import { useToast } from './ToastContext';
 import { useI18n } from '../i18n/I18nContext';
 import { startTone } from '../utils/tones';
+import { closeNotifications, resumePush, tellWorkerLanguage } from '../utils/push';
 import CallPanel from '../components/messaging/CallPanel';
 
 // Messaging and audio calls (spec #58 extension). Owns what has to outlive a page: the realtime
@@ -27,7 +29,8 @@ const ICE_RESTART_WAIT_MS = 15_000; // how long the callee waits for the caller'
 export function CommsProvider({ children }) {
   const { currentUser, hasPermission } = useApp();
   const { showToast } = useToast();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const navigate = useNavigate();
   const enabled = Boolean(currentUser) && !currentUser.mustChangePassword && hasPermission(currentUser, 'messages');
   const myId = currentUser?.id;
 
@@ -59,6 +62,26 @@ export function CommsProvider({ children }) {
       disconnectRealtime();
     };
   }, [enabled]);
+
+  // ---------- Push (calls and messages while the app is closed) ----------
+  // A device this user turned on before follows them into the new session
+  useEffect(() => {
+    if (enabled) resumePush();
+  }, [enabled, myId]);
+  useEffect(() => {
+    tellWorkerLanguage(lang);
+  }, [lang]);
+  // A tapped notification asks the open app to show the page (no reload: the sign-in is in memory)
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    const onMessage = (e) => {
+      if (e.data?.type !== 'navigate') return;
+      const url = new URL(e.data.url, window.location.origin);
+      if (url.origin === window.location.origin) navigate(url.pathname + url.search);
+    };
+    navigator.serviceWorker.addEventListener('message', onMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', onMessage);
+  }, [navigate]);
 
   // ---------- Unread count (sidebar) ----------
   const refreshUnread = useCallback(async ({ background = true } = {}) => {
@@ -93,6 +116,7 @@ export function CommsProvider({ children }) {
 
   const cleanup = useCallback(() => {
     stopTone();
+    if (callRef.current?.id) closeNotifications(`call-${callRef.current.id}`);
     clearTimeout(iceRef.current.timer);
     iceRef.current = { restarted: false, timer: null };
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -281,6 +305,7 @@ export function CommsProvider({ children }) {
         case 'call.incoming': {
           if (c) return; // the server marks busy users; a second tab of a busy user just ignores it
           updateCall({ id: msg.call.id, phase: 'incoming', role: 'callee', other: msg.call.other, muted: false });
+          closeNotifications(`call-${msg.call.id}`); // the app rings now
           toneRef.current = startTone('ring');
           return;
         }

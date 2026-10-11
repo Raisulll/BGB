@@ -25,7 +25,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((names) => Promise.all(names.filter((n) => n.startsWith('birds-') && n !== SHELL_CACHE && n !== ASSET_CACHE).map((n) => caches.delete(n))))
+      .then((names) => Promise.all(names.filter((n) => n.startsWith('birds-') && ![SHELL_CACHE, ASSET_CACHE, 'birds-prefs'].includes(n)).map((n) => caches.delete(n))))
       .then(() => self.clients.claim()),
   );
 });
@@ -81,4 +81,127 @@ self.addEventListener('fetch', (event) => {
   if (request.mode === 'navigate') event.respondWith(pageLoad(request));
   else if (url.pathname.startsWith('/assets/')) event.respondWith(asset(request));
   else if (url.pathname !== '/sw.js') event.respondWith(siteFile(request));
+});
+
+// ---------------------------------------------------------------------------
+// Web push (DOUBT-015): calls and messages while BIRDS is closed. Payloads carry names only,
+// never message text. The interface language comes from the app (postMessage 'lang'); the few
+// notification texts live here because a service worker can't load the app's i18n files.
+// ---------------------------------------------------------------------------
+const PREFS_CACHE = 'birds-prefs';
+const TEXT = {
+  en: {
+    message: (p) => (p.groupTitle ? `${p.senderName} in ${p.groupTitle}` : p.senderName),
+    messageBody: (p, n) => (n > 1 ? `${n} new messages` : p.voice ? 'Voice message' : 'New message'),
+    call: 'Incoming call',
+    callBody: (p) => `${p.callerName} is calling you`,
+    missed: 'Missed call',
+    missedBody: (p) => `Missed call from ${p.callerName}`,
+  },
+  bn: {
+    message: (p) => (p.groupTitle ? `${p.groupTitle}-এ ${p.senderName}` : p.senderName),
+    messageBody: (p, n) => (n > 1 ? `${n}টি নতুন বার্তা` : p.voice ? 'ভয়েস বার্তা' : 'নতুন বার্তা'),
+    call: 'ইনকামিং কল',
+    callBody: (p) => `${p.callerName} আপনাকে কল করছেন`,
+    missed: 'মিসড কল',
+    missedBody: (p) => `${p.callerName}-এর মিসড কল`,
+  },
+};
+const RING_MS = 35_000; // a ringing notification closes itself after the server's ring time
+
+async function language() {
+  const hit = await (await caches.open(PREFS_CACHE)).match('/__lang');
+  const lang = hit ? await hit.text() : 'en';
+  return TEXT[lang] ? lang : 'en';
+}
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'lang' && TEXT[event.data.lang]) {
+    event.waitUntil(caches.open(PREFS_CACHE).then((c) => c.put('/__lang', new Response(event.data.lang))));
+  }
+});
+
+/** A BIRDS window the user is looking at handles it in the app instead. */
+async function appInFront() {
+  const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  return windows.some((w) => w.visibilityState === 'visible' && w.focused);
+}
+
+async function showPush(payload) {
+  const t = TEXT[await language()];
+  const icon = '/icons/icon-192.png';
+  const badge = '/icons/icon-192.png';
+
+  if (payload.kind === 'message') {
+    if (await appInFront()) return;
+    const tag = `conv-${payload.conversationId}`;
+    const [previous] = await self.registration.getNotifications({ tag });
+    const count = (previous?.data?.count ?? 0) + 1;
+    return self.registration.showNotification(t.message(payload), {
+      body: t.messageBody(payload, count),
+      tag,
+      renotify: true,
+      icon,
+      badge,
+      data: { url: `/messages/${payload.conversationId}`, count },
+    });
+  }
+
+  if (payload.kind === 'call') {
+    if (await appInFront()) return; // the app is ringing already
+    const tag = `call-${payload.callId}`;
+    await self.registration.showNotification(t.call, {
+      body: t.callBody(payload),
+      tag,
+      renotify: true,
+      requireInteraction: true,
+      vibrate: [400, 200, 400, 200, 400, 200, 400],
+      icon,
+      badge,
+      data: { url: '/messages', callId: payload.callId },
+    });
+    // Stop "ringing" when the call can't be answered any more
+    await new Promise((r) => setTimeout(r, RING_MS));
+    const still = await self.registration.getNotifications({ tag });
+    still.filter((n) => !n.data?.missed).forEach((n) => n.close());
+    return;
+  }
+
+  if (payload.kind === 'call-ended' && payload.missed) {
+    return self.registration.showNotification(t.missed, {
+      body: t.missedBody(payload),
+      tag: `call-${payload.callId}`,
+      icon,
+      badge,
+      data: { url: '/calls', missed: true },
+    });
+  }
+}
+
+self.addEventListener('push', (event) => {
+  let payload;
+  try {
+    payload = event.data?.json();
+  } catch {
+    return;
+  }
+  if (payload) event.waitUntil(showPush(payload));
+});
+
+// Tapping a notification opens BIRDS on the right page (an open window is reused)
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = new URL(event.notification.data?.url || '/', self.location.origin).href;
+  event.waitUntil(
+    (async () => {
+      const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      const win = windows.find((w) => new URL(w.url).origin === self.location.origin);
+      if (win) {
+        // The open app changes page itself: a full reload would drop its in-memory sign-in
+        win.postMessage({ type: 'navigate', url });
+        return win.focus();
+      }
+      return self.clients.openWindow(url);
+    })(),
+  );
 });

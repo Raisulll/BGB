@@ -210,6 +210,23 @@ Direct (one thread per pair) and group conversations between any active users, t
 
 1:1 audio only. The audio goes browser to browser (or through the TURN relay) and is never stored. Each finished call is a `calls` row (ringing → answered → ended, or declined / missed / cancelled / failed) and an audit entry `CALL`; a missed call notifies the callee (type `call`). Unanswered calls are missed after `CALL_RING_SECONDS` (default 30). A second call to someone in a call is recorded as `failed` (busy). If a participant's realtime connection drops (network blip, phone screen lock), the call is not ended: the browser reconnects and sends `call.resume`, and only if that doesn't arrive within `CALL_RECONNECT_SECONDS` (default 30) does the call end as `connection lost`. Closing the tab ends the call at once. If the audio path itself fails, the caller restarts ICE once before giving up. On start-up, records a crash left open are closed (`sweepStaleCalls`): still ringing after a minute → missed (`interrupted`), answered more than 12 hours ago → ended (`stale`).
 
+## Push notifications (`/api/v1/push`, permission `messages`)
+
+Calls and messages reach a device while BIRDS is closed (web push through the browser's push service: Google FCM, Apple, Mozilla). Off until `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` are set (`npm run keys:vapid`); the app then shows "Not available".
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/config` | `{ enabled, publicKey }` |
+| GET | `/status?endpoint=` | `{ active }`: this device is registered for the caller's current session |
+| POST | `/subscriptions` | `{ endpoint (https), keys: { p256dh, auth }, resume? }`; audited `PUSH_SUBSCRIBE`. `resume` (sent at every app start) only re-binds a device the same user turned on, never another user's |
+| DELETE | `/subscriptions` | `{ endpoint }`; audited `PUSH_UNSUBSCRIBE` |
+
+- `push_subscriptions` rows are bound to the session (`refresh_tokens.id`, cascade). Pushes go only to sessions that are not revoked and not expired, so signing out, being signed out elsewhere or deactivation stop them at once. Delivery is not limited by the idle timeout (the point is to reach a closed app); opening BIRDS after an idle timeout still asks for a sign-in.
+- Payloads are encrypted to the browser (RFC 8291) and carry names only: `message` {conversationId, senderName, groupTitle, voice}, `call` {callId, callerName} (urgency high, TTL = ring time), `call-ended` {missed: true} for a call that was never answered. Never message text.
+- Sent once, where the event happens (message service, call invite, call end), not in the per-process realtime handlers. Devices the push service reports gone (404/410) are deleted; other failures are logged.
+- The service worker (`BGB/public/sw.js`) writes the notification in the app's language (the app posts it), collapses messages per conversation ("3 new messages"), skips anything while a BIRDS window is in front, and replaces the ringing notification with "Missed call". A socket that connects while a call to its user is ringing gets `call.incoming` at once, so opening BIRDS from the call notification shows the call.
+- Production: the API server needs outbound HTTPS to the push services (fcm.googleapis.com, *.push.apple.com, updates.push.services.mozilla.com). iPhone/iPad: only for the installed app (iOS 16.4+).
+
 ## Realtime channel (`/api/v1/ws`)
 
 One WebSocket per browser tab, same origin as the API (`src/realtime/hub.ts`).

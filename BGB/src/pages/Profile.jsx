@@ -6,6 +6,7 @@ import { useToast } from '../context/ToastContext';
 import useApi from '../hooks/useApi';
 import { formatDateTime, timeAgo } from '../utils/helpers';
 import Card from '../components/ui/Card';
+import { PushCard } from '../components/messaging/PushSettings';
 import ErrorState from '../components/ui/ErrorState';
 import Spinner from '../components/ui/Spinner';
 import { useI18n } from '../i18n/I18nContext';
@@ -153,6 +154,9 @@ export default function Profile() {
           <p className="border-t border-gray-100 px-4 py-2.5 text-xs text-gray-400 sm:px-5">{t('profile.activityNote')}</p>
         </Card>
       </div>
+
+      {/* Calls and messages on this device while BIRDS is closed (messages permission only) */}
+      {(user.permissions || []).includes('messages') && <PushCard />}
 
       {/* What this account can open */}
       <Card title={t('profile.access')} icon="fa-shield-alt">

@@ -2,7 +2,8 @@ import { env } from '../../config/env.js';
 import { logger } from '../../config/logger.js';
 import { prisma } from '../../db.js';
 import { publish } from '../../realtime/bus.js';
-import { onClientClose, onClientMessage, onEvent, type Client } from '../../realtime/hub.js';
+import { onClientClose, onClientMessage, onClientReady, onEvent, type Client } from '../../realtime/hub.js';
+import { pushToUsers } from '../push/push.service.js';
 import { createCall, finalise, getCall, isBusy, toCallDto, transition } from './calls.service.js';
 
 // Call signalling over the realtime channel. Flow:
@@ -35,6 +36,16 @@ async function ended(callId: number, ctx: Client['ctx']) {
   const payload = { type: 'call.ended', callId, status: call.status, reason: call.endReason };
   await toUser(call.callerId, payload);
   await toUser(call.calleeId, payload);
+  // A call that was never answered becomes a "Missed call" notification on the callee's devices
+  // (it replaces the ringing one). Answered or declined calls send nothing: the ringing
+  // notification closes itself when the ring time is over, or when the app opens.
+  if (!call.answeredAt && (call.status === 'missed' || call.status === 'cancelled')) {
+    void pushToUsers(
+      [call.calleeId],
+      { kind: 'call-ended', callId, callerName: call.caller.name, missed: true },
+      { ttlSeconds: 24 * 3600, urgency: 'normal', topic: `call-${callId}` },
+    );
+  }
 }
 
 export function registerCallRealtime() {
@@ -65,6 +76,8 @@ export function registerCallRealtime() {
         track(client, call.id);
         reply(client, { type: 'call.ringing', call: toCallDto(call, client.userId) });
         await toUser(to, { type: 'call.incoming', call: toCallDto(call, to) });
+        // Devices where BIRDS is closed ring through a notification; opening it replays the call
+        void pushToUsers([to], { kind: 'call', callId: call.id, callerName: client.name }, { ttlSeconds: env.CALL_RING_SECONDS, urgency: 'high', topic: `call-${call.id}` });
         setTimeout(async () => {
           const missed = await transition(call.id, ['ringing'], 'missed', 'no answer').catch(() => null);
           if (missed) await ended(call.id, client.ctx);
@@ -121,6 +134,16 @@ export function registerCallRealtime() {
         await toUser(other, { type: 'call.signal', callId, data: msg.data });
         return;
       }
+    }
+  });
+
+  // A socket that connects while a call to this user is still ringing (the app was opened from
+  // the call notification, or reconnected) gets the call
+  onClientReady(async (client) => {
+    const ringing = await prisma.call.findMany({ where: { calleeId: client.userId, status: 'ringing' }, select: { id: true } });
+    for (const { id } of ringing) {
+      const call = await getCall(id);
+      if (call?.status === 'ringing') reply(client, { type: 'call.incoming', call: toCallDto(call, client.userId) });
     }
   });
 

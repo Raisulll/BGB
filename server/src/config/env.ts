@@ -82,6 +82,13 @@ const schema = z.object({
   // screen lock) to reconnect before it ends as "connection lost". The audio keeps flowing meanwhile
   CALL_RECONNECT_SECONDS: z.coerce.number().int().min(1).max(120).default(30),
 
+  // Web push (calls and messages reach a phone while BIRDS is closed). VAPID keys from
+  // `npm run keys:vapid`; without them push is off and the app says so. Subject: a contact
+  // address the push services (Google, Apple, Mozilla) can use about this sender
+  VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  VAPID_SUBJECT: z.string().default('mailto:birds-admin@bgb.gov.bd'),
+
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'http', 'debug']).default('info'),
   LOG_DIR: z.string().default('logs'),
 });

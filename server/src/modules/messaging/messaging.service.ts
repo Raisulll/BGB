@@ -6,6 +6,7 @@ import { publish } from '../../realtime/bus.js';
 import { AppError, badRequest, forbidden, notFound } from '../../utils/errors.js';
 import type { RequestContext } from '../../utils/requestContext.js';
 import { writeAudit } from '../audit/audit.service.js';
+import { pushToUsers } from '../push/push.service.js';
 import { sha256 } from '../evidence/metadata.js';
 import { AUDIO_TYPES, detectAudio } from './audioType.js';
 import { IMAGE_TYPES, detectImage } from './imageType.js';
@@ -249,8 +250,16 @@ export async function createConversation(
   return conversationDto(user.id, c.id);
 }
 
-async function afterMessage(conversationId: number, messageId: number) {
-  await publish({ type: 'message.new', conversationId, messageId, recipients: await activeMemberIds(conversationId) });
+async function afterMessage(conversationId: number, messageId: number, sender: AuthUser, voice: boolean) {
+  const recipients = await activeMemberIds(conversationId);
+  await publish({ type: 'message.new', conversationId, messageId, recipients });
+  // Devices where BIRDS is closed: who wrote, never the text (see push.service.ts)
+  const conv = await prisma.conversation.findUnique({ where: { id: conversationId }, select: { kind: true, title: true } });
+  void pushToUsers(
+    recipients.filter((id) => id !== sender.id),
+    { kind: 'message', conversationId, senderName: sender.name, groupTitle: conv?.kind === 'group' ? conv.title : null, voice },
+    { ttlSeconds: 24 * 3600, urgency: 'normal', topic: `conv-${conversationId}` },
+  );
 }
 
 export async function sendText(user: AuthUser, conversationId: number, body: string) {
@@ -262,7 +271,7 @@ export async function sendText(user: AuthUser, conversationId: number, body: str
     await tx.conversationMember.update({ where: { conversationId_userId: { conversationId, userId: user.id } }, data: { lastReadId: msg.id } });
     return msg;
   });
-  await afterMessage(conversationId, m.id);
+  await afterMessage(conversationId, m.id, user, false);
   return toMessageDto(m);
 }
 
@@ -286,7 +295,7 @@ export async function sendVoice(user: AuthUser, conversationId: number, file: Bu
       await tx.conversationMember.update({ where: { conversationId_userId: { conversationId, userId: user.id } }, data: { lastReadId: msg.id } });
       return msg;
     });
-    await afterMessage(conversationId, m.id);
+    await afterMessage(conversationId, m.id, user, true);
     return toMessageDto(m);
   } catch (err) {
     await storage.remove(key).catch(() => {});

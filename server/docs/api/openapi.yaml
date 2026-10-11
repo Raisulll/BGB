@@ -77,7 +77,19 @@ tags:
       `call.error`. Calls ring for CALL_RING_SECONDS (default 30) before they are missed. When a
       participant's socket closes, the call waits CALL_RECONNECT_SECONDS (default 30) for a
       `call.resume` before it ends as "connection lost". Audio is never stored; each finished
-      call is audited (CALL) and listed in the call log.
+      call is audited (CALL) and listed in the call log. A call to someone whose app isn't open
+      rings by web push; a socket that connects while a call to its user is ringing gets
+      `call.incoming` at once.
+  - name: Push
+    description: |
+      Web push so calls and messages reach a device while BIRDS is closed (needs VAPID_PUBLIC_KEY
+      and VAPID_PRIVATE_KEY; `enabled: false` without them). A device registration belongs to the
+      sign-in session it was made in: signing out, being signed out elsewhere, deactivation or
+      session expiry stop pushes to it. Payloads are encrypted to the browser and carry names
+      only, never message text: `message` {conversationId, senderName, groupTitle, voice},
+      `call` {callId, callerName} (urgency high, TTL = ring time), `call-ended` {callId,
+      callerName, missed} for a call that was never answered. Devices the push service reports
+      gone (404/410) are deleted.
   - name: System
 
 paths:
@@ -1348,6 +1360,49 @@ paths:
       responses:
         '204': { description: Left }
         '403': { $ref: '#/components/responses/Forbidden' }
+  /push/config:
+    get:
+      tags: [Push]
+      summary: Whether push is available, and the VAPID public key for PushManager.subscribe()
+      x-permission: messages
+      responses:
+        '200': { description: Config, content: { application/json: { schema: { type: object, properties: { enabled: { type: boolean }, publicKey: { type: [string, 'null'] } } } } } }
+  /push/status:
+    get:
+      tags: [Push]
+      summary: Whether this device's endpoint is registered for the caller's current session
+      x-permission: messages
+      parameters: [{ name: endpoint, in: query, schema: { type: string, format: uri } }]
+      responses:
+        '200': { $ref: '#/components/responses/PushActive' }
+  /push/subscriptions:
+    post:
+      tags: [Push]
+      summary: Register this device (audited PUSH_SUBSCRIBE). With `resume` (app start) it only re-binds a device this user registered before, never another user's
+      x-permission: messages
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [endpoint, keys]
+              properties:
+                endpoint: { type: string, format: uri, description: https only }
+                keys: { type: object, required: [p256dh, auth], properties: { p256dh: { type: string }, auth: { type: string } } }
+                resume: { type: boolean }
+      responses:
+        '200': { $ref: '#/components/responses/PushActive' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+    delete:
+      tags: [Push]
+      summary: Unregister this device (audited PUSH_UNSUBSCRIBE)
+      x-permission: messages
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [endpoint], properties: { endpoint: { type: string, format: uri } } } } }
+      responses:
+        '200': { $ref: '#/components/responses/PushActive' }
   /calls:
     get:
       tags: [Calls]
@@ -1444,6 +1499,7 @@ components:
     Forbidden: { description: 'FORBIDDEN (missing page permission, wrong role, or not the creator)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     NotFound: { description: 'NOT_FOUND (or outside the caller''s scope)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     Conflict: { description: 'INVALID_STATE (record not in a state that allows this, or changed concurrently)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    PushActive: { description: Whether this device receives pushes for the caller's session, content: { application/json: { schema: { type: object, properties: { active: { type: boolean } } } } } }
     RateLimited: { description: RATE_LIMITED, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   schemas:

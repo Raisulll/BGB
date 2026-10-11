@@ -929,6 +929,7 @@ All endpoints require `Authorization: Bearer <access_token>` unless marked **Pub
 | PATCH/DELETE/POST | `/messaging/conversations/:id`, `/members/:uid`, `/requests/:rid/approve\|reject`, `/cover` | messages + group admin | Rename, roles, remove, approve/reject join requests, group photo (all audited) |
 | GET | `/calls`, `/calls/all`, `/calls/ice` | messages (+ admin or audit for `/all`) | Call log; every call; ICE servers |
 | WS | `/ws` | signed in + messages | Pushed messaging events and call signalling |
+| GET/POST/DELETE | `/push/config`, `/push/status`, `/push/subscriptions` | messages | Web push for calls/messages while the app is closed (VAPID keys; names only, never message text; bound to the session) |
 
 Messages and the call log are permanent records (append-only `messages`; `CALL` audit entry per call). Audio of calls is never stored.
 

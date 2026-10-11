@@ -344,3 +344,24 @@ The creator is the first admin; admins can make other members admins and remove 
 
 ### Resolution (if resolved)
 *Confirm with the owner/BGB.*
+
+---
+## DOUBT-015 — Push Notifications for Calls and Messages
+
+**TEC Spec**: #58 — Future expansion (messaging extension, DOUBT-013); also #23 (notifications), #26/#28 (security, sessions)
+**Raised on**: 2026-10-11
+**Status**: ASSUMED
+
+### The ambiguity
+The owner asked for push notifications so calls and messages reach phones while BIRDS is closed. Open: what a lock-screen notification may show, how push fits the 30-minute idle timeout (spec #28), and whether third-party push services may carry BIRDS traffic.
+
+### Options considered
+1. Content: full message text / sender only / a generic "new activity".
+2. Which devices: until the session's idle timeout / until sign-out or session expiry (8 h) / indefinitely.
+3. Transport: browser push services (Google FCM, Apple, Mozilla; the only way to wake a closed web app) / none.
+
+### Assumption made (if proceeding)
+Notifications show who wrote or called (and the group name), never message text. Payloads are end-to-end encrypted to the browser, so the push services see only that a push happened, its size and time. A device receives pushes while the session it was turned on in is valid (not signed out, not revoked, not past its expiry, account active), regardless of the idle timeout; opening BIRDS after the idle timeout still requires signing in. Turning on is per device and audited. A different user signing in on the same browser does not inherit it.
+
+### Resolution (if resolved)
+*Confirm with BGB: whether sender names on lock screens are acceptable, and whether the production network allows the API server outbound HTTPS to the browser push services (otherwise push stays off and calls ring only while the app is open).*

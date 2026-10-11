@@ -211,6 +211,8 @@ export default {
     "PERMISSION_DENIED": "Permission denied",
     "PERMISSION_RESET": "Permission reset",
     "PRINT_INCIDENT": "Print incident",
+    "PUSH_SUBSCRIBE": "Notifications turned on",
+    "PUSH_UNSUBSCRIBE": "Notifications turned off",
     "REACTIVATE_USER": "Reactivate user",
     "REJECT_INCIDENT": "Reject incident",
     "RETURN_INCIDENT": "Return incident",
@@ -1052,6 +1054,33 @@ export default {
     "thTime": "Date and time",
     "thisDevice": "This device",
     "unknownDevice": "Unknown device"
+  },
+  "push": {
+    "blocked": "Notifications are blocked for BIRDS in this browser. Allow them in the browser or phone settings.",
+    "explain": "Get incoming calls and new messages on this device while BIRDS is closed.",
+    "failed": "Notifications could not be turned on. Try again.",
+    "hint": {
+      "denied": "Notifications are blocked for BIRDS in this browser. Allow them in the site settings of the browser or the phone, then come back here.",
+      "install-first": "On iPhone and iPad, notifications work once BIRDS is installed: tap Share, then Add to Home Screen, and open it from there.",
+      "server-off": "Notifications are not set up on this server yet. Ask the system administrator."
+    },
+    "notNow": "Not now",
+    "privacy": "Notifications show who called or wrote, never the message text. They stop when you sign out on this device.",
+    "prompt": "Get calls and messages on this device even when BIRDS is closed.",
+    "state": {
+      "denied": "Blocked",
+      "install-first": "Install the app first",
+      "off": "Off",
+      "on": "On",
+      "server-off": "Not available",
+      "unsupported": "Not supported by this browser"
+    },
+    "status": "On this device",
+    "title": "Notifications on this device",
+    "turnOff": "Turn off",
+    "turnOn": "Turn on notifications",
+    "turningOn": "Turning on…",
+    "turnedOn": "Notifications are on for this device."
   },
   "pwa": {
     "install": "Install app",

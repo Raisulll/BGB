@@ -62,6 +62,7 @@ model User {
   configUpdates        SystemConfig[]
   conversationsCreated Conversation[]            @relation("ConversationCreator")
   memberships          ConversationMember[]
+  pushSubscriptions    PushSubscription[]
   membersRemoved       ConversationMember[]      @relation("MemberRemovedBy")
   joinRequestsFor      ConversationJoinRequest[] @relation("JoinRequestUser")
   joinRequestsMade     ConversationJoinRequest[] @relation("JoinRequestRequester")
@@ -286,7 +287,8 @@ model RefreshToken {
   revoked           Boolean   @default(false)
   revokedReason     String?   @map("revoked_reason") @db.VarChar(50)
 
-  user User @relation(fields: [userId], references: [id])
+  user              User               @relation(fields: [userId], references: [id])
+  pushSubscriptions PushSubscription[]
 
   @@index([userId, revoked])
   @@index([previousTokenHash])
@@ -360,6 +362,26 @@ model ConversationMember {
   @@id([conversationId, userId])
   @@index([userId])
   @@map("conversation_members")
+}
+
+// A browser/device that receives web push for a user (calls, messages). Bound to the sign-in
+// session it was registered in: pushes stop when that session is signed out, revoked or expired.
+model PushSubscription {
+  id            Int       @id @default(autoincrement())
+  userId        String    @map("user_id") @db.VarChar(10)
+  sessionId     String    @map("session_id") @db.Uuid
+  endpoint      String    @unique @db.VarChar(1000)
+  p256dh        String    @db.VarChar(200)
+  auth          String    @db.VarChar(100)
+  userAgent     String?   @map("user_agent") @db.VarChar(500)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  lastSuccessAt DateTime? @map("last_success_at") @db.Timestamptz
+
+  user    User         @relation(fields: [userId], references: [id])
+  session RefreshToken @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_subscriptions")
 }
 
 // A member's request to add someone to a group; an admin approves or rejects it

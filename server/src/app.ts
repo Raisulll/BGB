@@ -15,6 +15,7 @@ import { gisRouter } from './modules/gis/gis.router.js';
 import { incidentsRouter } from './modules/incidents/incidents.router.js';
 import { messagingRouter } from './modules/messaging/messaging.router.js';
 import { callsRouter } from './modules/calls/calls.router.js';
+import { pushRouter } from './modules/push/push.router.js';
 import { notificationsRouter } from './modules/notifications/notifications.router.js';
 import { reportsRouter } from './modules/reports/reports.router.js';
 import { usersRouter } from './modules/users/users.router.js';
@@ -67,6 +68,7 @@ export function createApp() {
   api.use('/reports', reportsRouter);
   api.use('/messaging', messagingRouter);
   api.use('/calls', callsRouter);
+  api.use('/push', pushRouter);
 
   app.use('/api/v1', api);
   if (env.API_DOCS) app.use('/api/docs', swaggerUiRouter());

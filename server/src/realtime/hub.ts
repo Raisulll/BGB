@@ -24,6 +24,7 @@ export interface Client {
   name: string;
   sessionId: string;
   alive: boolean;
+  ready?: boolean; // ready handlers have run
   ctx: { ip: string | null; userAgent: string | null }; // for audit entries
 }
 
@@ -34,6 +35,7 @@ const clients = new Map<string, Set<Client>>(); // userId -> open, authenticated
 const messageHandlers = new Map<string, ClientMessageHandler>(); // by message type prefix
 const busHandlers: BusHandler[] = [];
 const closeHandlers: ((client: Client) => void)[] = [];
+const readyHandlers: ((client: Client) => void | Promise<void>)[] = [];
 let wss: WebSocketServer | null = null;
 let timers: NodeJS.Timeout[] = [];
 
@@ -57,6 +59,11 @@ export const isOnlineHere = (userId: string) => (clients.get(userId)?.size ?? 0)
 /** Client messages whose `type` starts with `prefix` (e.g. "call.") go to `handler`. */
 export function onClientMessage(prefix: string, handler: ClientMessageHandler) {
   messageHandlers.set(prefix, handler);
+}
+
+/** Called when a socket has authenticated (first time only), after it was told "ready". */
+export function onClientReady(handler: (client: Client) => void | Promise<void>) {
+  readyHandlers.push(handler);
 }
 
 /** Called when an authenticated socket closes (e.g. to end its call). */
@@ -144,7 +151,14 @@ export function attachRealtime(server: Server) {
             } else {
               client.sessionId = sessionId;
             }
+            const first = !client.ready;
+            client.ready = true;
             ws.send(JSON.stringify({ type: 'ready', userId: user.id }));
+            if (first) {
+              for (const h of readyHandlers) {
+                void Promise.resolve(h(client)).catch((err) => logger.warn('Realtime ready handler failed', { err: String(err) }));
+              }
+            }
           } catch {
             ws.close(4001, 'auth failed');
           }

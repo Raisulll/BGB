@@ -87,3 +87,11 @@ services:
         sync: false
       - key: TURN_CREDENTIAL
         sync: false
+      # Web push for calls and messages while the app is closed: `npm run keys:vapid` (in server/).
+      # Changing the keys turns notifications off on every device
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        value: mailto:birds-admin@bgb.gov.bd
