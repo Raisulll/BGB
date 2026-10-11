@@ -22,7 +22,7 @@ info:
 
     ## Authorisation
     Each route requires a **page permission** (`dashboard`, `incidents`, `create`, `map`, `analytics`,
-    `reports`, `audit`, `admin`) granted to the user's role in `role_permissions`. Data is also limited
+    `reports`, `audit`, `admin`, `messages`) granted to the user's role in `role_permissions`. Data is also limited
     to the user's **scope** (HQ, sector, battalion or BOP); records outside it return `404` so their
     existence isn't revealed. Drafts are visible only to their creator. Nobody can act on an incident
     they filed themselves (separation of duties).
@@ -39,6 +39,39 @@ info:
     ## Dates
     Incident dates are `YYYY-MM-DD` and times `HH:MM` (Bangladesh Standard Time, as entered).
     Timestamps are ISO-8601 UTC. Exports show dates as `DD-MM-YYYY` and times in BST.
+
+    ## Realtime channel (messaging)
+    Direct and group conversations; messages are permanent records (append-only). Live delivery uses
+    the realtime channel: a WebSocket at `/api/v1/ws` on the same origin. The client's first message
+    is `{"type":"auth","token":"<access token>"}` (also sent again after a token refresh); the server
+    answers `{"type":"ready"}` or closes with 4001. Pushed events: `message` {message},
+    `conversation` {conversationId}, `read` {conversationId}. Sessions are re-checked every minute;
+    socket traffic never counts as user activity for the idle timeout.
+
+    ## Calls
+    1:1 audio calls with WebRTC. Signalling runs over the realtime channel. Client messages:
+    `call.invite` {to}, `call.accept` / `call.decline` / `call.cancel` / `call.end` {callId},
+    `call.signal` {callId, data} (SDP offer/answer, ICE candidates, relayed to the other party),
+    `call.resume` {callId} (after the socket reconnected during a call).
+    Server messages: `call.ringing`, `call.incoming`, `call.accepted`, `call.taken`, `call.busy`,
+    `call.signal`, `call.resumed` {callId, status}, `call.ended` {callId, status, reason},
+    `call.error`. Calls ring for CALL_RING_SECONDS (default 30) before they are missed. When a
+    participant's socket closes, the call waits CALL_RECONNECT_SECONDS (default 30) for a
+    `call.resume` before it ends as "connection lost". Audio is never stored; each finished
+    call is audited (CALL) and listed in the call log. A call to someone whose app isn't open
+    rings by web push; a socket that connects while a call to its user is ringing gets
+    `call.incoming` at once.
+
+    ## Push notifications
+    Web push so calls and messages reach a device while BIRDS is closed (needs VAPID_PUBLIC_KEY
+    and VAPID_PRIVATE_KEY; `enabled: false` without them). A device registration belongs to the
+    sign-in session it was made in: signing out, being signed out elsewhere, deactivation or
+    session expiry stop pushes to it. Payloads are encrypted to the browser and carry names
+    only, never message text: `message` {conversationId, senderName, groupTitle, voice},
+    `call` {callId, callerName, ringSeconds, declineToken} (urgency high, TTL = ring time; the
+    notification has Answer and Decline and rings again every few seconds), `call-ended` {callId,
+    callerName, missed} for a call that was never answered. Devices the push service reports
+    gone (404/410) are deleted.
   contact:
     name: BIRDS project team
 servers:
@@ -50,48 +83,31 @@ security:
   - bearerAuth: []
 tags:
   - name: Auth
+    description: Sign-in, token refresh, sign-out, password change and own sessions
   - name: Incidents
+    description: Incident records, workflow actions, timeline and comments
   - name: Evidence
+    description: Evidence files attached to incidents, with integrity checks
   - name: GIS
+    description: Incidents with coordinates for the map
   - name: Reports
+    description: Dashboard figures, analytics, operational reports, exports and printouts
   - name: Audit
+    description: Tamper-evident audit trail, chain verification and export
   - name: Notifications
+    description: The signed-in user's workflow notifications
   - name: Users
+    description: User accounts, roles and access scopes (administrators)
   - name: Admin
+    description: System configuration, permissions, categories, hierarchy and archiving
   - name: Messaging
-    description: |
-      Direct and group conversations; messages are permanent records (append-only). Live delivery uses
-      the realtime channel: a WebSocket at `/api/v1/ws` on the same origin. The client's first message
-      is `{"type":"auth","token":"<access token>"}` (also sent again after a token refresh); the server
-      answers `{"type":"ready"}` or closes with 4001. Pushed events: `message` {message},
-      `conversation` {conversationId}, `read` {conversationId}. Sessions are re-checked every minute;
-      socket traffic never counts as user activity for the idle timeout.
+    description: Direct and group conversations and voice messages (see Realtime channel above)
   - name: Calls
-    description: |
-      1:1 audio calls with WebRTC. Signalling runs over the realtime channel. Client messages:
-      `call.invite` {to}, `call.accept` / `call.decline` / `call.cancel` / `call.end` {callId},
-      `call.signal` {callId, data} (SDP offer/answer, ICE candidates, relayed to the other party),
-      `call.resume` {callId} (after the socket reconnected during a call).
-      Server messages: `call.ringing`, `call.incoming`, `call.accepted`, `call.taken`, `call.busy`,
-      `call.signal`, `call.resumed` {callId, status}, `call.ended` {callId, status, reason},
-      `call.error`. Calls ring for CALL_RING_SECONDS (default 30) before they are missed. When a
-      participant's socket closes, the call waits CALL_RECONNECT_SECONDS (default 30) for a
-      `call.resume` before it ends as "connection lost". Audio is never stored; each finished
-      call is audited (CALL) and listed in the call log. A call to someone whose app isn't open
-      rings by web push; a socket that connects while a call to its user is ringing gets
-      `call.incoming` at once.
+    description: One-to-one audio calls and the call log (see Calls above)
   - name: Push
-    description: |
-      Web push so calls and messages reach a device while BIRDS is closed (needs VAPID_PUBLIC_KEY
-      and VAPID_PRIVATE_KEY; `enabled: false` without them). A device registration belongs to the
-      sign-in session it was made in: signing out, being signed out elsewhere, deactivation or
-      session expiry stop pushes to it. Payloads are encrypted to the browser and carry names
-      only, never message text: `message` {conversationId, senderName, groupTitle, voice},
-      `call` {callId, callerName, ringSeconds, declineToken} (urgency high, TTL = ring time; the
-      notification has Answer and Decline and rings again every few seconds), `call-ended` {callId,
-      callerName, missed} for a call that was never answered. Devices the push service reports
-      gone (404/410) are deleted.
+    description: Web push to devices while BIRDS is closed (see Push notifications above)
   - name: System
+    description: Health check
 
 paths:
   /health:

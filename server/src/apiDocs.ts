@@ -76,6 +76,8 @@ export function swaggerUiRouter() {
         filter: true,
         defaultModelsExpandDepth: -1,
         displayRequestDuration: true,
+        // No validator badge: it would send the spec URL to validator.swagger.io (blocked by our CSP)
+        validatorUrl: 'none',
       },
     }),
   );

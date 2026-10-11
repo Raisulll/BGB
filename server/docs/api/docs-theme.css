@@ -54,7 +54,9 @@ body { margin: 0; }
 /* Tag groups as cards */
 .swagger-ui .opblock-tag-section { background: #fff; border: 1px solid var(--line); border-radius: 10px; margin: 14px 0; padding: 0 18px; }
 .swagger-ui .opblock-tag { border-bottom: 0; font-size: 20px; font-weight: 600; padding: 14px 0; }
-.swagger-ui .opblock-tag small { color: var(--muted); font-size: 13px; font-weight: 400; }
+.swagger-ui .opblock-tag small { flex: 1; padding: 0 16px; color: var(--muted); font-size: 13px; font-weight: 400; }
+.swagger-ui .opblock-tag > a { flex: 0 0 160px; }
+@media (max-width: 640px) { .swagger-ui .opblock-tag > a { flex-basis: auto; } .swagger-ui .opblock-tag small { display: none; } }
 .swagger-ui .opblock-tag-section.is-open .opblock-tag { border-bottom: 1px solid var(--line); }
 .swagger-ui .opblock { border-radius: 8px; box-shadow: none; margin: 0 0 10px; }
 .swagger-ui .opblock .opblock-summary-method { border-radius: 6px; font-weight: 600; min-width: 74px; }
