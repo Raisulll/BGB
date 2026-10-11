@@ -88,10 +88,9 @@ incidentsRouter.post('/:id/comments', requirePermission('incidents'), async (req
   res.status(201).json(await service.addComment(req.user!, incidentId(req), body, requestContext(req)));
 });
 
-// Audit entry for printing a single incident (the browser prints)
+// Reference number + audit entry for printing a single incident (the browser prints)
 incidentsRouter.post('/:id/print', requirePermission('incidents'), async (req, res) => {
-  await service.recordPrint(req.user!, incidentId(req), requestContext(req));
-  res.status(204).end();
+  res.json(await service.recordPrint(req.user!, incidentId(req), requestContext(req)));
 });
 
 // review | verify | approve | close | return | reject — role checks live in the service

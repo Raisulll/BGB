@@ -403,10 +403,19 @@ paths:
     parameters: [{ $ref: '#/components/parameters/IncidentId' }]
     post:
       tags: [Incidents]
-      summary: Record that the caller printed this incident (audit PRINT_INCIDENT); the browser does the printing
+      summary: Issue a document reference for printing this incident and record it (audit PRINT_INCIDENT); the browser does the printing
+      description: 'Reference format BGB/BIRDS/RPT/<year>/NNNN, the same series as printed reports.'
       x-permission: incidents
       responses:
-        '204': { description: Recorded }
+        '200':
+          description: Reference number and print time
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reference: { type: string, example: BGB/BIRDS/RPT/2026/0012 }
+                  printedAt: { type: string, format: date-time }
         '404': { $ref: '#/components/responses/NotFound' }
   /incidents/{id}/timeline:
     parameters: [{ $ref: '#/components/parameters/IncidentId' }]
@@ -748,6 +757,61 @@ paths:
                   byCategory: { type: array, items: { type: object } }
                   bySector: { type: array, items: { type: object } }
                   incidents: { type: array, items: { type: object } }
+  /reports/details:
+    get:
+      tags: [Reports]
+      summary: 'Incident annex for a report: the full record of every incident in it (specs #21, #22)'
+      description: 'Same filters, scope and order as /reports/operational; at most 100 incidents (truncated and total say when there are more). Evidence files are fetched separately (inline view, audited as VIEW_EVIDENCE).'
+      x-permission: reports
+      parameters:
+        - { name: type, in: query, schema: { type: string, enum: [operational, statistical, high-threat, sector-audit], default: operational } }
+        - $ref: '#/components/parameters/Q'
+        - $ref: '#/components/parameters/Status'
+        - $ref: '#/components/parameters/Severity'
+        - $ref: '#/components/parameters/Category'
+        - $ref: '#/components/parameters/Sector'
+        - $ref: '#/components/parameters/Battalion'
+        - $ref: '#/components/parameters/DateFrom'
+        - $ref: '#/components/parameters/DateTo'
+      responses:
+        '200':
+          description: Full incident records
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  incidents: { type: array, items: { $ref: '#/components/schemas/IncidentDetail' } }
+                  total: { type: integer }
+                  limit: { type: integer, example: 100 }
+                  truncated: { type: boolean }
+  /reports/print:
+    post:
+      tags: [Reports]
+      summary: 'Issue a reference number for a printed report and audit it (specs #21, #22, #24); the browser does the printing'
+      description: 'Reference format BGB/BIRDS/RPT/<year>/NNNN (per-year sequence). Audited as PRINT_REPORT with the report type, reference, incident count, whether the incident annex is included, and filters. Same query parameters as /reports/operational, plus details.'
+      x-permission: reports
+      parameters:
+        - { name: details, in: query, description: '1 when the printout includes the full incident annex', schema: { type: string, enum: ['0', '1'] } }
+        - { name: type, in: query, schema: { type: string, enum: [operational, statistical, high-threat, sector-audit], default: operational } }
+        - $ref: '#/components/parameters/Q'
+        - $ref: '#/components/parameters/Status'
+        - $ref: '#/components/parameters/Severity'
+        - $ref: '#/components/parameters/Category'
+        - $ref: '#/components/parameters/Sector'
+        - $ref: '#/components/parameters/Battalion'
+        - $ref: '#/components/parameters/DateFrom'
+        - $ref: '#/components/parameters/DateTo'
+      responses:
+        '200':
+          description: Reference number and print time
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reference: { type: string, example: BGB/BIRDS/RPT/2026/0001 }
+                  printedAt: { type: string, format: date-time }
   /reports/export/{format}:
     get:
       tags: [Reports]

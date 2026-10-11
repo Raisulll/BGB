@@ -3,7 +3,7 @@
 
 > **Project**: BIRDS Phase II — HQ Border Guard Bangladesh (BGB)
 > **Frontend root**: `BGB/` (React + Vite SPA)
-> **Status**: Backend API (`server/`) implemented; the frontend runs entirely on it, in English and Bangla (Sessions 9–10). Demo version: backups, DR, HA, load tests, log rotation and AD/LDAP are deferred and shown as DEMO in the UI. OpenAPI docs at `/api/docs` (Session 11). Remaining: deployment pack, documentation set, UAT. See `progress.md` for the next steps.
+> **Status**: Backend API (`server/`) implemented; the frontend runs entirely on it, in English and Bangla (Sessions 9–10). Demo version: backups, DR, HA, load tests, log rotation and AD/LDAP are deferred and shown as DEMO in the UI. OpenAPI docs at `/api/docs` (Session 11). Session 13: messaging + calls + group admins + push notifications, installable app (PWA), GIS framed on Bangladesh; live demo at https://birds-demo.onrender.com (Render free plan kept awake, Supabase). Remaining: the BGB documentation set (§27), security assessment, UAT test cases, training material. See `progress.md` for the next steps.
 
 ---
 
@@ -36,14 +36,17 @@ Tender/
         ├── index.css           ← Global styles (TailwindCSS v4 @import, custom CSS vars)
         ├── api/                ← REST client: client.js (token, refresh, errors, downloads)
         │                         + auth, incidents, users, audit, notifications, reports, admin,
-        │                         messaging, calls; realtime.js (WebSocket /api/v1/ws)
+        │                         messaging, calls, push; realtime.js (WebSocket /api/v1/ws)
         ├── context/
         │   ├── AppContext.jsx  ← Session, policy, form reference data, notification feed (API-backed)
         │   ├── CommsContext.jsx← Realtime channel, unread messages, the live call (WebRTC); mounted in Layout
         │   └── ToastContext.jsx
         ├── utils/
         │   ├── helpers.js      ← Shared pure utilities (date/BST formatting, styles, file helpers)
-        │   └── activity.js     ← Last user-input time (idle logout + background polling)
+        │   ├── activity.js     ← Last user-input time (idle logout + background polling)
+        │   ├── pwa.js          ← service worker registration, install prompt
+        │   ├── push.js         ← this device's web push (on/off, resume after sign-in, close by tag)
+        │   └── tones.js        ← call ring/ringback (Web Audio)
         ├── hooks/
         │   ├── useApi.js       ← Load-on-deps hook (abort, stale-response guard) + useDebounced
         │   ├── useIdleLogout.js
@@ -73,7 +76,8 @@ Tender/
         │   ├── incidents/
         │   │   └── IncidentList.jsx
         │   ├── dashboard/              ← Dashboard sub-components (charts, KPI cards, etc.)
-        │   ├── messaging/              ← CallPanel, Composer (text + voice recording), VoiceMessage, PeoplePicker, Avatar
+        │   ├── messaging/              ← CallPanel, Composer (one-tap voice), VoiceMessage, PeoplePicker, Avatar, GroupDialog, PushSettings
+        │   ├── map/                    ← MapLayers (clusters, heatmap), BangladeshFrame (view limits + mask)
         │   └── ui/
         │       ├── Badges.jsx          ← StatusBadge, SeverityBadge
         │       ├── Card.jsx

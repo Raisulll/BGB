@@ -114,8 +114,12 @@ describe('comments', () => {
 describe('printing', () => {
   it('records each print in the audit trail', async () => {
     const inc = await operator.post(URL, newIncident({ status: 'Submitted' }));
-    expect((await sector.post(`${URL}/${inc.body.id}/print`)).status).toBe(204);
-    expect((await lastAudit('PRINT_INCIDENT'))?.details).toContain(inc.body.id);
+    const res = await sector.post(`${URL}/${inc.body.id}/print`);
+    expect(res.status).toBe(200);
+    expect(res.body.reference).toMatch(/^BGB\/BIRDS\/RPT\/\d{4}\/\d{4}$/);
+    const entry = (await lastAudit('PRINT_INCIDENT'))?.details;
+    expect(entry).toContain(inc.body.id);
+    expect(entry).toContain(res.body.reference);
     expect((await sector.post(`${URL}/BIRDS-2026-9999/print`)).status).toBe(404);
   });
 });

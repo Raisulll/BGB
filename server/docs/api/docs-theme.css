@@ -1,0 +1,80 @@
+/* BIRDS look for the API documentation (Swagger UI): BGB green, slate neutrals, white cards.
+   Hides Swagger's own top bar, OAS badge and spec link; the BIRDS header comes from docs-header.js. */
+:root {
+  --bgb: #164716;
+  --bgb-dark: #0f300f;
+  --bgb-tint: #eef4ee;
+  --ink: #1f2937;
+  --muted: #5b6472;
+  --line: #e2e8f0;
+  --bg: #f8fafc;
+}
+html, body { background: var(--bg); }
+body { margin: 0; }
+.swagger-ui, .swagger-ui .info, .swagger-ui .opblock-tag, .swagger-ui table, .swagger-ui .btn,
+.swagger-ui input, .swagger-ui select, .swagger-ui textarea, .swagger-ui .markdown p, .swagger-ui .markdown li {
+  font-family: Inter, "Segoe UI", system-ui, -apple-system, Arial, sans-serif !important;
+  color: var(--ink);
+}
+
+/* Swagger branding and clutter */
+.swagger-ui .topbar, .swagger-ui .info .version-stamp, .swagger-ui .info a.link, .swagger-ui .info .link,
+.swagger-ui .info__tos, .swagger-ui .info hgroup > a { display: none !important; }
+
+/* BIRDS header (inserted by docs-header.js) */
+.birds-docs-header { background: #fff; border-bottom: 1px solid var(--line); }
+.birds-docs-header .inner { max-width: 1200px; margin: 0 auto; padding: 14px 24px; display: flex; align-items: center; gap: 14px; }
+.birds-docs-header img { width: 44px; height: 44px; }
+.birds-docs-header .name { font: 600 18px/1.2 Inter, "Segoe UI", system-ui, Arial, sans-serif; color: var(--ink); }
+.birds-docs-header .sub { font: 400 13px/1.3 Inter, "Segoe UI", system-ui, Arial, sans-serif; color: var(--muted); }
+.birds-docs-header .tag { margin-left: auto; font: 600 12px/1 Inter, "Segoe UI", system-ui, Arial, sans-serif; letter-spacing: .08em; color: #7f1d1d; border: 1px solid #fecaca; background: #fef2f2; padding: 6px 10px; border-radius: 6px; }
+
+/* Layout */
+.swagger-ui .wrapper { max-width: 1200px; padding: 0 24px; }
+.swagger-ui .information-container.wrapper { margin-top: 24px; }
+.swagger-ui .information-container .info { margin: 0; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 24px 28px; }
+.swagger-ui .info .title { font-size: 28px; font-weight: 600; color: var(--ink); }
+.swagger-ui .info .title small:not(.version-stamp) { background: var(--bgb-tint); border: 1px solid #cfe0cf; }
+.swagger-ui .info .title small:not(.version-stamp) pre { color: var(--bgb); font-weight: 600; }
+.swagger-ui .info .markdown h2 { font-size: 18px; font-weight: 600; margin-top: 22px; color: var(--ink); }
+.swagger-ui .info .markdown p, .swagger-ui .info .markdown li { font-size: 14px; line-height: 1.6; color: #334155; }
+.swagger-ui .info .markdown code, .swagger-ui .markdown code, .swagger-ui .renderedMarkdown code { background: var(--bgb-tint) !important; color: #14532d !important; border: 1px solid #d5e5d5; border-radius: 4px; padding: 0 5px; font-size: 12.5px; font-weight: 500; }
+.swagger-ui .info .renderedMarkdown p { margin: 6px 0; }
+
+.swagger-ui .scheme-container { background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: none; margin: 16px auto 0; max-width: 1152px; padding: 14px 24px; }
+.swagger-ui .scheme-container .schemes { align-items: center; padding: 0 !important; }
+.swagger-ui .scheme-container .schemes > div, .swagger-ui .scheme-container .schemes-server-container { margin: 0; padding: 0; }
+.swagger-ui .servers > label { margin: 0; font-size: 12px; color: var(--muted); }
+.swagger-ui .servers > label select { border: 1px solid #cbd5e1; border-radius: 6px; box-shadow: none; font-weight: 500; }
+.swagger-ui .filter-container { max-width: 1200px; margin: 16px auto 0; padding: 0 24px; }
+.swagger-ui .filter-container .filter, .swagger-ui .filter-container .wrapper { padding: 0 !important; margin: 0; }
+.swagger-ui .filter .operation-filter-input { margin: 0 !important; }
+.swagger-ui .filter .operation-filter-input { border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 14px; margin: 0; font-size: 14px; }
+
+/* Tag groups as cards */
+.swagger-ui .opblock-tag-section { background: #fff; border: 1px solid var(--line); border-radius: 10px; margin: 14px 0; padding: 0 18px; }
+.swagger-ui .opblock-tag { border-bottom: 0; font-size: 20px; font-weight: 600; padding: 14px 0; }
+.swagger-ui .opblock-tag small { color: var(--muted); font-size: 13px; font-weight: 400; }
+.swagger-ui .opblock-tag-section.is-open .opblock-tag { border-bottom: 1px solid var(--line); }
+.swagger-ui .opblock { border-radius: 8px; box-shadow: none; margin: 0 0 10px; }
+.swagger-ui .opblock .opblock-summary-method { border-radius: 6px; font-weight: 600; min-width: 74px; }
+.swagger-ui .opblock .opblock-summary-path { font-size: 14px; }
+.swagger-ui .opblock .opblock-summary-description { color: var(--muted); font-size: 13px; }
+.swagger-ui .opblock.opblock-get { background: #f5f8ff; border-color: #c7d7fb; }
+.swagger-ui .opblock.opblock-post { background: #f2f8f2; border-color: #b9d6b9; }
+.swagger-ui .opblock.opblock-post .opblock-summary-method { background: var(--bgb); }
+.swagger-ui .opblock.opblock-patch { background: #f2f9f8; border-color: #b6dcd7; }
+.swagger-ui .opblock.opblock-patch .opblock-summary-method { background: #0f766e; }
+.swagger-ui .opblock.opblock-delete { background: #fdf4f4; border-color: #f1c4c4; }
+
+/* Buttons */
+.swagger-ui .btn { border-radius: 6px; box-shadow: none; font-weight: 600; }
+.swagger-ui .btn.authorize { color: var(--bgb); border-color: var(--bgb); }
+.swagger-ui .btn.authorize svg { fill: var(--bgb); }
+.swagger-ui .btn.execute { background: var(--bgb); border-color: var(--bgb); }
+.swagger-ui .btn.execute:hover { background: var(--bgb-dark); }
+.swagger-ui .try-out__btn { border-color: #94a3b8; }
+.swagger-ui a, .swagger-ui .info a { color: var(--bgb); }
+
+/* Bottom margin */
+#swagger-ui { padding-bottom: 48px; }

@@ -41,6 +41,20 @@ reportsRouter.get('/operational', requirePermission('reports'), async (req, res)
   res.json(await service.operationalReport(req.user!, service.reportFiltersSchema.parse(rest), service.reportTypeSchema.parse(type)));
 });
 
+// Incident annex: the full record of every incident in the report (capped at REPORT_DETAIL_LIMIT)
+reportsRouter.get('/details', requirePermission('reports'), async (req, res) => {
+  const { type, ...rest } = req.query;
+  res.json(await service.reportDetails(req.user!, service.reportFiltersSchema.parse(rest), service.reportTypeSchema.parse(type)));
+});
+
+// Reference number + audit entry before the browser prints the report (filters in the query, as GET;
+// details=1 when the incident annex is included)
+reportsRouter.post('/print', requirePermission('reports'), async (req, res) => {
+  const { type, details, ...rest } = req.query;
+  const withDetails = details === '1' || details === 'true';
+  res.json(await service.recordReportPrint(req.user!, service.reportFiltersSchema.parse(rest), service.reportTypeSchema.parse(type), withDetails, requestContext(req)));
+});
+
 /** Shared by /reports/export/:format and /incidents/export/:format (§19.3, §19.7). */
 export async function exportHandler(req: Request, res: Response) {
   const format = req.params.format === 'csv' ? 'csv' : req.params.format === 'excel' ? 'excel' : null;

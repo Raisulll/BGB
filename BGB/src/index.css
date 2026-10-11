@@ -60,6 +60,13 @@
     body {
       @apply bg-white;
     }
+    /* Report print preview open: only the preview prints (the app behind it would add a blank page) */
+    html:has(.print-preview) {
+      overflow: visible !important;
+    }
+    body:has(> .print-preview) > :not(.print-preview) {
+      display: none !important;
+    }
   }
   button:not(:disabled),
   [role="button"]:not(:disabled) {
@@ -112,6 +119,10 @@
   /* Compact size for table rows */
   .btn-sm {
     @apply min-h-8 gap-1.5 px-2.5 py-1 text-xs md:min-h-8;
+  }
+  /* Formal printed documents (reports): serif type as on official BGB correspondence */
+  .official-doc {
+    font-family: "Times New Roman", Times, "Noto Serif Bengali", "Noto Sans Bengali", serif;
   }
   .th {
     @apply px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600;

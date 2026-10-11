@@ -550,9 +550,6 @@ Added after the session summary: deferred items now appear in **Admin › Operat
 - Frontend: `components/messaging/GroupDialog.jsx` replaces the members dialog ("Group settings": photo, rename, pending requests with Approve/Reject, members with Admin label, Make admin / Remove as admin / Remove, Add people or Request to add, Leave). Photo is cropped to a 512 px JPEG square in the browser (drops EXIF/GPS). `Avatar` shows group photos (`photoUrl`, fetched with the token, one object URL per version). Pending count on the Group settings button for admins. Group notifications open the conversation. Bug fixed on the way: system messages (rename, photo, members) now appear live in the open thread (catch-up when the conversation's latest message is newer than the one shown). `fetchBlob` now passes `background`. 35 i18n keys (1139 total).
 - Tests: `group-admin.test.ts` (6) → server **154/154**; OpenAPI documents the 8 new routes. Browser suite `group-ui.mjs` (13 checks, three users: member request → badge → approve, rename, photo, make admin, remove, removed member loses the group, promoted member gets controls, system messages live, 390 px layout); phone layout fixed (actions wrap under the name).
 
-### Blockers / waiting on
-- Not committed or deployed yet (owner to confirm)
-
 - Supabase migration: the owner's `db:deploy` dropped (P1017) after the integrity migration's SQL had run but before Prisma recorded it; the retry then hung on Prisma's advisory lock, held by the dead session. Checked every object existed (4 CHECKs, partial unique index, guard function and trigger; no live groups, so no admins to backfill), ended the stale session (`pg_terminate_backend`, lock 72707369 only) and ran `prisma migrate resolve --applied 20261010235000_group_admin_controls_integrity`. `migrate status`: up to date. The Supabase session pooler resets connections now and then (ECONNRESET seen twice): just retry.
 
 - **Installable app (PWA; owner request: many users on phones).** `public/manifest.webmanifest` (BIRDS, standalone, theme #164716, shortcuts New incident / Incidents / Messages), icons from the crest (`public/icons/`: 192, 512, maskable 512 on white with the crest in the safe zone, 180 apple-touch), `public/sw.js` (network-first page loads with the last index.html as offline fallback, cache-first `/assets/*` capped at 120 entries, stale-while-revalidate for other site files; never `/api`, non-GET or other origins), `utils/pwa.js` (registers in production builds only; keeps `beforeinstallprompt`), "Install app" in the user menu (browser prompt; iPhone/iPad get Share → Add to Home Screen steps), `index.html` manifest + Apple meta tags, safe-area padding for the app frame, call panel and toasts, offline notice in the app and on the sign-in page (`hooks/useOnline.js`). 8 i18n keys (`pwa.*`, 1147 total).
@@ -579,11 +576,114 @@ Added after the session summary: deferred items now appear in **Admin › Operat
 
 - **Keep the free Render service awake (owner wants to stay on the free plan).** `src/keepAwake.ts`: with `KEEP_AWAKE_MINUTES` (0-14, default 0 = off) the server requests `APP_BASE_URL/api/v1/health` that often; through Render's front door that counts as traffic, so the 15-minute idle stop never comes. `render.yaml` sets 10 (Blueprint value; set it in the dashboard too). Verified locally with 1 minute: the request arrives (200). Limits: one always-on free service uses ~744 of 750 free hours a month (only one free service in the workspace); if the service is ever stopped (deploy failure, Render maintenance) the self-ping can't wake it, so an outside monitor (UptimeRobot free, 5-minute check of /api/v1/health) is the backup and also the uptime record for spec #40. The health check also queries the database, which keeps the Supabase free project from pausing for inactivity.
 
+### Decisions & rationale
+- Pushes carry names only, never message text, and only reach devices whose session is live (DOUBT-015); a different user on the same browser doesn't inherit them.
+- A web app can't show a full-screen call on a locked phone; the call notification re-rings every 4 s with Answer/Decline instead. Decline uses a signed one-call token because the service worker has no sign-in.
+- Messages UI follows the owner's Messenger request (CLAUDE.md §9 exception for the chat bar).
+- Stay on Render's free plan, kept awake by a self-ping (`KEEP_AWAKE_MINUTES=10`).
+
+### State at the end of the session
+- Live demo: https://birds-demo.onrender.com; all migrations on Supabase (latest `20261011004447_push_subscriptions`); TURN (Metered) and VAPID keys set on Render. Everything up to the GIS map frame is pushed; the keep-awake change is committed locally only if the owner did so after this note.
+- Server tests 159/159; i18n 1173 keys (EN = BN); browser suites in this session's scratchpad (calls, messaging, groups, PWA, push, map).
+- Requirements: 38 DONE, 8 IN PROGRESS, 12 NOT STARTED (9 of those deferred for the demo by the owner, 1 commercial).
+
 ### Blockers / waiting on
-- Owner: on each phone, tap "Turn on notifications" (iPhone: install BIRDS to the home screen first, iOS 16.4+); report which phones/browsers the silent calls were on
+- Owner: push `keepAwake` work and set `KEEP_AWAKE_MINUTES=10` on Render (+ optional UptimeRobot on `/api/v1/health`)
+- Owner: on each phone, turn notifications on (iPhone: install first, iOS 16.4+) and retest calls; report the phone/browser if "No sound is arriving" appears
+- BGB: DOUBT-001 (concurrent users), DOUBT-009 (antivirus); confirm DOUBT-013/014/015 assumptions
+- BGB: a sample of their official report/memo format (letterhead, classification marking, reference number style, signature blocks) for the print redesign (DOUBT-016)
+
+### Next session — TODO (BGB documentation set, CLAUDE.md §27)
+1. Demo script: the 58 TEC specs in order, each with the screen, demo account and steps that prove it
+2. Security assessment (§27.7): OWASP Top 10 mitigation matrix, `npm audit`, OWASP ZAP scan of the live demo + remediation, password/session/encryption policies
+3. UAT test cases (§29) covering all 58 specs
+4. User manual (§27.2) and system administration manual (§27.1), with screenshots
+5. Installation & deployment guide for BGB servers (§27.5), database documentation with ERD + table dictionary (§27.4), backup & recovery procedure (§27.6, production plan)
+6. Training plan and slides (§28)
+7. **Official report print format (owner, 2026-10-11: the current printouts don't look official).** Redesign the printed/PDF reports (Reports page and the single-incident print) to BGB's official format: letterhead (crest, "Border Guard Bangladesh", headquarters/unit), security classification top and bottom, memo/reference number and date line, subject line, numbered paragraphs or tables in a formal layout, page numbers ("Page x of y"), prepared/checked/approved signature blocks with name, rank, appointment and unit, distribution list, and a Bangla version. Ask BGB for a sample official report or memo first (DOUBT-016); without one, follow the Bangladesh government memo layout (Secretariat Instructions)
+8. Before the TEC session: reset + re-seed the live database (clears test chats/calls), sign in once per demo account, rehearse on the real phones
+
+---
+## Session — 2026-10-11 (continued) — professional report format
+
+### What was done
+- **Reports page shown and printed as a formal BGB document** (owner: "the system generates the report but not professional"). New `components/reports/OfficialReport.jsx`, an A4 sheet on screen that prints/saves as PDF exactly as shown: crest and letterhead (Government of the People's Republic of Bangladesh / Border Guard Bangladesh / Headquarters, Pilkhana, Dhaka-1205 / BIRDS), CONFIDENTIAL // OPERATIONAL at the top and bottom of every printed page (outer table thead/tfoot repeat per page), reference number and date line, subject, numbered paragraphs (1 scope and parameters table, then the template's sections, then a certificate), Prepared by (filled from the user) / Checked by / Approved by signature blocks, distribution, "printed by" line, "Page x of y" through `@page` margin boxes (Chrome/Edge). Serif type (`.official-doc` in `index.css`), black on white, plain-text severity/status, totals rows, Ser columns.
+- Sections per template: operational = summary, category, sector, register; statistical = summary, severity, category with subcategories, sector; high-threat = summary, sector, register; sector-audit = summary, sector (with severity columns and risk score), category, register.
+- **Server**: `POST /api/v1/reports/print` (permission `reports`, same query as `/reports/operational`) issues `BGB/BIRDS/RPT/<year>/NNNN` from a per-year counter in `system_config` (`report.next_serial.<year>`, same pattern as incident IDs, no migration) and writes `PRINT_REPORT` to the audit trail with type, reference, count and filters. Print button: reference first, then `window.print()`; no audit entry, no print. OpenAPI documented; `reports.test.ts` +2 → server **161/161**, `tsc` clean.
+- **Printing fix for every page**: the app frame (`Layout.jsx`) was fixed to the screen height with overflow hidden, so printouts were cut to one page; it now flows across pages in print.
+- Reports toolbar: the icon-only reset button is now a named "Reset" button; label classes match the design system.
+- i18n: `rep.doc.*` (EN/BN), `rep.resetBtn`, audit label `PRINT_REPORT`; 18 unused `rep.*` keys removed (1215 keys, check passes).
+- Verified with headless Chrome on a local build (`report-check.mjs` in this session's scratchpad): 7-page A4 PDF of the operational report with header/footer and page numbers on every page, reference issued (0001, 0002, ...), statistical and sector-audit templates, Bangla, phone 390 px with no horizontal overflow; single-incident print still renders.
+
+### Decisions & rationale
+- Layout follows the Bangladesh government memo pattern (DOUBT-016 option 2, now ASSUMED) because no BGB sample was available; wording lives in i18n so it can be changed to BGB's sample without code changes to the layout logic.
+- Reference numbers are issued only when printing (not when viewing) so each paper copy is traceable to one audit entry.
+
+### Blockers / waiting on
+- BGB: sample official report/memo to confirm letterhead, classification wording, reference style, signature and distribution blocks (DOUBT-016)
 
 ### Next session — TODO
-1. Commit, push; `npm run db:deploy` on Supabase if the push migration isn't there yet; deploy on Render
-2. On the phones: turn notifications on, retest a call (both directions) and a call with BIRDS closed; if "No sound is arriving" shows, note which side
-2. Set the TURN variables on Render if not done
-3. Confirm DOUBT-014 assumptions with the owner
+1. Apply the same official layout to the single-incident print (`PrintableIncident.jsx`)
+2. Deploy: no migration needed; push and let Render rebuild
+3. Then continue the documentation set (demo script, security assessment, UAT cases)
+
+---
+## Session — 2026-10-11 (continued) — incident annex with evidence; overview on screen, preview for printing
+
+### What was done
+- **Owner: "include every incident in detail, each with its evidence; images previewed, videos with a thumbnail".** New option on Reports, "Include full details of each incident", adds **Annex A** to the printed report: one page (or more) per incident (`components/reports/IncidentAnnex.jsx`) with "Annex A to <ref> dated <date>", particulars table, narrative (a-d), evidence figures numbered Fig. A-n.i (photographs and images reproduced at print size; a video shows a still frame with a play mark, "still frame at m:ss / duration", resolution, and a note that the recording is kept in BIRDS; documents listed with a short box; files missing from storage say so), caption with type, size, capture time/camera/GPS (EXIF), upload time, evidence no. and full SHA-256; record history and comments. The register gets an "Annex" column (A-1, A-2, ...). Max 100 incidents (message when there are more).
+- Previews: `utils/evidencePreview.js` (images reduced to 1600 px JPEG; video frame at 1 s, skipping near-blank frames by luminance spread, then 25/50/75 %; 20 s timeout, "still frame not available in this browser" for codecs it can't decode) and `hooks/useEvidencePreviews.js` (one file at a time, token-authenticated inline fetch, so the server records VIEW_EVIDENCE; object URLs revoked).
+- **Owner: "on screen show the system report overview; when printing, print the preview".** The Reports page is again an in-app overview (`components/reports/ReportOverview.jsx`: stat cards, category and sector tables, incident list with badges and links). **Print / PDF** opens `components/reports/PrintPreview.jsx`, a full-screen preview of the formal document (portal on <body>; Close / Print; Escape closes; progress line while the annex and evidence previews load; Print disabled until ready). Print issues the reference + audit entry, then prints exactly the preview; print CSS hides the app behind it (`body:has(> .print-preview)`), so no blank first page. The annex is fetched only while the preview is open. Ctrl+P on the overview prints only a line pointing to Print / PDF.
+- Server: `GET /api/v1/reports/details` (permission `reports`; same filters, scope and order as the register; `incidentDetailsFor()` in incidents.service reuses the incident-page DTO; `{ incidents, total, limit: 100, truncated }`); `POST /reports/print?details=1` notes "with full incident details" in the PRINT_REPORT audit entry. OpenAPI documented; tests +3 → **164/164**, `tsc` clean.
+- Fixes: report document uses `table-fixed` (on phones the sheet no longer grows past the screen); register/sector tables drop their screen min-width in print (right edge was cut).
+- i18n: `rep.annex.*`, `rep.ov.*`, preview/option texts (1263 keys, check passes).
+- Verified in Chrome (scripts in this session's scratchpad: `seed-evidence.mjs`, `seed-video.mjs`, `annex-check.mjs`, `preview-check.mjs`, `phone-annex.mjs`): test incidents BIRDS-2026-1094 (JPEG, PNG, MP4, PDF) and BIRDS-2026-1095 (H.264 MP4 recorded in Chrome) on the **local** database; 43-page PDF with 27 annex pages, photos and a correct video still frame; reference issued; no blank page; Bangla; 390 px without overflow; annex not requested until the preview opens.
+
+### Decisions & rationale
+- Video thumbnails are made in the browser from the decrypted file (no ffmpeg on the server, nothing extra stored); the PDF of a video can only carry a still frame, so the caption says where the recording is kept.
+- Annex capped at 100 incidents to keep printouts and evidence loading manageable.
+
+### Next session — TODO
+1. Owner review of the overview + preview flow and Annex A; then commit and push (no migration)
+2. Apply the formal layout to the single-incident print (`PrintableIncident.jsx`) — could reuse `IncidentAnnex`
+3. Documentation set (demo script, security assessment, UAT cases)
+
+---
+## Session — 2026-10-11 (continued) — formal single-incident printout
+
+### What was done
+- **Owner: make the individual incident print/PDF professional.** "Print / PDF" on the incident page now opens the same print preview as Reports, showing the incident as a formal BGB document (`components/incidents/PrintableIncident.jsx`, rewritten): letterhead, classification on every page, document reference and date, subject "Incident report: <id> — <title>", the full record (particulars, narrative a-d, evidence figures Fig. 1..n with photos reproduced, video still frames, documents listed, SHA-256; record history; comments), a certificate ("true copy of incident record ... as held in BIRDS at ..."), signature blocks prefilled from the record (reporting officer = filer with unit and filing date; reviewed by / approved by = last Reviewed / Approved entries in the history), distribution, printed-by line, "Page x of y". Evidence previews load only while the preview is open.
+- Shared pieces: `components/reports/OfficialDocument.jsx` (frame: letterhead, thead/tfoot classification, ref/date, subject; `Section`, `SignatureBlock`, `Signatures`, `Distribution`, table classes) now used by both the report and the incident printout; `IncidentRecord` exported from `IncidentAnnex.jsx` (used by Annex A and the incident printout); the A4 `@page` rule moved into `PrintPreview`.
+- Server: `POST /incidents/:id/print` now returns `{ reference, printedAt }` (was 204) from the same per-year series as reports (`utils/printReference.ts`, used by both); the PRINT_INCIDENT audit entry names the reference. OpenAPI updated; `workflow-extras.test.ts` checks the reference → server **164/164**, `tsc` clean.
+- i18n: `print.subject`, `print.fig`, `print.certify`, `print.signReviewer`; `print.signFiler` in sentence case; 7 unused `print.*` keys removed (1260 keys, check passes).
+- Verified in Chrome (`incident-print.mjs`): BIRDS-2026-1094 → 3-page A4 PDF with the photo, image, video still frame and PDF entry, reference BGB/BIRDS/RPT/2026/0011; BIRDS-2026-1001 in Bangla with Reviewed by Lt. Col. Karim and Approved by Maj. Alam prefilled; report preview flow re-checked (no regression).
+
+### Next session — TODO
+1. Owner review of the report + incident printouts; then commit and push (no migration)
+2. Documentation set (demo script, security assessment, UAT cases)
+
+---
+## Session — 2026-10-11 (late) — tender details filled; NEXT SESSION: START HERE
+
+### Done
+- Tender details in `tender-submission/build/tender.js` (Grace International; tender "Development of Centralized Access Control Integration System — B. BIRDS ... Phase II" — exact wording to confirm with the owner; e-GP tracking no. 1347267). Rebuilt 01–05 (.docx) and 06 deck with them: headers, footers, signature block (tenderer prefilled; signatory/date left blank to sign), technical proposal §2 now says company verification documents are submitted separately + a roles table; proposed values (RPO 15 min, RTO 4 h, 2 TB storage, 10-week plan, training days, support times, Sun–Thu 9–17 support) are now stated without brackets.
+- API docs restyled (server/docs/api/docs-theme.css, docs-header.js, src/apiDocs.ts): BIRDS header, Swagger branding removed, BGB colours, collapsed groups, filter, schemas hidden. openapi test passes.
+- Demo video 07 re-made with Indian male voice "Psi" (Kokoro, local); George version kept in tender-submission/build/video-out/. Root `.gitignore` ignores tender-submission/.
+
+### Next session — TODO (in this order)
+1. Re-make the video so the intro/closing cards show "Grace International · e-GP 1347267" (edit cards in tender-submission/build/video/video.mjs to use tender.js, run `bash tender-submission/build/video/make-video.sh <scratch dir with seed-video.mjs, seed-evidence.mjs, seed-messages.mjs>`; those seed scripts were in the session scratchpad — recreate them in build/video/ if missing). Stop port 4100 server afterwards.
+2. Update tender-submission/README.md: placeholders filled; remaining owner checks (tender name wording, proposed commitment values, sign/seal/date).
+3. Security self-assessment + test results (OWASP Top 10 table, npm audit both projects, 164 server tests) as 08 document; clarification letter to BGB (DOUBT-001/009/016).
+4. Full server test run, then commit and push (print/report work, API docs restyle, .gitignore, living docs). No migration needed.
+5. Optional: reset local dev DB (3 test incidents "Yaba consignment…"/"Night movement…" created by scripts).
+
+---
+## Session — 2026-10-11 (late, continued) — submission date set
+
+### What was done
+- Checked all tender documents (01–06) for placeholders: only the date and the signatory fields were blank; "[100/250/500]" in item 38 is BGB's own wording and stays.
+- Submission date **18/10/2026** added as `DATE` in `tender-submission/build/tender.js` and used in the header date line and the signature-block date of 01 and 04; documents 01–05 regenerated (`node build.js`).
+
+### Next session — TODO
+- Unchanged from the previous block; still to fill by hand: authorised signatory name, designation, signature and seal (01 and 04). `tender-submission/README.md` steps 1 and 5 are out of date.
+- Speaker notes for the whole presentation (06): new `tender-submission/build/speaker-notes.js` (script per slide; "Show:" live-demo hints with the demo account; "If asked:" answers), used by `deck.js` for all 53 slides (build fails if a slide has no note). Rebuild: `NODE_PATH=./node_modules PPTX_SKILL=<pptx skill dir> node deck.js` in `build/`. Slide content unchanged.

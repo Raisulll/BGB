@@ -131,3 +131,45 @@ describe('configurable reports and exports (specs #21, #22)', () => {
     expect(entry?.details).toMatch(/^CSV export of statistical report/);
   });
 });
+
+describe('printed reports (specs #21, #22, #24)', () => {
+  it('issues sequential reference numbers and audits each print', async () => {
+    const a = await admin.post(`${R}/print?type=high-threat&sector=Sector-7`);
+    const b = await admin.post(`${R}/print`);
+    expect(a.status).toBe(200);
+    expect(a.body.reference).toMatch(/^BGB\/BIRDS\/RPT\/\d{4}\/\d{4}$/);
+    const seq = (r: string) => Number(r.split('/').pop());
+    expect(seq(b.body.reference)).toBe(seq(a.body.reference) + 1);
+    const entry = await prisma.auditLog.findFirst({ where: { action: 'PRINT_REPORT', details: { contains: a.body.reference } } });
+    expect(entry?.details).toContain('high-threat');
+    expect(entry?.details).toContain('Sector-7');
+  });
+
+  it('needs the reports permission', async () => {
+    expect((await operator.post(`${R}/print`)).status).toBe(403);
+  });
+});
+
+describe('report incident annex (specs #21, #22)', () => {
+  it('returns full records in register order, filtered like the report', async () => {
+    const [details, report] = await Promise.all([admin.get(`${R}/details?type=high-threat`), admin.get(`${R}/operational?type=high-threat`)]);
+    expect(details.status).toBe(200);
+    expect(details.body.total).toBe(report.body.summary.total);
+    const ids = (rows: { id: string }[]) => rows.map((i) => i.id);
+    expect(ids(details.body.incidents)).toEqual(ids(report.body.incidents).slice(0, details.body.limit));
+    const first = details.body.incidents[0];
+    expect(['High', 'Critical']).toContain(first.severity);
+    expect(first).toHaveProperty('description');
+    expect(Array.isArray(first.timeline) && Array.isArray(first.evidence) && Array.isArray(first.comments)).toBe(true);
+  });
+
+  it('needs the reports permission', async () => {
+    expect((await operator.get(`${R}/details`)).status).toBe(403);
+  });
+
+  it('notes the annex in the print audit entry', async () => {
+    const res = await admin.post(`${R}/print?details=1`);
+    const entry = await prisma.auditLog.findFirst({ where: { action: 'PRINT_REPORT', details: { contains: res.body.reference } } });
+    expect(entry?.details).toContain('with full incident details');
+  });
+});

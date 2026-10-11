@@ -365,3 +365,25 @@ Notifications show who wrote or called (and the group name), never message text.
 
 ### Resolution (if resolved)
 *Confirm with BGB: whether sender names on lock screens are acceptable, and whether the production network allows the API server outbound HTTPS to the browser push services (otherwise push stays off and calls ring only while the app is open).*
+
+---
+## DOUBT-016 — Official Format for Printed Reports
+
+**TEC Spec**: #21 — Reporting; #22 — Export (PDF); CLAUDE.md rules 10 and 12 (crest, CONFIDENTIAL // OPERATIONAL banner)
+**Raised on**: 2026-10-11
+**Status**: ASSUMED
+
+### The ambiguity
+The owner finds the current printed reports (Reports page print/PDF and the single-incident print) not official-looking. The specs ask for printable reports but don't define BGB's official layout: letterhead, classification wording (e.g. CONFIDENTIAL / RESTRICTED, or Bangla equivalents), memo/reference number format, date style, signature and approval blocks, distribution list, and whether reports must be in Bangla, English or both.
+
+### Options considered
+1. Copy a sample official report or memo supplied by BGB (best: matches what TEC members expect to see).
+2. Follow the general Bangladesh government memo layout (Secretariat Instructions): letterhead, memo number and date, subject, body, signature block with name/designation, distribution.
+3. Keep the current layout with small fixes (not enough per the owner).
+
+### Assumption made (if proceeding)
+None yet: ask BGB for a sample first. If none arrives before the redesign session, use option 2 with the BGB crest and the existing CONFIDENTIAL // OPERATIONAL marking, and offer English and Bangla versions.
+
+### Resolution (if resolved)
+2026-10-11 (assumed, owner asked for a professional report before a sample arrived): option 2 built for the Reports page. A4 document with the crest and letterhead ("Government of the People's Republic of Bangladesh / Border Guard Bangladesh / Headquarters, Pilkhana, Dhaka-1205"), CONFIDENTIAL // OPERATIONAL at the top and bottom of every printed page, reference number `BGB/BIRDS/RPT/<year>/NNNN` issued by the server on print (audited `PRINT_REPORT`), date line, subject, numbered paragraphs, a certificate, Prepared / Checked / Approved signature blocks, distribution, "Page x of y", in English and Bangla. *Still to confirm with BGB: letterhead wording and address, classification wording, the reference number style, and the signature/distribution blocks; replace with their sample when it arrives. The single-incident print uses the same layout (2026-10-11).*
+

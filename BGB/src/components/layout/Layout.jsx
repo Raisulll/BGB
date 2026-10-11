@@ -46,7 +46,7 @@ export default function Layout() {
   return (
     <CommsProvider>
       {/* Safe-area padding: the installed app runs full screen under the iPhone notch and home bar */}
-      <div className="flex h-dvh overflow-hidden bg-slate-100/60 pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]">
+      <div className="flex h-dvh overflow-hidden bg-slate-100/60 print:block print:h-auto print:overflow-visible print:bg-white pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]">
         {/* Mobile overlay */}
         <div
           onClick={() => setMobileOpen(false)}
@@ -63,7 +63,7 @@ export default function Layout() {
           onToggleCollapse={toggleCollapseOnly}
         />
 
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden print:block print:overflow-visible">
           <Header onToggleSidebar={toggleSidebar} collapsed={collapsed} />
           {!online && (
             <p role="status" className="border-b border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-900 print:hidden">
@@ -78,7 +78,7 @@ export default function Layout() {
                 <PushPrompt />
               </div>
             )}
-            <div key={pathname} className="mx-auto w-full max-w-screen-2xl animate-fade-in">
+            <div key={pathname} className="mx-auto w-full max-w-screen-2xl animate-fade-in print:max-w-none print:animate-none">
               <Outlet />
             </div>
           </main>

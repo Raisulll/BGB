@@ -1,6 +1,7 @@
 import { prisma } from '../../db.js';
 import { Prisma } from '../../generated/prisma/client.js';
 import { AppError, badRequest, forbidden, notFound } from '../../utils/errors.js';
+import { allocatePrintReference } from '../../utils/printReference.js';
 import { bstYear, fromDateString, fromTimeString, toDateString, toTimeString } from '../../utils/formatDate.js';
 import { paged, toSkipTake } from '../../utils/pagination.js';
 import type { RequestContext } from '../../utils/requestContext.js';
@@ -343,6 +344,18 @@ export async function getIncident(user: AuthUser, id: string) {
   return toDetailDto(inc, user, cutoff, await mayComment(user, inc));
 }
 
+/**
+ * Specs #21, #22 — full records for the report annex: same fields as the incident page (timeline,
+ * evidence list, comments), for rows already filtered and scoped by the caller (reports module).
+ */
+export async function incidentDetailsFor(user: AuthUser, where: Prisma.IncidentWhereInput, take: number) {
+  const [rows, cutoff] = await Promise.all([
+    prisma.incident.findMany({ where, include: detailInclude, orderBy: [{ incidentDate: 'desc' }, { id: 'desc' }], take }),
+    overdueCutoff(),
+  ]);
+  return rows.map((inc) => toDetailDto(inc, user, cutoff, false));
+}
+
 export async function getTimeline(user: AuthUser, id: string) {
   return (await loadVisible(user, id)).timeline.map(toTimelineDto);
 }
@@ -525,9 +538,12 @@ export async function addComment(user: AuthUser, id: string, body: string, ctx: 
 }
 
 /** Printing puts a confidential record on paper: audited (spec #24). */
+/** Specs #22, #24 — a printed incident gets a document reference (same series as reports) and an audit entry naming it */
 export async function recordPrint(user: AuthUser, id: string, ctx: RequestContext) {
   const inc = await loadVisible(user, id);
-  await writeAudit({ action: 'PRINT_INCIDENT', username: user.username, userId: user.id, details: `Printed ${id} (${inc.title})`, ctx });
+  const reference = await allocatePrintReference();
+  await writeAudit({ action: 'PRINT_INCIDENT', username: user.username, userId: user.id, details: `Printed ${id} (${inc.title}) as ${reference}`, ctx });
+  return { reference, printedAt: new Date().toISOString() };
 }
 
 const EVENT_FOR: Record<WorkflowAction, WorkflowEvent> = {

@@ -42,18 +42,40 @@ export function openApiRouter() {
   return router;
 }
 
-/** Swagger UI at /api/docs, reading /api/v1/openapi.json */
+/**
+ * Swagger UI at /api/docs, reading /api/v1/openapi.json, in the BIRDS look: BGB header and colours
+ * (docs/api/docs-theme.css, docs-header.js), Swagger's own top bar and badges hidden, groups collapsed
+ * with a filter box, schemas list hidden.
+ */
 export function swaggerUiRouter() {
   const router = express.Router();
+  const docsDir = path.dirname(OPENAPI_PATH);
+  // The page's CSP allows scripts from this origin only, so the header script is served as a file
+  router.get('/birds-docs-header.js', (_req, res) => {
+    res.type('application/javascript').sendFile(path.join(docsDir, 'docs-header.js'));
+  });
+  let customCss = '';
+  try {
+    customCss = readFileSync(path.join(docsDir, 'docs-theme.css'), 'utf8');
+  } catch (err) {
+    logger.warn(`API docs theme not found (${(err as Error).message}); using the default look`);
+  }
   router.use(
     '/',
     swaggerUi.serve,
     swaggerUi.setup(undefined, {
-      customSiteTitle: 'BIRDS API',
+      customSiteTitle: 'BIRDS API documentation',
+      customfavIcon: '/favicon.svg',
+      customCss,
+      customJs: '/api/docs/birds-docs-header.js',
       swaggerOptions: {
         url: '/api/v1/openapi.json',
         // Keep the pasted access token in memory only (CLAUDE.md §13.16)
         persistAuthorization: false,
+        docExpansion: 'none',
+        filter: true,
+        defaultModelsExpandDepth: -1,
+        displayRequestDuration: true,
       },
     }),
   );

@@ -11,3 +11,7 @@ export const bySector = (query) => api('/reports/by-sector', { query });
 export const operational = (query) => api('/reports/operational', { query });
 /** format: csv | excel */
 export const exportReport = (format, query) => downloadFrom(`/reports/export/${format}`, { query, fallbackName: `birds-report.${format === 'excel' ? 'xlsx' : 'csv'}` });
+/** Incident annex: full record of every incident in the report (max 100) → { incidents, total, limit, truncated } */
+export const details = (query) => api('/reports/details', { query });
+/** Reference number + audit entry before printing (same query as operational) → { reference, printedAt } */
+export const recordPrint = (query) => api('/reports/print', { method: 'POST', query });

@@ -3,8 +3,11 @@ import { prisma } from '../../db.js';
 import { badRequest } from '../../utils/errors.js';
 import type { ExportTable } from '../../utils/export.js';
 import { toBstDisplay, toDateString, toDisplayDate, toTimeString } from '../../utils/formatDate.js';
+import type { RequestContext } from '../../utils/requestContext.js';
+import { writeAudit } from '../audit/audit.service.js';
+import { allocatePrintReference } from '../../utils/printReference.js';
 import { listIncidentsSchema } from '../incidents/incidents.schema.js';
-import { incidentWhere, overdueCutoff, type IncidentFilters } from '../incidents/incidents.service.js';
+import { incidentDetailsFor, incidentWhere, overdueCutoff, type IncidentFilters } from '../incidents/incidents.service.js';
 import { OVERDUE_STATUSES, SEVERITIES, STATUSES } from '../incidents/workflow.js';
 
 type AuthUser = Express.AuthUser;
@@ -295,3 +298,36 @@ export async function reportExportTable(user: AuthUser, filters: IncidentFilters
   };
 }
 
+
+/** The incident annex (one full record per incident) is capped so a printout stays manageable */
+export const REPORT_DETAIL_LIMIT = 100;
+
+/**
+ * Specs #21, #22 — the report's incident annex: every incident in the report (same filters, scope
+ * and order as the register) with its full record, timeline, comments and evidence list.
+ */
+export async function reportDetails(user: AuthUser, filters: IncidentFilters, type: ReportType) {
+  const f = applyType(filters, type);
+  const w = await where(user, f);
+  const [incidents, total] = await Promise.all([incidentDetailsFor(user, w, REPORT_DETAIL_LIMIT), prisma.incident.count({ where: w })]);
+  return { incidents, total, limit: REPORT_DETAIL_LIMIT, truncated: total > incidents.length };
+}
+
+/**
+ * Specs #21, #22, #24 — a printed (or saved-as-PDF) report gets a reference number,
+ * BGB/BIRDS/RPT/<year>/NNNN from a per-year counter in system_config, and an audit entry
+ * naming it, so a paper copy can be traced back to who printed what. The browser prints.
+ */
+export async function recordReportPrint(user: AuthUser, filters: IncidentFilters, type: ReportType, withDetails: boolean, ctx: RequestContext) {
+  const f = applyType(filters, type);
+  const [reference, kpis] = await Promise.all([allocatePrintReference(), summary(user, f)]);
+  const fdesc = describeFilters(f);
+  await writeAudit({
+    action: 'PRINT_REPORT',
+    username: user.username,
+    userId: user.id,
+    details: `Printed ${type} report ${reference} (${kpis.total} incidents${withDetails ? `; with full incident details (up to ${REPORT_DETAIL_LIMIT})` : ''}${fdesc ? `; filters: ${fdesc}` : ''})`,
+    ctx,
+  });
+  return { reference, printedAt: new Date().toISOString() };
+}

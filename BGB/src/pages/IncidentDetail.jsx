@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet';
 import { BD_LIMIT, TILE_ATTRIBUTION, TILE_URL } from '../lib/leaflet';
@@ -12,6 +12,8 @@ import { FILE_ICONS, fileKind, formatDateDisplay, formatDateTime, formatFileSize
 import { daysWaiting, OverdueBadge, SeverityBadge, StatusBadge } from '../components/ui/Badges';
 import IncidentComments from '../components/incidents/IncidentComments';
 import PrintableIncident from '../components/incidents/PrintableIncident';
+import PrintPreview from '../components/reports/PrintPreview';
+import useEvidencePreviews from '../hooks/useEvidencePreviews';
 import ReasonBanner from '../components/incidents/ReasonBanner';
 import RelatedIncidents from '../components/incidents/RelatedIncidents';
 import Card from '../components/ui/Card';
@@ -150,15 +152,18 @@ export default function IncidentDetail() {
     }
   };
 
-  // Print / Save as PDF: the server records the print first (audit), then the browser prints the
-  // print-only report below. No audit entry, no print.
-  const [printedAt, setPrintedAt] = useState(null);
+  // Print / Save as PDF: "Print" opens a preview of the formal document; printing from the preview
+  // first gets a document reference from the server (audited), then the browser prints exactly the
+  // preview. No audit entry, no print. Evidence previews load only while the preview is open.
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [printed, setPrinted] = useState(null); // { reference, printedAt }
+  const previewIncidents = useMemo(() => (previewOpen && inc ? [inc] : null), [previewOpen, inc]);
+  const { previews, total: previewTotal, pending: previewPending } = useEvidencePreviews(previewIncidents);
   const print = async () => {
     setBusy('print');
     try {
-      await incidentsApi.recordPrint(inc.id);
-      setPrintedAt(new Date().toISOString());
-      setTimeout(() => window.print(), 50); // let the printed-at stamp render first
+      setPrinted(await incidentsApi.recordPrint(inc.id));
+      setTimeout(() => window.print(), 50); // let the reference number render first
     } catch (err) {
       showToast(errorMessage(err), 'error');
     } finally {
@@ -266,8 +271,7 @@ export default function IncidentDetail() {
                   {t('detail.restore')}
                 </button>
               )}
-              <button id="print-incident" disabled={Boolean(busy)} onClick={print} className="btn btn-secondary" title={t('detail.printHint')}>
-                {busy === 'print' && <i className="fas fa-spinner fa-spin" aria-hidden="true" />}
+              <button id="print-incident" disabled={Boolean(busy)} onClick={() => setPreviewOpen(true)} className="btn btn-secondary" title={t('detail.printHint')}>
                 {t('detail.print')}
               </button>
             </div>
@@ -470,7 +474,17 @@ export default function IncidentDetail() {
           onConfirm={discard}
         />
       </div>
-      <PrintableIncident incident={inc} printedAt={printedAt} />
+      {previewOpen && (
+        <PrintPreview
+          onClose={() => setPreviewOpen(false)}
+          onPrint={print}
+          printing={busy === 'print'}
+          preparing={previewPending > 0}
+          status={previewPending > 0 ? t('rep.preparingEvidence', { n: previewTotal - previewPending, total: previewTotal }) : null}
+        >
+          <PrintableIncident incident={inc} printed={printed} previews={previews} />
+        </PrintPreview>
+      )}
     </>
   );
 }
