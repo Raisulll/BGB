@@ -29,3 +29,33 @@ export const markRead = (id, lastReadId, { background = false } = {}) =>
   api(`/messaging/conversations/${id}/read`, { method: 'POST', body: { lastReadId }, background });
 export const addMembers = (id, userIds) => api(`/messaging/conversations/${id}/members`, { method: 'POST', body: { userIds } });
 export const leave = (id) => api(`/messaging/conversations/${id}/leave`, { method: 'POST' });
+
+// Group administration (group admins; the server checks)
+export const rename = (id, title) => api(`/messaging/conversations/${id}`, { method: 'PATCH', body: { title } });
+export const removeMember = (id, userId) => api(`/messaging/conversations/${id}/members/${userId}`, { method: 'DELETE' });
+export const setMemberRole = (id, userId, role) => api(`/messaging/conversations/${id}/members/${userId}`, { method: 'PATCH', body: { role } });
+export const approveRequest = (id, requestId) => api(`/messaging/conversations/${id}/requests/${requestId}/approve`, { method: 'POST' });
+export const rejectRequest = (id, requestId) => api(`/messaging/conversations/${id}/requests/${requestId}/reject`, { method: 'POST' });
+export const setCover = (id, blob) => {
+  const form = new FormData();
+  form.append('image', blob, 'group.jpg');
+  return api(`/messaging/conversations/${id}/cover`, { method: 'POST', body: form });
+};
+export const removeCover = (id) => api(`/messaging/conversations/${id}/cover`, { method: 'DELETE' });
+
+// Group photos are fetched with the access token; one object URL per photo version, shared
+const covers = new Map(); // url -> Promise<objectURL | null>
+export function coverObjectUrl(url) {
+  if (!covers.has(url)) {
+    covers.set(
+      url,
+      fetchBlob(url.replace(/^\/api\/v1/, ''), { fallbackName: 'group', background: true })
+        .then(({ blob }) => URL.createObjectURL(blob))
+        .catch(() => {
+          covers.delete(url); // try again next time
+          return null;
+        }),
+    );
+  }
+  return covers.get(url);
+}

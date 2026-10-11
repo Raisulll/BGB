@@ -11,6 +11,7 @@ import { useI18n } from '../i18n/I18nContext';
 import { cn, formatDateDisplay, formatDateTime } from '../utils/helpers';
 import Avatar from '../components/messaging/Avatar';
 import Composer from '../components/messaging/Composer';
+import GroupDialog from '../components/messaging/GroupDialog';
 import PeoplePicker from '../components/messaging/PeoplePicker';
 import VoiceMessage from '../components/messaging/VoiceMessage';
 import { formatDuration } from '../components/messaging/CallPanel';
@@ -83,7 +84,7 @@ function ConversationList({ list, activeId, myId, onNewDirect, onNewGroup }) {
               aria-current={c.id === activeId ? 'page' : undefined}
               className={cn('flex items-center gap-3 rounded-lg px-2 py-2.5 hover:bg-slate-100', c.id === activeId && 'bg-bgb-50 hover:bg-bgb-50')}
             >
-              <Avatar name={c.title} group={c.kind === 'group'} size="lg" />
+              <Avatar name={c.title} group={c.kind === 'group'} photoUrl={c.coverUrl} size="lg" />
               <span className="min-w-0 flex-1">
                 <span className={cn('block truncate text-sm text-slate-900', c.unread ? 'font-semibold' : 'font-medium')}>{c.title}</span>
                 <span className={cn('flex min-w-0 items-center gap-1 text-xs', c.unread ? 'font-semibold text-slate-900' : 'text-slate-500')}>
@@ -216,21 +217,34 @@ function Thread({ conversation, myId, onChanged, onBack }) {
     [id],
   );
 
-  // After a reconnect, add anything that arrived while the channel was down
-  const loaded = Boolean(messages);
-  useEffect(() => {
-    if (!connected || !loaded) return;
+  // Adds whatever is newer than the last message on screen
+  const catchUp = useCallback(() => {
     messagingApi
       .history(id, { limit: PAGE, background: true })
       .then((r) =>
         setMessages((list) => {
+          if (!list) return list;
           const known = new Set(list.map((m) => m.id));
           const fresh = r.messages.filter((m) => !known.has(m.id) && m.id > (list.at(-1)?.id ?? 0));
           return fresh.length ? [...list, ...fresh] : list;
         }),
       )
       .catch(() => {});
-  }, [connected, loaded, id]);
+  }, [id]);
+
+  // After a reconnect, add anything that arrived while the channel was down
+  const loaded = Boolean(messages);
+  useEffect(() => {
+    if (connected && loaded) catchUp();
+  }, [connected, loaded, catchUp]);
+
+  // Group events (rename, photo, members) arrive as a changed conversation, not as a message:
+  // when its latest message is newer than the one on screen, load it
+  const latestId = conversation.lastMessage?.id ?? 0;
+  const shownId = messages?.at(-1)?.id ?? 0;
+  useEffect(() => {
+    if (loaded && latestId > shownId) catchUp();
+  }, [latestId, shownId, loaded, catchUp]);
 
   // Coming back to the tab marks what arrived meanwhile as read
   useEffect(() => {
@@ -323,7 +337,7 @@ function Thread({ conversation, myId, onChanged, onBack }) {
         <button type="button" onClick={onBack} className="btn btn-secondary btn-sm md:hidden" aria-label={t('msg.backToList')}>
           <i className="fas fa-arrow-left" aria-hidden="true" />
         </button>
-        <Avatar name={conversation.title} group={conversation.kind === 'group'} />
+        <Avatar name={conversation.title} group={conversation.kind === 'group'} photoUrl={conversation.coverUrl} />
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-base font-semibold text-slate-900">{conversation.title}</h2>
           <p className="truncate text-xs text-slate-500">
@@ -338,7 +352,12 @@ function Thread({ conversation, myId, onChanged, onBack }) {
         ) : (
           <button type="button" onClick={() => setMembersOpen(true)} className="btn btn-secondary btn-sm">
             <i className="fas fa-users" aria-hidden="true" />
-            {t('msg.members')}
+            {t('msg.groupSettings')}
+            {conversation.myRole === 'admin' && conversation.pendingRequests.length > 0 && (
+              <span className="rounded-full bg-amber-100 px-1.5 text-[11px] font-semibold text-amber-900" aria-label={t('msg.requestsBadge', { n: conversation.pendingRequests.length })}>
+                {conversation.pendingRequests.length}
+              </span>
+            )}
           </button>
         )}
       </div>
@@ -382,7 +401,7 @@ function Thread({ conversation, myId, onChanged, onBack }) {
       <Composer key={id} onSendText={sendText} onSendVoice={sendVoice} disabled={!messages} />
 
       {membersOpen && (
-        <MembersDialog
+        <GroupDialog
           conversation={conversation}
           myId={myId}
           onClose={() => setMembersOpen(false)}
@@ -463,90 +482,6 @@ function NewGroupDialog({ onClose, onOpened }) {
           </button>
         </div>
       </form>
-    </Modal>
-  );
-}
-
-function MembersDialog({ conversation, myId, onClose, onChanged, onLeft }) {
-  const { t, tv } = useI18n();
-  const { showToast } = useToast();
-  const [adding, setAdding] = useState(false);
-  const [selected, setSelected] = useState([]);
-  const [busy, setBusy] = useState(false);
-  const memberIds = conversation.members.map((m) => m.id);
-
-  const add = async () => {
-    setBusy(true);
-    try {
-      await messagingApi.addMembers(conversation.id, selected);
-      showToast(t('msg.membersAdded', { n: selected.length }), 'success');
-      setSelected([]);
-      setAdding(false);
-      onChanged();
-    } catch (err) {
-      showToast(errorMessage(err), 'error');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const leave = async () => {
-    if (!window.confirm(t('msg.leaveConfirm', { name: conversation.title }))) return;
-    setBusy(true);
-    try {
-      await messagingApi.leave(conversation.id);
-      showToast(t('msg.left', { name: conversation.title }), 'success');
-      onLeft();
-    } catch (err) {
-      showToast(errorMessage(err), 'error');
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Modal open title={t('msg.membersOf', { name: conversation.title })} icon="fa-users" onClose={onClose} busy={busy} maxWidth="max-w-lg">
-      {adding ? (
-        <div className="space-y-3">
-          <PeoplePicker multiple selected={selected} onChange={setSelected} exclude={memberIds} disabled={busy} />
-          <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => setAdding(false)} disabled={busy} className="btn btn-secondary">
-              {t('common.cancel')}
-            </button>
-            <button type="button" onClick={add} disabled={busy || selected.length === 0} className="btn btn-primary">
-              {t('msg.addSelected', { n: selected.length })}
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <ul className="max-h-72 divide-y divide-slate-100 overflow-y-auto rounded-md border border-slate-200">
-            {conversation.members.map((m) => (
-              <li key={m.id} className="flex items-center gap-3 px-3 py-2">
-                <Avatar name={m.name} size="sm" />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium text-slate-900">
-                    {m.name}
-                    {m.id === myId && <span className="ml-1 font-normal text-slate-500">({t('msg.you')})</span>}
-                  </span>
-                  <span className="block truncate text-xs text-slate-500">
-                    {tv('role', m.role)} · {m.scope}
-                  </span>
-                </span>
-              </li>
-            ))}
-          </ul>
-          <p className="text-xs text-slate-500">{t('msg.membersNotice')}</p>
-          <div className="flex flex-wrap justify-between gap-2">
-            <button type="button" onClick={leave} disabled={busy} className="btn btn-danger-outline">
-              {t('msg.leaveGroup')}
-            </button>
-            <button type="button" onClick={() => setAdding(true)} disabled={busy} className="btn btn-primary">
-              <i className="fas fa-user-plus" aria-hidden="true" />
-              {t('msg.addPeople')}
-            </button>
-          </div>
-        </div>
-      )}
     </Modal>
   );
 }

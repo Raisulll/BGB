@@ -922,7 +922,8 @@ All endpoints require `Authorization: Bearer <access_token>` unless marked **Pub
 | GET | `/messaging/conversations/:id[/messages]` | messages | One conversation; history (`before`, `limit`) |
 | POST | `/messaging/conversations/:id/messages` / `/voice` | messages | Text; voice (encrypted, SHA-256) |
 | GET | `/messaging/conversations/:id/messages/:mid/audio` | messages | Voice audio (integrity-checked) |
-| POST | `/messaging/conversations/:id/read` / `/members` / `/leave` | messages | Read marker; group membership (audited) |
+| POST | `/messaging/conversations/:id/read` / `/members` / `/leave` | messages | Read marker; group membership (audited; a member's additions need an admin's approval) |
+| PATCH/DELETE/POST | `/messaging/conversations/:id`, `/members/:uid`, `/requests/:rid/approve\|reject`, `/cover` | messages + group admin | Rename, roles, remove, approve/reject join requests, group photo (all audited) |
 | GET | `/calls`, `/calls/all`, `/calls/ice` | messages (+ admin or audit for `/all`) | Call log; every call; ICE servers |
 | WS | `/ws` | signed in + messages | Pushed messaging events and call signalling |
 

@@ -178,8 +178,8 @@ const filenameFrom = (res, fallback) => {
 };
 
 /** Fetches an authenticated file and returns { blob, filename }. */
-export async function fetchBlob(path, { query, fallbackName = 'download' } = {}) {
-  const res = await request(path, { query });
+export async function fetchBlob(path, { query, fallbackName = 'download', background = false } = {}) {
+  const res = await request(path, { query, background });
   return { blob: await res.blob(), filename: filenameFrom(res, fallbackName) };
 }
 

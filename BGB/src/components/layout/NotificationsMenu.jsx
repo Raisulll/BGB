@@ -11,6 +11,7 @@ const TYPE_ICON = {
   return: 'fa-undo text-purple-600 bg-purple-50 border-purple-200',
   comment: 'fa-comment-dots text-slate-600 bg-slate-50 border-slate-200',
   call: 'fa-phone-slash text-red-600 bg-red-50 border-red-200',
+  group: 'fa-users text-slate-600 bg-slate-50 border-slate-200',
 };
 
 export default function NotificationsMenu() {
@@ -42,7 +43,17 @@ export default function NotificationsMenu() {
   const handleItemClick = (n) => {
     setOpen(false);
     if (!n.read) markRead(n.id);
-    navigate(n.incidentId ? `/incidents/${n.incidentId}` : n.type === 'call' ? '/calls' : '/incidents');
+    navigate(
+      n.incidentId
+        ? `/incidents/${n.incidentId}`
+        : n.conversationId
+          ? `/messages/${n.conversationId}`
+          : n.type === 'call'
+            ? '/calls'
+            : n.type === 'group'
+              ? '/messages'
+              : '/incidents',
+    );
   };
 
   return (

@@ -322,3 +322,25 @@ Owner's choices (2026-10-09): anyone can message and call anyone; 1:1 and group 
 ### Resolution (if resolved)
 *Confirm with BGB: whether messaging falls under the same records rules as incidents (retention, disclosure), and which TURN/STUN servers are allowed on the production network (a public STUN server reveals users' public IP addresses to that server).*
 
+---
+## DOUBT-014 — Group Chat Admin Controls
+
+**TEC Spec**: #58 — Future expansion (messaging extension, DOUBT-013); also #3 (access control), #24 (audit)
+**Raised on**: 2026-10-11
+**Status**: ASSUMED
+
+### The ambiguity
+The owner asked for group admins: admins accept join requests, members may add people but an admin approves, admins remove anyone, rename the group and change its photo. Not specified: who is admin at the start, whether there can be several, what happens when the last admin leaves, whether a group photo is kept after it is replaced, and whether people outside a group can ask to join (groups are not listed to non-members).
+
+### Options considered
+1. First admin: the creator / an HQ administrator / chosen at creation.
+2. Several admins: yes (admins promote) / one only.
+3. Last admin leaves: block leaving / hand over to the longest-standing member / group without admin.
+4. Replaced photos: keep as records / delete (the change is audited).
+5. Self-service join: requests from outsiders (needs group discovery) / only members propose people.
+
+### Assumption made (if proceeding)
+The creator is the first admin; admins can make other members admins and remove admin rights, but a group always keeps one; if the last admin leaves, the longest-standing member becomes admin (system message). Only members propose people; there is no group discovery or outside join request. A replaced or removed photo is deleted from storage (the audit entry keeps its SHA-256, type and size). Removed members lose access at once and can be added again later. Existing groups got their creator (or longest-standing member) as admin in the migration.
+
+### Resolution (if resolved)
+*Confirm with the owner/BGB.*
