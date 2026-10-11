@@ -89,6 +89,10 @@ const schema = z.object({
   VAPID_PRIVATE_KEY: z.string().optional(),
   VAPID_SUBJECT: z.string().default('mailto:birds-admin@bgb.gov.bd'),
 
+  // Free hosting that sleeps when idle (Render free plan): ping our own public URL this often
+  // (minutes, under the 15-minute idle limit). 0 = off, the right value for real servers
+  KEEP_AWAKE_MINUTES: z.coerce.number().int().min(0).max(14).default(0),
+
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'http', 'debug']).default('info'),
   LOG_DIR: z.string().default('logs'),
 });

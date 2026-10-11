@@ -7,8 +7,9 @@ services:
     name: birds-demo
     runtime: node
     region: singapore
-    # Free: sleeps after 15 min idle (~1 min to wake; mail/archive timers pause meanwhile). Switch to
-    # starter (paid, always on) for the TEC session if needed: only this line changes.
+    # Free: sleeps after 15 min without requests. KEEP_AWAKE_MINUTES below keeps it awake (the
+    # server pings its own public URL). One always-on free service uses ~744 of the workspace's
+    # 750 free instance hours a month. Starter (paid, always on) needs only this line changed.
     plan: free
     autoDeploy: false # deploy deliberately from the dashboard, never mid-demo
     # NODE_ENV=production is set at build time too, so devDependencies (Vite, TypeScript, Prisma CLI)
@@ -26,6 +27,9 @@ services:
       # Relative to server/, where the start command runs
       - key: SERVE_SPA_DIR
         value: ../BGB/dist
+      # Keep the free service awake: ping APP_BASE_URL/api/v1/health every 10 minutes
+      - key: KEEP_AWAKE_MINUTES
+        value: "10"
       # Render has more than one proxy hop (with "1", logs showed Render's own 10.x address). Trust its
       # private-network proxies by address instead, so req.ip is the first outside address = the client
       # (audit log, rate limits); addresses a client prepends itself are never reached

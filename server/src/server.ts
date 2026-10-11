@@ -9,12 +9,14 @@ import { registerCallRealtime } from './modules/calls/calls.realtime.js';
 import { sweepStaleCalls } from './modules/calls/calls.service.js';
 import { startBus, stopBus } from './realtime/bus.js';
 import { attachRealtime, stopRealtime } from './realtime/hub.js';
+import { startKeepAwake, stopKeepAwake } from './keepAwake.js';
 
 // Entry point. In production run under PM2 cluster mode (ecosystem.config.cjs) — §26.
 const server = createApp().listen(env.PORT, () => {
   logger.info(`BIRDS API listening on http://localhost:${env.PORT}/api/v1 (${env.NODE_ENV})`);
   startMailWorker();
   startArchiveScheduler();
+  startKeepAwake();
 });
 
 // Realtime channel (messaging, calls): WebSocket on the same port, events via PostgreSQL NOTIFY
@@ -31,6 +33,7 @@ async function shutdown(signal: string) {
   logger.info(`${signal} received, shutting down`);
   stopMailWorker();
   stopArchiveScheduler();
+  stopKeepAwake();
   stopRealtime();
   await stopBus();
   const force = setTimeout(() => process.exit(1), 10_000);
