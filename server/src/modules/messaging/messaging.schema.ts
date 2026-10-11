@@ -19,6 +19,12 @@ export const readSchema = z.object({ lastReadId: z.coerce.number().int().min(0) 
 
 export const addMembersSchema = z.object({ userIds: z.array(userId).min(1).max(50) }).strict();
 
+export const renameSchema = z.object({ title: z.string().trim().min(2).max(100) }).strict();
+
+export const memberRoleSchema = z.object({ role: z.enum(['admin', 'member']) }).strict();
+
+export const memberIdParam = userId;
+
 export const historyQuerySchema = z.object({
   before: z.coerce.number().int().positive().optional(), // messages with id < before (older page)
   limit: z.coerce.number().int().min(1).max(100).default(50),

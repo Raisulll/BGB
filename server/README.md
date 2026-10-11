@@ -189,8 +189,16 @@ Direct (one thread per pair) and group conversations between any active users, t
 | POST | `/conversations/:id/voice` | multipart `audio` + `durationMs` (300–300000). WebM, Ogg, MP4/M4A or MP3, recognised by the bytes; up to 10 MB; anything else is 415 and audited `UPLOAD_REJECTED`. Stored encrypted like evidence, with SHA-256 |
 | GET | `/conversations/:id/messages/:mid/audio` | Members only; the SHA-256 is checked before the file is served (409 on mismatch) |
 | POST | `/conversations/:id/read` | `{ lastReadId }`; never moves backwards |
-| POST | `/conversations/:id/members` | Groups only; any member may add (audited `MESSAGE_GROUP_ADD`) |
-| POST | `/conversations/:id/leave` | Groups only (audited `MESSAGE_GROUP_LEAVE`) |
+| POST | `/conversations/:id/members` | Groups only. A group admin adds at once (audited `MESSAGE_GROUP_ADD`); a member's additions become join requests (`MESSAGE_GROUP_REQUEST`, admins notified). Returns `{ conversation, added, requested }` |
+| POST | `/conversations/:id/requests/:rid/approve` · `/reject` | Group admins. The requester is notified (`MESSAGE_GROUP_APPROVE` / `MESSAGE_GROUP_REJECT`); 409 if already decided |
+| DELETE | `/conversations/:id/members/:uid` | Group admins remove a member (`MESSAGE_GROUP_REMOVE`); they lose access at once |
+| PATCH | `/conversations/:id/members/:uid` | `{ role: 'admin' \| 'member' }`, group admins (`MESSAGE_GROUP_ROLE`); the last admin can't step down (409) |
+| PATCH | `/conversations/:id` | `{ title }`, group admins (`MESSAGE_GROUP_RENAME`) |
+| POST / DELETE | `/conversations/:id/cover` | Group photo, group admins: multipart `image`, JPEG/PNG/WebP by the bytes, up to 2 MB, stored encrypted with SHA-256 (`MESSAGE_GROUP_COVER`; 415 audited `UPLOAD_REJECTED`) |
+| GET | `/conversations/:id/cover` | Members only; SHA-256 checked before it is served. The DTO's `coverUrl` carries a version, so it may be cached |
+| POST | `/conversations/:id/leave` | Groups only (audited `MESSAGE_GROUP_LEAVE`). If the last admin leaves, the longest-standing member becomes admin |
+
+**Group admins.** The creator is a group's first admin (`conversation_members.role`). Every group change writes a system message in the thread and an audit entry. Join requests (`conversation_join_requests`) are one per person while open (partial unique index); a decided request can't be changed or deleted (trigger). Removed members keep their row with `removed_by` set. Conversation DTOs carry `myRole`, each member's `groupRole`, `coverUrl` and `pendingRequests` (admins see all, members their own). Group notifications (type `group`) carry `conversationId`. The browser crops a group photo to a 512 px square JPEG before upload, which also drops its metadata (camera, GPS); the server still checks the bytes.
 
 ## Calls API (`/api/v1/calls`, permission `messages`)
 

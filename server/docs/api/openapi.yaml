@@ -1170,6 +1170,16 @@ paths:
       responses:
         '200': { description: Conversation, content: { application/json: { schema: { $ref: '#/components/schemas/Conversation' } } } }
         '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Messaging]
+      summary: Rename a group (group admins; audited MESSAGE_GROUP_RENAME)
+      x-permission: messages
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [title], properties: { title: { type: string, minLength: 2, maxLength: 100 } } } } }
+      responses:
+        '200': { description: Conversation, content: { application/json: { schema: { $ref: '#/components/schemas/Conversation' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /messaging/conversations/{id}/messages:
     parameters: [{ $ref: '#/components/parameters/ConversationId' }]
     get:
@@ -1234,11 +1244,98 @@ paths:
     parameters: [{ $ref: '#/components/parameters/ConversationId' }]
     post:
       tags: [Messaging]
-      summary: Add people to a group (any member; audited MESSAGE_GROUP_ADD)
+      summary: Add people to a group. A group admin adds them at once (audited MESSAGE_GROUP_ADD); a member files requests for an admin to approve (MESSAGE_GROUP_REQUEST; admins are notified)
       x-permission: messages
       requestBody:
         required: true
         content: { application/json: { schema: { type: object, required: [userIds], properties: { userIds: { type: array, items: { type: string } } } } } }
+      responses:
+        '200':
+          description: The conversation, who was added and who was asked for
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  conversation: { $ref: '#/components/schemas/Conversation' }
+                  added: { type: array, items: { type: string } }
+                  requested: { type: array, items: { type: string } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /messaging/conversations/{id}/members/{uid}:
+    parameters:
+      - { $ref: '#/components/parameters/ConversationId' }
+      - { name: uid, in: path, required: true, schema: { type: string } }
+    patch:
+      tags: [Messaging]
+      summary: Make a member an admin or an admin a member (group admins; a group keeps at least one admin; audited MESSAGE_GROUP_ROLE)
+      x-permission: messages
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [role], properties: { role: { type: string, enum: [admin, member] } } } } }
+      responses:
+        '200': { description: Conversation, content: { application/json: { schema: { $ref: '#/components/schemas/Conversation' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { description: The last admin can't step down }
+    delete:
+      tags: [Messaging]
+      summary: Remove a member (group admins; audited MESSAGE_GROUP_REMOVE); they lose access to the group
+      x-permission: messages
+      responses:
+        '200': { description: Conversation, content: { application/json: { schema: { $ref: '#/components/schemas/Conversation' } } } }
+        '400': { description: Use leave to remove yourself }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /messaging/conversations/{id}/requests/{rid}/approve:
+    parameters:
+      - { $ref: '#/components/parameters/ConversationId' }
+      - { name: rid, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Messaging]
+      summary: Approve a request to add someone (group admins; audited MESSAGE_GROUP_APPROVE; the requester is notified)
+      x-permission: messages
+      responses:
+        '200': { description: Conversation, content: { application/json: { schema: { $ref: '#/components/schemas/Conversation' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { description: Already decided }
+  /messaging/conversations/{id}/requests/{rid}/reject:
+    parameters:
+      - { $ref: '#/components/parameters/ConversationId' }
+      - { name: rid, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Messaging]
+      summary: Reject a request to add someone (group admins; audited MESSAGE_GROUP_REJECT; the requester is notified)
+      x-permission: messages
+      responses:
+        '200': { description: Conversation, content: { application/json: { schema: { $ref: '#/components/schemas/Conversation' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { description: Already decided }
+  /messaging/conversations/{id}/cover:
+    parameters: [{ $ref: '#/components/parameters/ConversationId' }]
+    get:
+      tags: [Messaging]
+      summary: The group photo (members only; SHA-256 checked before it is served)
+      x-permission: messages
+      responses:
+        '200': { $ref: '#/components/responses/File' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: Integrity check failed }
+    post:
+      tags: [Messaging]
+      summary: Set the group photo (group admins; JPEG, PNG or WebP up to 2 MB, checked on the bytes; stored encrypted; audited MESSAGE_GROUP_COVER)
+      x-permission: messages
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { type: object, required: [image], properties: { image: { type: string, format: binary } } }
+      responses:
+        '200': { description: Conversation, content: { application/json: { schema: { $ref: '#/components/schemas/Conversation' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '413': { description: Too large }
+        '415': { description: 'Not a JPEG, PNG or WebP image (audited UPLOAD_REJECTED)' }
+    delete:
+      tags: [Messaging]
+      summary: Remove the group photo (group admins; audited MESSAGE_GROUP_COVER)
+      x-permission: messages
       responses:
         '200': { description: Conversation, content: { application/json: { schema: { $ref: '#/components/schemas/Conversation' } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -1246,7 +1343,7 @@ paths:
     parameters: [{ $ref: '#/components/parameters/ConversationId' }]
     post:
       tags: [Messaging]
-      summary: Leave a group (audited MESSAGE_GROUP_LEAVE); the caller loses access to it
+      summary: Leave a group (audited MESSAGE_GROUP_LEAVE); the caller loses access to it. If the last admin leaves, the longest-standing member becomes admin
       x-permission: messages
       responses:
         '204': { description: Left }
@@ -1369,7 +1466,24 @@ components:
         id: { type: integer }
         kind: { type: string, enum: [direct, group] }
         title: { type: string, description: 'Group title, or the other person''s name for a direct conversation' }
-        members: { type: array, items: { $ref: '#/components/schemas/Person' } }
+        members:
+          type: array
+          items:
+            allOf:
+              - { $ref: '#/components/schemas/Person' }
+              - { type: object, properties: { groupRole: { type: [string, 'null'], enum: [admin, member, null] } } }
+        myRole: { type: [string, 'null'], enum: [admin, member, null], description: The caller's role in a group }
+        coverUrl: { type: [string, 'null'], description: Group photo URL (versioned), or null }
+        pendingRequests:
+          type: array
+          description: Requests to add people waiting for an admin (admins see all; members see their own)
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              user: { $ref: '#/components/schemas/Person' }
+              requestedBy: { type: object, properties: { id: { type: string }, name: { type: string } } }
+              createdAt: { type: string, format: date-time }
         createdBy: { type: string }
         createdAt: { type: string, format: date-time }
         lastMessage: { oneOf: [{ $ref: '#/components/schemas/Message' }, { type: 'null' }] }

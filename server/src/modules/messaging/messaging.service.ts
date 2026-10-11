@@ -8,15 +8,22 @@ import type { RequestContext } from '../../utils/requestContext.js';
 import { writeAudit } from '../audit/audit.service.js';
 import { sha256 } from '../evidence/metadata.js';
 import { AUDIO_TYPES, detectAudio } from './audioType.js';
+import { IMAGE_TYPES, detectImage } from './imageType.js';
 
 // Messaging (spec #58 extension). Any active user can message any other (decision 2026-10-09);
 // conversations are direct (one per pair) or groups. Messages are permanent: no edit, no delete
 // (append-only triggers). Voice notes are stored encrypted through the evidence storage driver.
 // Group membership changes are audited; individual messages are themselves the record.
+//
+// Groups have admins (the creator first). Admins add people directly, approve or reject what
+// members ask to add, remove members, make or unmake admins, rename the group and set its photo.
+// A member who adds someone only files a request. A group always keeps an admin: if the last one
+// leaves, the longest-standing member takes over.
 type AuthUser = Express.AuthUser;
 type Tx = Prisma.TransactionClient;
 
 export const MAX_VOICE_BYTES = 10 * 1024 * 1024;
+export const MAX_COVER_BYTES = 2 * 1024 * 1024;
 
 const userSelect = { id: true, name: true, role: true, scope: true } as const;
 
@@ -32,6 +39,17 @@ async function loadMembership(user: AuthUser, conversationId: number) {
   if (!m || m.leftAt) throw notFound('Conversation not found');
   return m;
 }
+
+/** A current member of a group who is one of its admins. */
+async function loadGroupAdmin(user: AuthUser, conversationId: number) {
+  const m = await loadMembership(user, conversationId);
+  if (m.conversation.kind !== 'group') throw forbidden('This is not a group conversation');
+  if (m.role !== 'admin') throw forbidden('Only a group admin can do this');
+  return m;
+}
+
+const activeAdminIds = async (conversationId: number, db: Tx | typeof prisma = prisma) =>
+  (await db.conversationMember.findMany({ where: { conversationId, leftAt: null, role: 'admin' }, select: { userId: true } })).map((m) => m.userId);
 
 const activeMemberIds = async (conversationId: number, db: Tx | typeof prisma = prisma) =>
   (await db.conversationMember.findMany({ where: { conversationId, leftAt: null }, select: { userId: true } })).map((m) => m.userId);
@@ -78,12 +96,25 @@ async function conversationDto(userId: string, conversationId: number) {
   const me = await prisma.conversationMember.findUniqueOrThrow({ where: { conversationId_userId: { conversationId, userId } } });
   const unread = await prisma.message.count({ where: { conversationId, id: { gt: me.lastReadId }, senderId: { not: userId } } });
   const others = c.members.filter((m) => m.userId !== userId).map((m) => m.user);
+  const isAdmin = c.kind === 'group' && me.role === 'admin';
+  // Admins see every open request; a member sees the ones they filed
+  const requests =
+    c.kind === 'group'
+      ? await prisma.conversationJoinRequest.findMany({
+          where: { conversationId, status: 'pending', ...(isAdmin ? {} : { requestedBy: userId }) },
+          include: { user: { select: userSelect }, requester: { select: { id: true, name: true } } },
+          orderBy: { id: 'asc' },
+        })
+      : [];
   return {
     id: c.id,
     kind: c.kind,
     // Direct conversations are titled by the other person
     title: c.kind === 'group' ? c.title : (others[0]?.name ?? ''),
-    members: c.members.map((m) => m.user),
+    members: c.members.map((m) => ({ ...m.user, groupRole: c.kind === 'group' ? m.role : null })),
+    myRole: c.kind === 'group' ? me.role : null,
+    coverUrl: c.coverPath && c.coverUpdatedAt ? `/api/v1/messaging/conversations/${c.id}/cover?v=${c.coverUpdatedAt.getTime()}` : null,
+    pendingRequests: requests.map((r) => ({ id: r.id, user: r.user, requestedBy: r.requester, createdAt: r.createdAt.toISOString() })),
     createdBy: c.createdBy,
     createdAt: c.createdAt.toISOString(),
     lastMessage: c.messages[0] ? toMessageDto(c.messages[0]) : null,
@@ -197,7 +228,12 @@ export async function createConversation(
   const names = await prisma.user.findMany({ where: { id: { in: memberIds } }, select: { name: true } });
   const c = await prisma.$transaction(async (tx) => {
     const conv = await tx.conversation.create({
-      data: { kind: 'group', title: input.title, createdBy: user.id, members: { create: [user.id, ...memberIds].map((userId) => ({ userId })) } },
+      data: {
+        kind: 'group',
+        title: input.title,
+        createdBy: user.id,
+        members: { create: [{ userId: user.id, role: 'admin' }, ...memberIds.map((userId) => ({ userId }))] },
+      },
     });
     await systemMessage(tx, conv.id, user.id, `${user.name} created the group "${input.title}" with ${names.map((n) => n.name).join(', ')}`);
     return conv;
@@ -287,28 +323,217 @@ export async function markRead(user: AuthUser, conversationId: number, lastReadI
   return conversationDto(user.id, conversationId);
 }
 
+/**
+ * Adds people to a group. An admin adds them at once; a member's additions become requests for
+ * an admin to approve (people already asked for are skipped).
+ */
 export async function addMembers(user: AuthUser, conversationId: number, userIds: string[], ctx: RequestContext) {
   const m = await loadMembership(user, conversationId);
   if (m.conversation.kind !== 'group') throw forbidden('People can only be added to group conversations');
   const current = await activeMemberIds(conversationId);
-  const toAdd = [...new Set(userIds)].filter((id) => !current.includes(id));
-  if (toAdd.length === 0) return conversationDto(user.id, conversationId);
-  await assertActiveUsers(toAdd);
-  const names = await prisma.user.findMany({ where: { id: { in: toAdd } }, select: { name: true } });
+  const wanted = [...new Set(userIds)].filter((id) => !current.includes(id));
+  if (wanted.length === 0) return { conversation: await conversationDto(user.id, conversationId), added: [], requested: [] };
+  await assertActiveUsers(wanted);
+
+  if (m.role === 'admin') {
+    await addToGroup(user, conversationId, wanted, current);
+    await writeAudit({ action: 'MESSAGE_GROUP_ADD', username: user.username, userId: user.id, details: `Added ${wanted.join(', ')} to group #${conversationId}`, ctx });
+    return { conversation: await conversationDto(user.id, conversationId), added: wanted, requested: [] };
+  }
+
+  const open = await prisma.conversationJoinRequest.findMany({ where: { conversationId, status: 'pending', userId: { in: wanted } }, select: { userId: true } });
+  const toRequest = wanted.filter((id) => !open.some((r) => r.userId === id));
+  if (toRequest.length) {
+    const names = await prisma.user.findMany({ where: { id: { in: toRequest } }, select: { name: true } });
+    const admins = await activeAdminIds(conversationId);
+    await prisma.$transaction(async (tx) => {
+      await tx.conversationJoinRequest.createMany({ data: toRequest.map((id) => ({ conversationId, userId: id, requestedBy: user.id })) });
+      await tx.notification.createMany({
+        data: admins.map((adminId) => ({
+          userId: adminId,
+          title: 'Group join request',
+          message: `${user.name} asked to add ${names.map((n) => n.name).join(', ')} to "${m.conversation.title}"`,
+          type: 'group',
+          conversationId,
+        })),
+      });
+    });
+    await writeAudit({ action: 'MESSAGE_GROUP_REQUEST', username: user.username, userId: user.id, details: `Asked to add ${toRequest.join(', ')} to group #${conversationId}`, ctx });
+    await publish({ type: 'conversation.changed', conversationId, recipients: [user.id, ...admins] });
+  }
+  return { conversation: await conversationDto(user.id, conversationId), added: [], requested: toRequest };
+}
+
+/** Makes people members (rejoining reuses the row: they see the history from the start). */
+async function addToGroup(actor: AuthUser, conversationId: number, ids: string[], current: string[], note?: string) {
+  const names = await prisma.user.findMany({ where: { id: { in: ids } }, select: { name: true } });
   await prisma.$transaction(async (tx) => {
-    for (const id of toAdd) {
-      // Rejoining after leaving reuses the row; they see the history from the start
+    for (const id of ids) {
       await tx.conversationMember.upsert({
         where: { conversationId_userId: { conversationId, userId: id } },
-        update: { leftAt: null },
+        update: { leftAt: null, removedBy: null, role: 'member' },
         create: { conversationId, userId: id },
       });
     }
-    await systemMessage(tx, conversationId, user.id, `${user.name} added ${names.map((n) => n.name).join(', ')}`);
+    // Anything still asked for these people is settled by this
+    await tx.conversationJoinRequest.updateMany({
+      where: { conversationId, status: 'pending', userId: { in: ids } },
+      data: { status: 'approved', decidedBy: actor.id, decidedAt: new Date() },
+    });
+    await systemMessage(tx, conversationId, actor.id, `${actor.name} added ${names.map((n) => n.name).join(', ')}${note ?? ''}`);
   });
-  await writeAudit({ action: 'MESSAGE_GROUP_ADD', username: user.username, userId: user.id, details: `Added ${toAdd.join(', ')} to group #${conversationId}`, ctx });
-  await publish({ type: 'conversation.changed', conversationId, recipients: [...current, ...toAdd] });
+  await publish({ type: 'conversation.changed', conversationId, recipients: [...current, ...ids] });
+}
+
+/** An admin approves or rejects a request to add someone. */
+export async function decideRequest(user: AuthUser, conversationId: number, requestId: number, approve: boolean, ctx: RequestContext) {
+  await loadGroupAdmin(user, conversationId);
+  const r = await prisma.conversationJoinRequest.findFirst({
+    where: { id: requestId, conversationId },
+    include: { user: { select: { id: true, name: true, isActive: true } }, requester: { select: { id: true, name: true } } },
+  });
+  if (!r) throw notFound('Request not found');
+  if (r.status !== 'pending') throw new AppError(409, 'ALREADY_DECIDED', 'This request has already been decided');
+  const conv = await prisma.conversation.findUniqueOrThrow({ where: { id: conversationId }, select: { title: true } });
+  const current = await activeMemberIds(conversationId);
+
+  if (approve && r.user.isActive && !current.includes(r.userId)) {
+    await addToGroup(user, conversationId, [r.userId], current, ` (asked by ${r.requester.name})`);
+  } else {
+    // Rejected, or no longer possible (already a member, account deactivated)
+    const { count } = await prisma.conversationJoinRequest.updateMany({
+      where: { id: requestId, status: 'pending' },
+      data: { status: approve ? 'cancelled' : 'rejected', decidedBy: user.id, decidedAt: new Date() },
+    });
+    if (!count) throw new AppError(409, 'ALREADY_DECIDED', 'This request has already been decided');
+  }
+  if (r.requestedBy !== user.id) {
+    await prisma.notification.create({
+      data: {
+        userId: r.requestedBy,
+        title: approve ? 'Join request approved' : 'Join request declined',
+        message: `${user.name} ${approve ? 'approved' : 'declined'} adding ${r.user.name} to "${conv.title}"`,
+        type: 'group',
+        conversationId,
+      },
+    });
+  }
+  await writeAudit({
+    action: approve ? 'MESSAGE_GROUP_APPROVE' : 'MESSAGE_GROUP_REJECT',
+    username: user.username,
+    userId: user.id,
+    details: `${approve ? 'Approved' : 'Rejected'} request #${r.id} (${r.requestedBy} to add ${r.userId}) in group #${conversationId}`,
+    ctx,
+  });
+  await publish({ type: 'conversation.changed', conversationId, recipients: [...new Set([...(await activeAdminIds(conversationId)), r.requestedBy, user.id])] });
   return conversationDto(user.id, conversationId);
+}
+
+/** An admin removes a member. Use leave for yourself. */
+export async function removeMember(user: AuthUser, conversationId: number, targetId: string, ctx: RequestContext) {
+  await loadGroupAdmin(user, conversationId);
+  if (targetId === user.id) throw badRequest('Use Leave group to leave');
+  const target = await prisma.conversationMember.findUnique({ where: { conversationId_userId: { conversationId, userId: targetId } }, include: { user: { select: { name: true } } } });
+  if (!target || target.leftAt) throw notFound('Not a member of this group');
+  const recipients = await activeMemberIds(conversationId);
+  await prisma.$transaction(async (tx) => {
+    await systemMessage(tx, conversationId, user.id, `${user.name} removed ${target.user.name}`);
+    await tx.conversationMember.update({
+      where: { conversationId_userId: { conversationId, userId: targetId } },
+      data: { leftAt: new Date(), removedBy: user.id, role: 'member' },
+    });
+  });
+  await writeAudit({ action: 'MESSAGE_GROUP_REMOVE', username: user.username, userId: user.id, details: `Removed ${targetId} from group #${conversationId}`, ctx });
+  await publish({ type: 'conversation.changed', conversationId, recipients });
+  return conversationDto(user.id, conversationId);
+}
+
+/** An admin makes a member an admin, or an admin a member (a group keeps at least one admin). */
+export async function setMemberRole(user: AuthUser, conversationId: number, targetId: string, role: 'admin' | 'member', ctx: RequestContext) {
+  await loadGroupAdmin(user, conversationId);
+  const target = await prisma.conversationMember.findUnique({ where: { conversationId_userId: { conversationId, userId: targetId } }, include: { user: { select: { name: true } } } });
+  if (!target || target.leftAt) throw notFound('Not a member of this group');
+  if (target.role === role) return conversationDto(user.id, conversationId);
+  if (role === 'member' && (await activeAdminIds(conversationId)).length <= 1) throw new AppError(409, 'LAST_ADMIN', 'A group needs at least one admin');
+  await prisma.$transaction(async (tx) => {
+    await tx.conversationMember.update({ where: { conversationId_userId: { conversationId, userId: targetId } }, data: { role } });
+    await systemMessage(tx, conversationId, user.id, role === 'admin' ? `${user.name} made ${target.user.name} an admin` : `${user.name} removed ${target.user.name} as admin`);
+  });
+  await writeAudit({ action: 'MESSAGE_GROUP_ROLE', username: user.username, userId: user.id, details: `Set ${targetId} to ${role} in group #${conversationId}`, ctx });
+  await publish({ type: 'conversation.changed', conversationId, recipients: await activeMemberIds(conversationId) });
+  return conversationDto(user.id, conversationId);
+}
+
+export async function renameGroup(user: AuthUser, conversationId: number, title: string, ctx: RequestContext) {
+  const m = await loadGroupAdmin(user, conversationId);
+  if (m.conversation.title === title) return conversationDto(user.id, conversationId);
+  await prisma.$transaction(async (tx) => {
+    await tx.conversation.update({ where: { id: conversationId }, data: { title } });
+    await systemMessage(tx, conversationId, user.id, `${user.name} renamed the group to "${title}"`);
+  });
+  await writeAudit({ action: 'MESSAGE_GROUP_RENAME', username: user.username, userId: user.id, details: `Renamed group #${conversationId} from "${m.conversation.title}" to "${title}"`, ctx });
+  await publish({ type: 'conversation.changed', conversationId, recipients: await activeMemberIds(conversationId) });
+  return conversationDto(user.id, conversationId);
+}
+
+/** Sets (file) or removes (null) the group photo: JPEG, PNG or WebP, stored encrypted. */
+export async function setCover(user: AuthUser, conversationId: number, file: Buffer | null, ctx: RequestContext) {
+  const m = await loadGroupAdmin(user, conversationId);
+  let next: { coverPath: string | null; coverMime: string | null; coverSha256: string | null; coverUpdatedAt: Date | null } = {
+    coverPath: null,
+    coverMime: null,
+    coverSha256: null,
+    coverUpdatedAt: null,
+  };
+  if (file) {
+    if (file.length > MAX_COVER_BYTES) throw new AppError(413, 'LIMIT_FILE_SIZE', 'The photo is too large (2 MB at most)');
+    const mime = detectImage(file);
+    if (!mime) {
+      await writeAudit({ action: 'UPLOAD_REJECTED', username: user.username, userId: user.id, details: `Group photo for #${conversationId}: not a JPEG, PNG or WebP image`, ctx });
+      throw new AppError(415, 'UNSUPPORTED_TYPE', 'The group photo must be a JPEG, PNG or WebP image');
+    }
+    const key = `groups/${conversationId}/${randomUUID()}${IMAGE_TYPES[mime]}`;
+    await storage.put(key, file);
+    next = { coverPath: key, coverMime: mime, coverSha256: sha256(file), coverUpdatedAt: new Date() };
+  } else if (!m.conversation.coverPath) {
+    return conversationDto(user.id, conversationId);
+  }
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.conversation.update({ where: { id: conversationId }, data: next });
+      await systemMessage(tx, conversationId, user.id, file ? `${user.name} changed the group photo` : `${user.name} removed the group photo`);
+    });
+  } catch (err) {
+    if (next.coverPath) await storage.remove(next.coverPath).catch(() => {});
+    throw err;
+  }
+  // The old photo isn't needed any more (the change itself is in the audit log)
+  if (m.conversation.coverPath) await storage.remove(m.conversation.coverPath).catch(() => {});
+  await writeAudit({
+    action: 'MESSAGE_GROUP_COVER',
+    username: user.username,
+    userId: user.id,
+    details: file ? `Set the photo of group #${conversationId} (${next.coverMime}, ${file.length} bytes, SHA-256 ${next.coverSha256})` : `Removed the photo of group #${conversationId}`,
+    ctx,
+  });
+  await publish({ type: 'conversation.changed', conversationId, recipients: await activeMemberIds(conversationId) });
+  return conversationDto(user.id, conversationId);
+}
+
+/** The group photo, for members only, integrity-checked. */
+export async function coverImage(user: AuthUser, conversationId: number) {
+  const m = await loadMembership(user, conversationId);
+  const c = m.conversation;
+  if (!c.coverPath) throw notFound('This group has no photo');
+  let object;
+  try {
+    object = await readObject(c.coverPath);
+  } catch {
+    throw new AppError(409, 'EVIDENCE_TAMPERED', 'The group photo failed its integrity check');
+  }
+  if (!object) throw new AppError(404, 'FILE_UNAVAILABLE', 'The group photo is not in storage');
+  if (c.coverSha256 && sha256(object.data) !== c.coverSha256) throw new AppError(409, 'EVIDENCE_TAMPERED', 'The group photo failed its integrity check');
+  return { data: object.data, mime: c.coverMime ?? 'application/octet-stream' };
 }
 
 export async function leave(user: AuthUser, conversationId: number, ctx: RequestContext) {
@@ -317,7 +542,19 @@ export async function leave(user: AuthUser, conversationId: number, ctx: Request
   const recipients = await activeMemberIds(conversationId);
   await prisma.$transaction(async (tx) => {
     await systemMessage(tx, conversationId, user.id, `${user.name} left the group`);
-    await tx.conversationMember.update({ where: { conversationId_userId: { conversationId, userId: user.id } }, data: { leftAt: new Date() } });
+    await tx.conversationMember.update({ where: { conversationId_userId: { conversationId, userId: user.id } }, data: { leftAt: new Date(), role: 'member' } });
+    // The last admin leaving hands the group to the longest-standing member
+    if (m.role === 'admin' && (await activeAdminIds(conversationId, tx)).length === 0) {
+      const next = await tx.conversationMember.findFirst({
+        where: { conversationId, leftAt: null },
+        orderBy: [{ joinedAt: 'asc' }, { userId: 'asc' }],
+        include: { user: { select: { name: true } } },
+      });
+      if (next) {
+        await tx.conversationMember.update({ where: { conversationId_userId: { conversationId, userId: next.userId } }, data: { role: 'admin' } });
+        await systemMessage(tx, conversationId, next.userId, `${next.user.name} is now an admin`);
+      }
+    }
   });
   await writeAudit({ action: 'MESSAGE_GROUP_LEAVE', username: user.username, userId: user.id, details: `Left group #${conversationId}`, ctx });
   await publish({ type: 'conversation.changed', conversationId, recipients });

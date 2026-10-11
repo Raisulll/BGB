@@ -3,10 +3,10 @@
 // live in the hand-written SQL appended to the init migration — see prisma/sql/integrity.sql.
 
 generator client {
-  provider               = "prisma-client"
-  output                 = "../src/generated/prisma"
-  moduleFormat           = "esm"
-  importFileExtension    = "js"
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
 }
 
 datasource db {
@@ -26,11 +26,11 @@ model Role {
 
 // §17.3
 model RolePermission {
-  id       Int     @id @default(autoincrement())
-  role     String  @db.VarChar(50)
-  pageId   String  @map("page_id") @db.VarChar(50)
-  enabled  Boolean @default(true)
-  roleRef  Role    @relation(fields: [role], references: [name], onUpdate: Cascade)
+  id      Int     @id @default(autoincrement())
+  role    String  @db.VarChar(50)
+  pageId  String  @map("page_id") @db.VarChar(50)
+  enabled Boolean @default(true)
+  roleRef Role    @relation(fields: [role], references: [name], onUpdate: Cascade)
 
   @@unique([role, pageId])
   @@map("role_permissions")
@@ -53,19 +53,23 @@ model User {
   createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  roleRef       Role               @relation(fields: [role], references: [name], onUpdate: Cascade)
-  incidents     Incident[]
-  timeline      IncidentTimeline[]
-  comments      IncidentComment[]
-  evidence      Evidence[]
-  notifications Notification[]
-  configUpdates SystemConfig[]
-  conversationsCreated Conversation[] @relation("ConversationCreator")
-  memberships   ConversationMember[]
-  messagesSent  Message[]
-  callsMade     Call[]             @relation("CallCaller")
-  callsReceived Call[]             @relation("CallCallee")
-  refreshTokens RefreshToken[]
+  roleRef              Role                      @relation(fields: [role], references: [name], onUpdate: Cascade)
+  incidents            Incident[]
+  timeline             IncidentTimeline[]
+  comments             IncidentComment[]
+  evidence             Evidence[]
+  notifications        Notification[]
+  configUpdates        SystemConfig[]
+  conversationsCreated Conversation[]            @relation("ConversationCreator")
+  memberships          ConversationMember[]
+  membersRemoved       ConversationMember[]      @relation("MemberRemovedBy")
+  joinRequestsFor      ConversationJoinRequest[] @relation("JoinRequestUser")
+  joinRequestsMade     ConversationJoinRequest[] @relation("JoinRequestRequester")
+  joinRequestsDecided  ConversationJoinRequest[] @relation("JoinRequestDecider")
+  messagesSent         Message[]
+  callsMade            Call[]                    @relation("CallCaller")
+  callsReceived        Call[]                    @relation("CallCallee")
+  refreshTokens        RefreshToken[]
 
   @@map("users")
 }
@@ -105,27 +109,27 @@ model IncidentSubcategory {
 
 // §17.6 — status/severity CHECK constraints are in prisma/sql/integrity.sql
 model Incident {
-  id              String   @id @db.VarChar(30)
-  title           String   @db.VarChar(255)
-  category        String   @db.VarChar(100)
-  subcategory     String?  @db.VarChar(100)
-  severity        String   @db.VarChar(20)
-  status          String   @db.VarChar(20)
-  incidentDate    DateTime @map("incident_date") @db.Date
-  incidentTime    DateTime @map("incident_time") @db.Time(0)
-  location        String?  @db.VarChar(255)
-  bop             String?  @db.VarChar(100)
-  sector          String?  @db.VarChar(50)
-  battalion       String?  @db.VarChar(50)
-  lat             Decimal? @db.Decimal(10, 7)
-  lng             Decimal? @db.Decimal(10, 7)
+  id              String    @id @db.VarChar(30)
+  title           String    @db.VarChar(255)
+  category        String    @db.VarChar(100)
+  subcategory     String?   @db.VarChar(100)
+  severity        String    @db.VarChar(20)
+  status          String    @db.VarChar(20)
+  incidentDate    DateTime  @map("incident_date") @db.Date
+  incidentTime    DateTime  @map("incident_time") @db.Time(0)
+  location        String?   @db.VarChar(255)
+  bop             String?   @db.VarChar(100)
+  sector          String?   @db.VarChar(50)
+  battalion       String?   @db.VarChar(50)
+  lat             Decimal?  @db.Decimal(10, 7)
+  lng             Decimal?  @db.Decimal(10, 7)
   description     String
-  personsInvolved String?  @map("persons_involved")
-  actionTaken     String?  @map("action_taken")
+  personsInvolved String?   @map("persons_involved")
+  actionTaken     String?   @map("action_taken")
   outcome         String?
-  createdBy       String   @map("created_by") @db.VarChar(10)
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  createdBy       String    @map("created_by") @db.VarChar(10)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
   // Spec #45 — set when a Closed/Rejected incident is archived; archived records leave the default
   // lists and statistics but are never deleted
   archivedAt      DateTime? @map("archived_at") @db.Timestamptz
@@ -235,17 +239,19 @@ model AuditLog {
 
 // §17.10
 model Notification {
-  id         Int      @id @default(autoincrement())
-  userId     String?  @map("user_id") @db.VarChar(10)
-  title      String   @db.VarChar(200)
-  message    String
-  type       String?  @db.VarChar(50)
-  isRead     Boolean  @default(false) @map("is_read")
-  incidentId String?  @map("incident_id") @db.VarChar(30)
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id             Int      @id @default(autoincrement())
+  userId         String?  @map("user_id") @db.VarChar(10)
+  title          String   @db.VarChar(200)
+  message        String
+  type           String?  @db.VarChar(50)
+  isRead         Boolean  @default(false) @map("is_read")
+  incidentId     String?  @map("incident_id") @db.VarChar(30)
+  conversationId Int?     @map("conversation_id") // group notifications open the conversation
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  user     User?     @relation(fields: [userId], references: [id])
-  incident Incident? @relation(fields: [incidentId], references: [id])
+  user         User?         @relation(fields: [userId], references: [id])
+  incident     Incident?     @relation(fields: [incidentId], references: [id])
+  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: Restrict)
 
   @@index([userId, isRead])
   @@map("notifications")
@@ -314,18 +320,25 @@ model EmailOutbox {
 // like evidence (spec #27). Calls are 1:1 WebRTC audio; only the call record is kept, never audio.
 // ---------------------------------------------------------------------------
 model Conversation {
-  id            Int       @id @default(autoincrement())
-  kind          String    @db.VarChar(10) // 'direct' | 'group' (DB CHECK)
-  title         String?   @db.VarChar(100) // groups only
+  id             Int       @id @default(autoincrement())
+  kind           String    @db.VarChar(10) // 'direct' | 'group' (DB CHECK)
+  title          String?   @db.VarChar(100) // groups only
   // Direct conversations: both user ids sorted and joined with ':', so a pair has exactly one thread
-  directKey     String?   @unique @map("direct_key") @db.VarChar(25)
-  createdBy     String    @map("created_by") @db.VarChar(10)
-  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  lastMessageAt DateTime? @map("last_message_at") @db.Timestamptz
+  directKey      String?   @unique @map("direct_key") @db.VarChar(25)
+  createdBy      String    @map("created_by") @db.VarChar(10)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  lastMessageAt  DateTime? @map("last_message_at") @db.Timestamptz
+  // Group photo, stored encrypted like voice messages; changed only by group admins
+  coverPath      String?   @map("cover_path") @db.VarChar(500)
+  coverMime      String?   @map("cover_mime") @db.VarChar(50)
+  coverSha256    String?   @map("cover_sha256") @db.VarChar(64)
+  coverUpdatedAt DateTime? @map("cover_updated_at") @db.Timestamptz
 
-  creator  User                 @relation("ConversationCreator", fields: [createdBy], references: [id])
-  members  ConversationMember[]
-  messages Message[]
+  creator       User                      @relation("ConversationCreator", fields: [createdBy], references: [id])
+  members       ConversationMember[]
+  messages      Message[]
+  joinRequests  ConversationJoinRequest[]
+  notifications Notification[]
 
   @@index([lastMessageAt])
   @@map("conversations")
@@ -337,13 +350,36 @@ model ConversationMember {
   joinedAt       DateTime  @default(now()) @map("joined_at") @db.Timestamptz
   leftAt         DateTime? @map("left_at") @db.Timestamptz // members who leave keep their row (history)
   lastReadId     Int       @default(0) @map("last_read_id") // highest message id this member has read
+  role           String    @default("member") @db.VarChar(10) // groups: 'admin' | 'member' (DB CHECK)
+  removedBy      String?   @map("removed_by") @db.VarChar(10) // set when an admin removed them (left_at too)
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Restrict)
   user         User         @relation(fields: [userId], references: [id])
+  remover      User?        @relation("MemberRemovedBy", fields: [removedBy], references: [id])
 
   @@id([conversationId, userId])
   @@index([userId])
   @@map("conversation_members")
+}
+
+// A member's request to add someone to a group; an admin approves or rejects it
+model ConversationJoinRequest {
+  id             Int       @id @default(autoincrement())
+  conversationId Int       @map("conversation_id")
+  userId         String    @map("user_id") @db.VarChar(10) // the person to be added
+  requestedBy    String    @map("requested_by") @db.VarChar(10)
+  status         String    @default("pending") @db.VarChar(10) // pending | approved | rejected | cancelled (DB CHECK)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  decidedBy      String?   @map("decided_by") @db.VarChar(10)
+  decidedAt      DateTime? @map("decided_at") @db.Timestamptz
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Restrict)
+  user         User         @relation("JoinRequestUser", fields: [userId], references: [id])
+  requester    User         @relation("JoinRequestRequester", fields: [requestedBy], references: [id])
+  decider      User?        @relation("JoinRequestDecider", fields: [decidedBy], references: [id])
+
+  @@index([conversationId, status])
+  @@map("conversation_join_requests")
 }
 
 model Message {

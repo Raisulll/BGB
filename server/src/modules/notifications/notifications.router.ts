@@ -31,6 +31,7 @@ notificationsRouter.get('/', async (req, res) => {
         type: n.type,
         read: n.isRead,
         incidentId: n.incidentId,
+        conversationId: n.conversationId,
         createdAt: n.createdAt.toISOString(),
       })),
       total,

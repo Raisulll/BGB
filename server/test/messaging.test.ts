@@ -83,8 +83,10 @@ describe('groups', () => {
     expect(g.body.members).toHaveLength(3);
     expect((await lastAudit('MESSAGE_GROUP_CREATE'))?.details).toContain('Sector-7 duty officers');
 
-    const added = await operator.post(`${M}/conversations/${g.body.id}/members`, { userIds: [auditor.user.id] });
-    expect(added.body.members).toHaveLength(4);
+    // The creator is the admin, so people they add join at once
+    const added = await sector.post(`${M}/conversations/${g.body.id}/members`, { userIds: [auditor.user.id] });
+    expect(added.body.added).toEqual([auditor.user.id]);
+    expect(added.body.conversation.members).toHaveLength(4);
     expect((await lastAudit('MESSAGE_GROUP_ADD'))?.details).toContain(auditor.user.id);
 
     expect((await verifier.post(`${M}/conversations/${g.body.id}/leave`)).status).toBe(204);
