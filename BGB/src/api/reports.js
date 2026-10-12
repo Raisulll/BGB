@@ -7,6 +7,10 @@ export const trends = (query) => api('/reports/trends', { query });
 export const byCategory = (query) => api('/reports/by-category', { query });
 export const bySeverity = (query) => api('/reports/by-severity', { query });
 export const bySector = (query) => api('/reports/by-sector', { query });
+/** Hotspot BOPs, highest weighted score first (limit 1–50, default 10) */
+export const byLocation = (query) => api('/reports/by-location', { query });
+/** { hours[24], weekdays[7] (Monday first) }, each { count, highSeverity } */
+export const byTime = (query) => api('/reports/by-time', { query });
 /** type: operational | statistical | high-threat | sector-audit */
 export const operational = (query) => api('/reports/operational', { query });
 /** format: csv | excel */

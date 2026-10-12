@@ -176,3 +176,34 @@
   z-index: 0;
   font-family: inherit;
 }
+
+/* GIS location marker: incident count on a severity-coloured disc (MapView locationIcon) */
+.map-location > div {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2.5px solid #fff;
+  border-radius: 9999px;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+  color: #0f172a; /* slate-900: at least 5:1 on all four severity colours */
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+}
+.map-location:hover > div,
+.map-location:focus-visible > div {
+  box-shadow: 0 0 0 3px rgb(15 23 42 / 0.35), 0 1px 4px rgb(0 0 0 / 0.35);
+}
+.map-location:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Leaflet colours every link in a popup; buttons in a popup keep their own text colour */
+.leaflet-container .leaflet-popup-content a.btn-secondary {
+  color: var(--color-slate-800);
+}
+
+/* No browser focus box around a map point after a mouse click (keyboard focus still shows) */
+.leaflet-container .leaflet-interactive:focus:not(:focus-visible) {
+  outline: none;
+}

@@ -207,6 +207,57 @@ export async function bySector(user: AuthUser, f: IncidentFilters) {
   return [...sectors.values()].sort((a, b) => b.riskScore - a.riskScore);
 }
 
+/**
+ * Hotspots (spec #19): BOPs ranked by the same severity-weighted score as sectors, with their
+ * high/critical count and latest incident date. `limit` caps the list (default 10).
+ */
+export async function byLocation(user: AuthUser, f: IncidentFilters, limit = 10) {
+  const rows = await prisma.incident.groupBy({
+    by: ['sector', 'battalion', 'bop', 'severity'],
+    where: await where(user, f),
+    _count: { _all: true },
+    _max: { incidentDate: true },
+  });
+  type Spot = { sector: string | null; battalion: string | null; bop: string; total: number; highSeverity: number; riskScore: number; lastDate: Date | null };
+  const spots = new Map<string, Spot>();
+  for (const r of rows) {
+    const bop = r.bop ?? 'Unassigned';
+    const key = `${r.sector}|${r.battalion}|${bop}`;
+    const s = spots.get(key) ?? { sector: r.sector, battalion: r.battalion, bop, total: 0, highSeverity: 0, riskScore: 0, lastDate: null };
+    const n = r._count._all;
+    s.total += n;
+    s.riskScore += n * (SEVERITY_WEIGHT[r.severity] ?? 0);
+    if (r.severity === 'High' || r.severity === 'Critical') s.highSeverity += n;
+    if (r._max.incidentDate && (!s.lastDate || r._max.incidentDate > s.lastDate)) s.lastDate = r._max.incidentDate;
+    spots.set(key, s);
+  }
+  return [...spots.values()]
+    .sort((a, b) => b.riskScore - a.riskScore || b.total - a.total || a.bop.localeCompare(b.bop))
+    .slice(0, limit)
+    .map((s) => ({ ...s, lastDate: s.lastDate ? toDateString(s.lastDate) : null }));
+}
+
+/**
+ * When incidents happen (spec #19): counts by hour of the incident time (0–23, Bangladesh local
+ * time as entered) and by weekday of the incident date (Monday first), each with the high/critical part.
+ */
+export async function byTime(user: AuthUser, f: IncidentFilters) {
+  const rows = await prisma.incident.groupBy({ by: ['incidentDate', 'incidentTime', 'severity'], where: await where(user, f), _count: { _all: true } });
+  const hours = Array.from({ length: 24 }, (_, hour) => ({ hour, count: 0, highSeverity: 0 }));
+  const weekdays = Array.from({ length: 7 }, (_, day) => ({ day, count: 0, highSeverity: 0 })); // 0 = Monday
+  for (const r of rows) {
+    const n = r._count._all;
+    const high = r.severity === 'High' || r.severity === 'Critical' ? n : 0;
+    const h = hours[r.incidentTime.getUTCHours()]!;
+    h.count += n;
+    h.highSeverity += high;
+    const d = weekdays[(r.incidentDate.getUTCDay() + 6) % 7]!;
+    d.count += n;
+    d.highSeverity += high;
+  }
+  return { hours, weekdays };
+}
+
 // ---------------------------------------------------------------------------
 // Configurable report (spec #21) and exports (spec #22)
 // ---------------------------------------------------------------------------

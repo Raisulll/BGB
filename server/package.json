@@ -17,6 +17,8 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
+    "db:demo": "tsx prisma/demo/demo-seed.ts",
+    "db:demo:docs": "tsx prisma/demo/make-docs.ts",
     "db:reset": "prisma migrate reset",
     "db:start": "pg_ctl -D .pgdata -l .pgdata/server.log -w start",
     "db:stop": "pg_ctl -D .pgdata -w stop",

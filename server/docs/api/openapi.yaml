@@ -735,6 +735,56 @@ paths:
                     total: { type: integer }
                     riskScore: { type: integer, description: 'Low 1, Medium 2, High 3, Critical 4 per incident' }
                     bySeverity: { type: object, additionalProperties: { type: integer } }
+  /reports/by-location:
+    get:
+      tags: [Reports]
+      summary: Hotspots — BOPs ranked by severity-weighted score
+      x-permission: dashboard or analytics
+      parameters:
+        - $ref: '#/components/parameters/Q'
+        - $ref: '#/components/parameters/Status'
+        - $ref: '#/components/parameters/Severity'
+        - $ref: '#/components/parameters/Category'
+        - $ref: '#/components/parameters/Sector'
+        - $ref: '#/components/parameters/Battalion'
+        - $ref: '#/components/parameters/Bop'
+        - $ref: '#/components/parameters/DateFrom'
+        - $ref: '#/components/parameters/DateTo'
+        - $ref: '#/components/parameters/Archived'
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 10 } }
+      responses:
+        '200':
+          description: BOPs, highest score first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    sector: { type: [string, 'null'] }
+                    battalion: { type: [string, 'null'] }
+                    bop: { type: string }
+                    total: { type: integer }
+                    highSeverity: { type: integer }
+                    riskScore: { type: integer, description: 'Low 1, Medium 2, High 3, Critical 4 per incident' }
+                    lastDate: { type: [string, 'null'], format: date }
+  /reports/by-time:
+    get:
+      tags: [Reports]
+      summary: Incidents by hour of day and by weekday (Monday first)
+      x-permission: dashboard or analytics
+      parameters: *reportFilters
+      responses:
+        '200':
+          description: 24 hours and 7 weekdays, each with the high/critical part
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hours: { type: array, items: { type: object, properties: { hour: { type: integer }, count: { type: integer }, highSeverity: { type: integer } } } }
+                  weekdays: { type: array, items: { type: object, properties: { day: { type: integer, description: '0 = Monday' }, count: { type: integer }, highSeverity: { type: integer } } } }
   /reports/operational:
     get:
       tags: [Reports]

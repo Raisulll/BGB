@@ -9,10 +9,10 @@ export function DemoBadge({ className = '' }) {
   const { t } = useI18n();
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded border border-violet-300 bg-violet-100 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-violet-800 ${className}`}
+      className={`inline-flex shrink-0 items-center gap-1 rounded border border-violet-300 bg-violet-50 px-1.5 py-px text-xs font-semibold text-violet-800 ${className}`}
       title={t('demo.badgeTitle')}
     >
-      <i className="fas fa-flask text-[8px]" /> {t('demo.badge')}
+      <i className="fas fa-flask text-[10px]" aria-hidden="true" /> {t('demo.badge')}
     </span>
   );
 }
@@ -21,7 +21,7 @@ export function DemoBadge({ className = '' }) {
 export function Sample({ children }) {
   const { t } = useI18n();
   return (
-    <span className="rounded border border-dashed border-violet-300 bg-violet-50/70 px-1.5 py-0.5 font-mono text-[11px] text-violet-900" title={t('demo.sampleTitle')}>
+    <span className="rounded border border-dashed border-violet-300 bg-violet-50 px-1.5 py-px font-mono text-xs text-violet-900" title={t('demo.sampleTitle')}>
       {children}
     </span>
   );
@@ -29,8 +29,8 @@ export function Sample({ children }) {
 
 export function DemoNotice({ children }) {
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-violet-200 bg-violet-50 p-3.5 text-xs text-violet-900">
-      <i className="fas fa-flask mt-0.5 text-violet-600" />
+    <div className="flex items-start gap-3 rounded-md border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900">
+      <i className="fas fa-flask mt-0.5 text-violet-700" aria-hidden="true" />
       <div>{children}</div>
     </div>
   );
@@ -41,7 +41,7 @@ export function DemoButton({ icon, children, feature, className = 'btn-secondary
   const { showToast } = useToast();
   const { t } = useI18n();
   return (
-    <button type="button" onClick={() => showToast(t('demo.notActive', { feature: feature || children }), 'info')} className={`btn ${className} text-xs`}>
+    <button type="button" onClick={() => showToast(t('demo.notActive', { feature: feature || children }), 'info')} className={`btn ${className}`}>
       <i className={`fas ${icon}`} /> {children} <DemoBadge />
     </button>
   );

@@ -59,6 +59,34 @@ describe('KPIs and breakdowns (specs #17, #19)', () => {
   });
 });
 
+describe('hotspots and time patterns (spec #19)', () => {
+  it('by-location ranks BOPs by weighted score, adds up and respects limit', async () => {
+    const res = await admin.get(`${R}/by-location?limit=50`);
+    expect(res.status).toBe(200);
+    expect(res.body.reduce((n: number, s: { total: number }) => n + s.total, 0)).toBe(await prisma.incident.count({ where: filed }));
+    const scores = res.body.map((s: { riskScore: number }) => s.riskScore);
+    expect(scores).toEqual([...scores].sort((a: number, b: number) => b - a));
+    const top = res.body[0];
+    expect(top.highSeverity).toBe(await prisma.incident.count({ where: { ...filed, bop: top.bop, battalion: top.battalion, severity: { in: ['High', 'Critical'] } } }));
+    expect(top.lastDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect((await admin.get(`${R}/by-location?limit=1`)).body).toHaveLength(1);
+    expect((await admin.get(`${R}/by-location?limit=0`)).status).toBe(400);
+  });
+
+  it('by-time gives 24 hours and 7 weekdays that add up to the total; scoped', async () => {
+    const res = await operator.get(`${R}/by-time`);
+    expect(res.status).toBe(200);
+    expect(res.body.hours).toHaveLength(24);
+    expect(res.body.weekdays).toHaveLength(7);
+    const total = await prisma.incident.count({ where: { ...filed, battalion: '17 BGB' } });
+    const sum = (a: { count: number }[]) => a.reduce((n, x) => n + x.count, 0);
+    expect(sum(res.body.hours)).toBe(total);
+    expect(sum(res.body.weekdays)).toBe(total);
+    const one = await prisma.incident.findFirst({ where: { ...filed, battalion: '17 BGB' } });
+    expect(res.body.hours[one!.incidentTime.getUTCHours()].count).toBeGreaterThan(0);
+  });
+});
+
 describe('trends (spec #20)', () => {
   it('day buckets cover the range with no gaps and match the database', async () => {
     const res = await admin.get(`${R}/trends?granularity=day&dateFrom=2026-10-01&dateTo=2026-10-31`);

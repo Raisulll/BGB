@@ -17,5 +17,5 @@
     "forceConsistentCasingInFileNames": true,
     "sourceMap": true
   },
-  "include": ["src", "prisma/seed.ts", "prisma/data", "scripts"]
+  "include": ["src", "prisma/seed.ts", "prisma/data", "prisma/demo", "scripts"]
 }

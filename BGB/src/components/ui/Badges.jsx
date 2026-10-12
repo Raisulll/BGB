@@ -47,10 +47,9 @@ export function OverdueBadge({ since }) {
   const n = Math.max(1, daysWaiting(since));
   return (
     <span
-      className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-medium text-red-800"
+      className="inline-flex items-center whitespace-nowrap rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-medium text-red-800"
       title={t('incidents.overdueTitle', { n })}
     >
-      <i className="fas fa-hourglass-end text-xs" />
       {t('incidents.overdueDays', { n })}
     </span>
   );

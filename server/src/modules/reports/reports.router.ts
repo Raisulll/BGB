@@ -1,4 +1,5 @@
 import { Router, type Request, type Response } from 'express';
+import { z } from 'zod';
 import { requireAuth } from '../../middleware/auth.js';
 import { apiLimiter } from '../../middleware/rateLimiter.js';
 import { requireAnyPermission, requirePermission } from '../../middleware/rbac.js';
@@ -34,6 +35,16 @@ reportsRouter.get('/by-sector', analytics, async (req, res) => {
 
 reportsRouter.get('/by-severity', analytics, async (req, res) => {
   res.json(await service.bySeverity(req.user!, filters(req)));
+});
+
+reportsRouter.get('/by-location', analytics, async (req, res) => {
+  const { limit, ...rest } = req.query;
+  const n = z.coerce.number().int().min(1).max(50).default(10).parse(limit);
+  res.json(await service.byLocation(req.user!, service.reportFiltersSchema.parse(rest), n));
+});
+
+reportsRouter.get('/by-time', analytics, async (req, res) => {
+  res.json(await service.byTime(req.user!, filters(req)));
 });
 
 reportsRouter.get('/operational', requirePermission('reports'), async (req, res) => {

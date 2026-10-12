@@ -387,3 +387,28 @@ None yet: ask BGB for a sample first. If none arrives before the redesign sessio
 ### Resolution (if resolved)
 2026-10-11 (assumed, owner asked for a professional report before a sample arrived): option 2 built for the Reports page. A4 document with the crest and letterhead ("Government of the People's Republic of Bangladesh / Border Guard Bangladesh / Headquarters, Pilkhana, Dhaka-1205"), CONFIDENTIAL // OPERATIONAL at the top and bottom of every printed page, reference number `BGB/BIRDS/RPT/<year>/NNNN` issued by the server on print (audited `PRINT_REPORT`), date line, subject, numbered paragraphs, a certificate, Prepared / Checked / Approved signature blocks, distribution, "Page x of y", in English and Bangla. *Still to confirm with BGB: letterhead wording and address, classification wording, the reference number style, and the signature/distribution blocks; replace with their sample when it arrives. The single-incident print uses the same layout (2026-10-11).*
 
+
+---
+## DOUBT-017 — Demonstration Data (Real Places, Fictional Records, Licensed Media)
+
+**TEC Spec**: #1, #57 (demonstration / acceptance); #10, #11 (evidence and media metadata); #43 (Bangla)
+**Raised on**: 2026-10-12
+**Status**: ASSUMED
+
+### The ambiguity
+The owner asked to replace all data with enough realistic data to show every feature, including previous-year records, real images and videos as evidence, and English + Bangla narratives. Real BGB incident records, photos and unit structures are not available to us, and using real people or real case details would be inappropriate.
+
+### Options considered
+1. Fictional records at real border locations, with freely licensed photos/videos of real places and objects (Wikimedia Commons) as evidence stand-ins.
+2. Ask BGB for sanitised sample incidents and media (best realism; not available before the demo).
+3. Synthetic placeholder images (no licensing questions, but not "real" as requested).
+
+### Assumption made (if proceeding)
+Option 1 (`server/prisma/demo/`, `npm run db:demo`):
+- Units are real border areas (5 sectors, 10 battalions, 32 BOPs, plausible but not official battalion numbers); people, events and documents are fictional. Generated PDFs carry a "fictional data" footer.
+- Media are CC / public-domain files from Wikimedia Commons, credited in `server/prisma/demo/media/CREDITS.md`; no photo shows identifiable people as suspects (one candidate with identifiable passengers was dropped).
+- Photos keep their own EXIF (camera, original capture date), which therefore predates the fictional incident dates. Not rewritten, so no metadata is fabricated.
+- The demo wipes the target database and its evidence storage; it refuses to run without `DEMO_RESET=yes`.
+
+### Resolution (if resolved)
+—

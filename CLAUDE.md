@@ -887,6 +887,8 @@ All endpoints require `Authorization: Bearer <access_token>` unless marked **Pub
 | GET | `/reports/by-category` | analytics | Incident count grouped by category | #19 |
 | GET | `/reports/by-sector` | analytics | Risk distribution by sector | #19 |
 | GET | `/reports/by-severity` | analytics | Severity breakdown | #19 |
+| GET | `/reports/by-location` | analytics | Hotspot BOPs by weighted score (`limit` 1–50) | #19 |
+| GET | `/reports/by-time` | analytics | Counts by hour of day and weekday, with high/critical part | #19 |
 | GET | `/reports/operational` | reports | Full configurable operational report | #21 |
 | GET | `/reports/print` | reports | Print-ready HTML report | #21 |
 | GET | `/reports/export/pdf` | reports | Server-rendered PDF via Puppeteer | #22 |

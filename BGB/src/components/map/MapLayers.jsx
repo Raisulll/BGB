@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useMap } from 'react-leaflet';
 import L from 'leaflet';
 import '../../lib/leafletPlugins';
+import { focusOn } from './FocusZoom';
 import { formatDateDisplay, SEVERITY_HEX } from '../../utils/helpers';
 
 // Spec #18 — clustered markers and a severity-weighted heatmap for the GIS page. Plain Leaflet
@@ -50,7 +51,10 @@ export function ClusterLayer({ incidents, labels }) {
           <p style="margin:2px 0 6px;font-size:10px;color:#6b7280">${esc(inc.bop || '')}</p>
           <a href="/incidents/${encodeURIComponent(inc.id)}" data-incident="${esc(inc.id)}" style="font-size:11px;font-weight:700;color:#1e5e1e">${esc(labels.view)} &rarr;</a>
         </div>`,
+        { autoPan: false },
       );
+      // Spec #18 — zoom in on the incident; focusOn() keeps its popup inside the map
+      marker.on('click', () => focusOn(map, marker.getLatLng()));
       group.addLayer(marker);
     }
     // Popup links navigate inside the app (no full page reload)

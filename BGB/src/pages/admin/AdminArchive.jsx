@@ -4,15 +4,15 @@ import * as adminApi from '../../api/admin';
 import { errorMessage } from '../../api/client';
 import useApi from '../../hooks/useApi';
 import { formatDateTime } from '../../utils/helpers';
-import Card from '../../components/ui/Card';
 import ErrorState from '../../components/ui/ErrorState';
 import { useI18n } from '../../i18n/I18nContext';
 import ConfigRow from './ConfigRow';
+import { SettingsSection, StatGrid } from './SettingsParts';
 
 // Specs #44, #45 — archiving policy, retention policy and an on-demand archiving run. The same run
 // happens daily on the server. Records past retention are only counted for review; nothing is
 // deleted automatically (DOUBT-012).
-export default function AdminArchive({ byKey, onSave, busy }) {
+export default function AdminArchive({ id, byKey, onSave, busy }) {
   const { t } = useI18n();
   const { showToast } = useToast();
   const { data, error, message, reload, setData } = useApi(() => adminApi.getArchive(), []);
@@ -34,42 +34,38 @@ export default function AdminArchive({ byKey, onSave, busy }) {
     }
   };
 
-  const stat = (label, value, cls = 'text-gray-900') => (
-    <div className="rounded-lg bg-gray-50 p-2 text-center">
-      <p className={`text-lg font-semibold ${cls}`}>{value ?? '–'}</p>
-      <p className="text-xs text-gray-500">{label}</p>
-    </div>
-  );
-
   return (
-    <Card title={t('arch.title')} icon="fa-archive" bodyClassName="space-y-3">
+    <SettingsSection
+      id={id}
+      title={t('arch.title')}
+      icon="fa-archive"
+      description={t('arch.policy')}
+      footer={
+        <>
+          <button type="button" onClick={run} disabled={running} className="btn btn-secondary btn-sm">
+            <i className={`fas ${running ? 'fa-spinner fa-spin' : 'fa-box-archive'}`} aria-hidden="true" /> {t('arch.runNow')}
+          </button>
+          {data?.lastRun && <span className="text-xs text-slate-600">{t('arch.lastRun', { date: formatDateTime(data.lastRun.at) })}</span>}
+        </>
+      }
+    >
       {['archive.after_days', 'data.retention_days'].map((key) =>
-        byKey[key] ? <ConfigRow key={`${key}:${byKey[key].value}`} item={{ key, icon: key.startsWith('archive') ? 'fa-box-archive' : 'fa-history' }} row={byKey[key]} onSave={save} busy={busy} /> : null,
+        byKey[key] ? <ConfigRow key={`${key}:${byKey[key].value}`} item={{ key }} row={byKey[key]} onSave={save} busy={busy} /> : null,
       )}
       {error ? (
-        <ErrorState message={message} onRetry={reload} />
+        <div className="py-4">
+          <ErrorState message={message} onRetry={reload} />
+        </div>
       ) : (
-        <>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {stat(t('arch.active'), data?.active)}
-            {stat(t('arch.archived'), data?.archived, 'text-navy-700')}
-            {stat(t('arch.due'), data?.dueForArchive, data?.dueForArchive ? 'text-amber-600' : 'text-gray-900')}
-            {stat(t('arch.pastRetention'), data?.pastRetention, data?.pastRetention ? 'text-red-600' : 'text-gray-900')}
-          </div>
-          <p className="text-xs text-gray-500">{t('arch.policy')}</p>
-          {data?.lastRun && (
-            <p className="text-xs text-gray-500">
-              <i className="fas fa-history mr-1" />
-              {t('arch.lastRun', { date: formatDateTime(data.lastRun.at) })}
-            </p>
-          )}
-        </>
+        <StatGrid
+          items={[
+            { label: t('arch.active'), value: data?.active },
+            { label: t('arch.archived'), value: data?.archived },
+            { label: t('arch.due'), value: data?.dueForArchive, tone: data?.dueForArchive ? 'text-amber-700' : undefined },
+            { label: t('arch.pastRetention'), value: data?.pastRetention, tone: data?.pastRetention ? 'text-red-700' : undefined },
+          ]}
+        />
       )}
-      <div className="border-t border-gray-100 pt-3">
-        <button type="button" onClick={run} disabled={running} className="btn btn-secondary text-xs">
-          <i className={`fas ${running ? 'fa-spinner fa-spin' : 'fa-box-archive'}`} /> {t('arch.runNow')}
-        </button>
-      </div>
-    </Card>
+    </SettingsSection>
   );
 }

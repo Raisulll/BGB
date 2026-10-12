@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import * as incidentsApi from '../api/incidents';
 import useApi, { useDebounced } from '../hooks/useApi';
@@ -34,6 +34,9 @@ export default function Incidents() {
   const { meta, hasPermission } = useApp();
   const { t, tv } = useI18n();
   const [params, setParams] = useSearchParams();
+  // Opened from a GIS map location: offer the way back to the map as it was left
+  const location = useLocation();
+  const mapBack = location.state?.backTo?.startsWith('/map') ? location.state.backTo : null;
   const canCreate = hasPermission(null, 'create');
   const canAct = Boolean(meta?.canAct) || canCreate; // filers act on their own returned reports
 
@@ -69,7 +72,7 @@ export default function Incidents() {
     const p = new URLSearchParams();
     if (nextView !== 'all') p.set('view', nextView);
     for (const [k, v] of Object.entries(nextFilters)) if (v && k !== 'q') p.set(k, v);
-    setParams(p, { replace: true });
+    setParams(p, { replace: true, state: location.state }); // keeps "Back to the map"
   };
   const update = (patch) => {
     const next = { ...filters, ...patch };
@@ -146,6 +149,11 @@ export default function Incidents() {
 
   return (
     <div className="space-y-4">
+      {mapBack && (
+        <Link id="back-to-map" to={mapBack} className="inline-flex items-center gap-2 text-sm font-medium text-bgb-600 hover:text-bgb-800">
+          <i className="fas fa-arrow-left" /> {t('map.backToMap')}
+        </Link>
+      )}
       {/* Views */}
       {views.length > 1 && (
         <nav className="flex gap-1 overflow-x-auto rounded-md border border-gray-200 bg-white p-1 shadow-sm" aria-label={t('incidents.views')}>

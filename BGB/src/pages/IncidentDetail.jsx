@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet';
 import { BD_LIMIT, TILE_ATTRIBUTION, TILE_URL } from '../lib/leaflet';
 import BangladeshFrame from '../components/map/BangladeshFrame';
@@ -60,6 +60,9 @@ function metadataSummary(ev, t) {
 
 export default function IncidentDetail() {
   const { id } = useParams();
+  // Opened from the GIS map: the back link returns to the map as it was left
+  const location = useLocation();
+  const mapBack = location.state?.backTo?.startsWith('/map') ? location.state.backTo : null;
   const navigate = useNavigate();
   const { currentUser } = useApp();
   const { showToast } = useToast();
@@ -189,8 +192,8 @@ export default function IncidentDetail() {
   if (error) {
     return (
       <div className="mx-auto max-w-6xl space-y-4">
-        <Link to="/incidents" className="inline-flex items-center gap-2 text-sm font-medium text-bgb-600 hover:text-bgb-800">
-          <i className="fas fa-arrow-left" /> {t('detail.back')}
+        <Link to={mapBack || '/incidents'} className="inline-flex items-center gap-2 text-sm font-medium text-bgb-600 hover:text-bgb-800">
+          <i className="fas fa-arrow-left" /> {mapBack ? t('map.backToMap') : t('detail.back')}
         </Link>
         <Card>
           <ErrorState message={error.status === 404 ? t('detail.notFound', { id }) : message} onRetry={error.status === 404 ? undefined : reload} />
@@ -210,8 +213,8 @@ export default function IncidentDetail() {
   return (
     <>
       <div className="mx-auto max-w-6xl space-y-4 sm:space-y-6 print:hidden">
-        <Link to="/incidents" className="inline-flex items-center gap-2 text-sm font-medium text-bgb-600 hover:text-bgb-800">
-          <i className="fas fa-arrow-left" /> {t('detail.back')}
+        <Link to={mapBack || '/incidents'} className="inline-flex items-center gap-2 text-sm font-medium text-bgb-600 hover:text-bgb-800">
+          <i className="fas fa-arrow-left" /> {mapBack ? t('map.backToMap') : t('detail.back')}
         </Link>
 
         {/* Header */}

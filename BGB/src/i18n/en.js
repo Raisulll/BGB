@@ -29,6 +29,20 @@ export default {
     }
   },
   "an": {
+    "byWeekday": "By day of the week",
+    "clickBar": "Select a bar to open those incidents.",
+    "clickTrend": "Select a point to open that period's incidents.",
+    "hotspotsNote": "Ranked by risk score (Low 1, Medium 2, High 3, Critical 4 per incident). Select a BOP to open its incidents.",
+    "hotspotsTitle": "Hotspots (BOPs)",
+    "otherSeverity": "Low & medium",
+    "overdueLink": "{n} overdue — view",
+    "riskNote": "High/critical ratio: share of a sector's incidents that are High or Critical. Assessment: 60% or more critical sector, 40% high risk, 20% moderate. Risk score: Low 1, Medium 2, High 3, Critical 4 per incident.",
+    "thLast": "Latest",
+    "timeNote": "Incident time as recorded in the report (Bangladesh time).",
+    "timeSummary": "Busiest hour: {hour}–{to}. {night}% of incidents happened at night (18:00–06:00).",
+    "timeTitle": "When incidents happen",
+    "totalN": "Total: {n}",
+    "viewIncidents": "View incidents",
     "approvedClosed": "{n} approved/closed",
     "categoryTitle": "Incidents by category",
     "exportExcel": "Export Excel",
@@ -684,6 +698,8 @@ export default {
     "welcome": "Signed in as {name}"
   },
   "mail": {
+    "recent": "Recent messages",
+    "testNeedsSmtp": "Available once SMTP is configured.",
     "delivery": "Delivery",
     "events": "Sent for: new submission, approval, rejection and return. Messages contain the reference number and a link only.",
     "failed": "Failed",
@@ -699,6 +715,7 @@ export default {
     "viaSmtp": "SMTP {server}"
   },
   "map": {
+    "backToMap": "Back to the map",
     "filterCategory": "Filter by category",
     "filterSeverity": "Filter by severity",
     "filterStatus": "Filter by status",
@@ -711,9 +728,13 @@ export default {
     "noLocations": "No matching incident locations.",
     "point": "Location",
     "recentTwo": "Recent incidents (last 2)",
+    "resetView": "Back to the whole map",
+    "showAll": "Show all {n} incidents",
     "shown": "{n} incidents on the map",
     "total": "{n} total",
-    "viewDetails": "View details"
+    "viewDetails": "View details",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out"
   },
   "month": {
     "1": "Jan",
@@ -836,6 +857,29 @@ export default {
     "unreadCount": "{n} unread"
   },
   "ops": {
+    "desc": {
+      "backup": "Automated encrypted database and evidence backups, with restore and verification.",
+      "dr": "A second site kept in step with the primary, so service can resume after a site failure.",
+      "ha": "Redundant servers so a single failure does not stop the system.",
+      "logs": "Application, security and access logs, rotated and forwarded for monitoring.",
+      "perf": "Capacity and response targets from the tender, and the load test that proves them."
+    },
+    "loadResults": "Load test results",
+    "overviewTitle": "Production operations",
+    "plannedProduction": "Planned for production",
+    "recentBackups": "Recent backups",
+    "sections": "Operations sections",
+    "state": {
+      "active": "Active",
+      "standby": "Standby"
+    },
+    "sum": {
+      "backup": "Daily encrypted backup, copied off-site",
+      "dr": "Streaming replication to a second site",
+      "ha": "Load balancer, two application nodes, database standby",
+      "logs": "Daily rotation, 90 days kept, SIEM forwarding",
+      "perf": "Up to 500 users, under 3 s, 99.5% availability"
+    },
     "activeSessions": "Active sessions",
     "availabilityTarget": "Availability target",
     "backupTitle": "Backup & restore",
@@ -1277,6 +1321,25 @@ export default {
     "idle": "Session expired after {n} minutes of inactivity"
   },
   "set": {
+    "auditedNote": "Changes apply immediately and are recorded in the audit trail.",
+    "desc": {
+      "password": "Rules every new password must meet, and when repeated failed sign-ins lock an account.",
+      "session": "How long an idle session lasts and whether a user may be signed in on several devices.",
+      "workflow": "When an incident waiting in one workflow step is flagged as overdue."
+    },
+    "noRefs": "No incident has been numbered yet.",
+    "ov": {
+      "mail": "E-mail delivery",
+      "signIn": "Sign-in method"
+    },
+    "sections": "Settings sections",
+    "unit": {
+      "attempts": "attempts",
+      "chars": "characters",
+      "days": "days",
+      "hours": "hours",
+      "minutes": "minutes"
+    },
     "api": "API service",
     "check": "Check",
     "checking": "Checking…",
@@ -1312,16 +1375,16 @@ export default {
     "jobPending": "Job pending",
     "key": {
       "archive": {
-        "after_days": "Archive after (days)"
+        "after_days": "Archive after"
       },
       "backup": {
-        "frequency_hours": "Backup interval (hours)"
+        "frequency_hours": "Backup interval"
       },
       "data": {
-        "retention_days": "Data retention period (days)"
+        "retention_days": "Data retention period"
       },
       "password": {
-        "lockout_minutes": "Lockout duration (min)",
+        "lockout_minutes": "Lockout duration",
         "max_attempts": "Max failed login attempts",
         "min_length": "Minimum password length",
         "require_number": "Require number",
@@ -1330,16 +1393,16 @@ export default {
       },
       "session": {
         "single_session": "Single active session",
-        "timeout_minutes": "Idle session timeout (min)"
+        "timeout_minutes": "Idle session timeout"
       },
       "workflow": {
-        "overdue_days": "Overdue after (days)"
+        "overdue_days": "Overdue after"
       }
     },
     "nextRefs": "Next incident reference numbers",
     "operational": "Operational",
     "passwordTitle": "Password policy & lockout",
-    "range": "({min}–{max})",
+    "range": "allowed {min}–{max}",
     "readOnly": "Read-only; allocated atomically by the server.",
     "retentionTitle": "Data retention",
     "savedNoBackup": "Setting saved (no backup job runs in the demo version)",

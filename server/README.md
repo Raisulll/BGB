@@ -40,6 +40,8 @@ Development uses a project-local PostgreSQL 18 cluster (`server/.pgdata`, port 5
 | `db:migrate` | `prisma migrate dev` (create + apply a migration during development) |
 | `db:deploy` | `prisma migrate deploy` (production) |
 | `db:seed` | Seed demo data |
+| `db:demo` | **Wipes all data** and loads the full demonstration dataset (needs `DEMO_RESET=yes`; see `prisma/demo/README.md`) |
+| `db:demo:docs` | Regenerates the demo PDF documents (Chromium) |
 | `db:start` / `db:stop` | Start/stop the local dev cluster |
 | `demo:reset-user -- <username>` | Restore a demo account's password, unlock it and end its sessions |
 | `test` / `test:watch` | Vitest + supertest against a disposable `birds_test` database (recreated, migrated and seeded on every run) |
