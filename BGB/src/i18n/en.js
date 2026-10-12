@@ -272,6 +272,8 @@ export default {
     "ringing": "Ringing"
   },
   "calls": {
+    "reachOffline": "{name} is not signed in on any device. They will see a missed call when they sign in.",
+    "reachPush": "{name} is not in BIRDS right now; the call rings on their phone.",
     "alreadyInCall": "You are already in a call.",
     "answer": "Answer",
     "call": "Call",

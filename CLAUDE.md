@@ -3,7 +3,7 @@
 
 > **Project**: BIRDS Phase II — HQ Border Guard Bangladesh (BGB)
 > **Frontend root**: `BGB/` (React + Vite SPA)
-> **Status**: Backend API (`server/`) implemented; the frontend runs entirely on it, in English and Bangla (Sessions 9–10). Demo version: backups, DR, HA, load tests, log rotation and AD/LDAP are deferred and shown as DEMO in the UI. OpenAPI docs at `/api/docs` (Session 11). Session 13: messaging + calls + group admins + push notifications, installable app (PWA), GIS framed on Bangladesh; live demo at https://birds-demo.onrender.com (Render free plan kept awake, Supabase). Remaining: the BGB documentation set (§27), security assessment, UAT test cases, training material. See `progress.md` for the next steps.
+> **Status**: Backend API (`server/`) implemented; the frontend runs entirely on it, in English and Bangla (Sessions 9–10). Demo version: backups, DR, HA, load tests, log rotation and AD/LDAP are deferred and shown as DEMO in the UI. OpenAPI docs at `/api/docs` (Session 11). Session 13: messaging + calls + group admins + push notifications, installable app (PWA), GIS framed on Bangladesh; live demo at https://birds-demo.onrender.com (Render free plan kept awake, Supabase). 2026-10-12: GIS zoom/show-all/back-to-map, analytics hotspots and time patterns, redesigned Admin › Security & system and Operations; full demonstration dataset (`server/prisma/demo`, `npm run db:demo`, loaded on local and live); tender pack (119-slide deck, documents 01–05, PDFs) updated from it. Remaining: the BGB documentation set (§27), security assessment, UAT test cases, training material. See `progress.md` for the next steps.
 
 ---
 

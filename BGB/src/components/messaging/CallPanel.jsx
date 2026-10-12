@@ -26,7 +26,7 @@ function Timer({ since }) {
  */
 export default function CallPanel({ call, soundBlocked, audioHealth, onEnableSound, onAccept, onDecline, onHangUp, onToggleMute }) {
   const { t, tv } = useI18n();
-  const { phase, other, muted, answeredAt } = call;
+  const { phase, other, muted, answeredAt, reach } = call;
   const incoming = phase === 'incoming';
 
   const status =
@@ -60,6 +60,14 @@ export default function CallPanel({ call, soundBlocked, audioHealth, onEnableSou
           </p>
         </div>
       </div>
+
+      {/* While ringing: say plainly when the other person cannot receive the call right now */}
+      {phase === 'outgoing' && reach && reach !== 'online' && (
+        <p role="status" className={`mt-3 rounded-md border px-3 py-2 text-xs ${reach === 'offline' ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-slate-200 bg-slate-50 text-slate-700'}`}>
+          <i className={`fas ${reach === 'offline' ? 'fa-user-slash' : 'fa-mobile-screen'} mr-1.5`} aria-hidden="true" />
+          {reach === 'offline' ? t('calls.reachOffline', { name: other?.name }) : t('calls.reachPush', { name: other?.name })}
+        </p>
+      )}
 
       {/* Sound problems, in plain words */}
       {soundBlocked && (

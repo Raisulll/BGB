@@ -93,7 +93,8 @@ describe('calls', () => {
     const caller = await connect(operator.token);
     const callee = await connect(sector.token);
     caller.send({ type: 'call.invite', to: sector.user.id });
-    const ringing = (await caller.type('call.ringing')) as { call: { id: number } };
+    const ringing = (await caller.type('call.ringing')) as { call: { id: number }; reach: string };
+    expect(ringing.reach).toBe('online');
     const incoming = (await callee.type('call.incoming')) as { call: { id: number; other: { id: string } } };
     expect(incoming.call.id).toBe(ringing.call.id);
     expect(incoming.call.other.id).toBe(operator.user.id);
@@ -137,6 +138,31 @@ describe('calls', () => {
     expect(await caller.type('call.ended', 5000)).toMatchObject({ callId: missed, status: 'missed' }); // CALL_RING_SECONDS=1 in tests
     const note = await prisma.notification.findFirst({ where: { userId: verifier.user.id, type: 'call' }, orderBy: { id: 'desc' } });
     expect(note?.message).toContain(operator.user.name);
+  });
+
+  it('tells the caller when the callee is signed in nowhere, or only reachable by a notification', async () => {
+    const id = `T${Date.now() % 1e8}`;
+    const away = await prisma.user.create({
+      data: { id, username: `away_${id}`, passwordHash: 'x', name: 'Away Tester', role: 'Battalion Operator', scope: '17 BGB', email: `${id}@test.invalid` },
+    });
+    const caller = await connect(operator.token);
+    const ringOnce = async () => {
+      caller.send({ type: 'call.invite', to: away.id });
+      const r = (await caller.type('call.ringing')) as { call: { id: number }; reach: string };
+      caller.send({ type: 'call.cancel', callId: r.call.id });
+      await caller.type('call.ended');
+      return r.reach;
+    };
+    expect(await ringOnce()).toBe('offline');
+
+    // An idle session (last seen an hour ago) with a device registered for notifications
+    const session = await prisma.refreshToken.create({
+      data: { userId: away.id, tokenHash: `test-${id}`, expiresAt: new Date(Date.now() + 3600_000), lastSeenAt: new Date(Date.now() - 3600_000) },
+    });
+    await prisma.pushSubscription.create({
+      data: { userId: away.id, sessionId: session.id, endpoint: `https://push.invalid/${id}`, p256dh: 'x', auth: 'x' },
+    });
+    expect(await ringOnce()).toBe('push');
   });
 
   it('keeps a call through a reconnect, and ends it when a participant stays away', async () => {

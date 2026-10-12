@@ -3,7 +3,7 @@ import { env } from '../../config/env.js';
 import { logger } from '../../config/logger.js';
 import { prisma } from '../../db.js';
 import { publish } from '../../realtime/bus.js';
-import { onClientClose, onClientMessage, onClientReady, onEvent, type Client } from '../../realtime/hub.js';
+import { isOnlineHere, onClientClose, onClientMessage, onClientReady, onEvent, type Client } from '../../realtime/hub.js';
 import { pushToUsers } from '../push/push.service.js';
 import { createCall, finalise, getCall, isBusy, toCallDto, transition } from './calls.service.js';
 
@@ -86,6 +86,20 @@ export function registerCallRealtime() {
     }
   });
 
+  /**
+   * How a callee can be reached, so the caller is not left listening to an empty ring:
+   * 'online' (connected now, or a session active in the last 35 minutes), 'push' (only a device
+   * registered for notifications) or 'offline' (signed in nowhere: the call can only be missed).
+   */
+  async function reachOf(userId: string): Promise<'online' | 'push' | 'offline'> {
+    if (isOnlineHere(userId)) return 'online';
+    const recent = await prisma.refreshToken.count({
+      where: { userId, revoked: false, expiresAt: { gt: new Date() }, lastSeenAt: { gt: new Date(Date.now() - 35 * 60_000) } },
+    });
+    if (recent) return 'online';
+    return (await prisma.pushSubscription.count({ where: { userId } })) ? 'push' : 'offline';
+  }
+
   onClientMessage('call.', async (client, msg) => {
     const callId = Number(msg.callId);
     switch (msg.type) {
@@ -101,7 +115,7 @@ export function registerCallRealtime() {
         }
         const call = await createCall(client.userId, to);
         track(client, call.id);
-        reply(client, { type: 'call.ringing', call: toCallDto(call, client.userId) });
+        reply(client, { type: 'call.ringing', call: toCallDto(call, client.userId), reach: await reachOf(to) });
         await toUser(to, { type: 'call.incoming', call: toCallDto(call, to) });
         // Devices where BIRDS is closed ring through a notification; opening it replays the call
         void pushToUsers(

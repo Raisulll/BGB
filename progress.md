@@ -739,3 +739,30 @@ Added after the session summary: deferred items now appear in **Admin › Operat
 ### Next session — TODO
 - Owner decision: reseed the live demo (Render + Supabase). Run from a machine with the live env: `DATABASE_URL=<supabase> STORAGE_DRIVER=s3 S3_*=… EVIDENCE_ENCRYPTION_KEY=<live key> DEMO_RESET=yes npm run db:demo`, then restart the Render service. This wipes everything on the live demo.
 - Commit and push today's work (map, analytics, admin redesigns, demo dataset — about 30 MB of media).
+
+---
+## Session — 2026-10-12 (continued) — presentation and documents rebuilt on the demo data
+
+### What was done
+- Live demo reseeded by the owner from this machine (`server/.env.live`, git-ignored; `DOTENV_CONFIG_PATH=.env.live DEMO_RESET=yes npm run db:demo`): 130 incidents, 361 evidence files in Supabase storage, audit chain intact. Evidence first failed on live with "failed its integrity check": the seed's `EVIDENCE_ENCRYPTION_KEY` differed from Render's; owner told to make the keys equal (set Render's key to the seed's, or reseed with Render's).
+- Screenshots re-captured from a freshly reseeded local copy (identical to live; voice/call/print scenes would otherwise leave records on live): ~110 screens at 1440 × 900 (scale 1.5), phone 390, tablet 820, plus real printed PDFs (operational, statistical, high-threat, sector reports; report with full incident annex, 42 pages; single-incident printout) rendered to page images, the Excel export rendered from the real file, and a generated seizure list. Voice message recorded with Chromium's fake microphone; real two-browser audio call (ringing, incoming, connected, call log). Capture scripts (lib/a/b/c.cjs) in the session scratchpad.
+- `tender-submission/build`: deck rebuilt as `deck.js` (layouts: screen, two, three, fit for portrait images, grid5; custom opening/solution/delivery slides) + `slides.js`/`slides-b.js` (content and speaker notes; `speaker-notes.js` retired to `shots-old/`). 119 slides: opening 5, solution 3, 11 sections (access, registration, workflow, tracking, GIS, analytics, reports & printing, audit, administration, platform, messaging & calls), value additions + BGB infrastructure, delivery (implementation items, work plan, training & documents, warranty), compliance matrix, thanks. Requirement badges per screen; notes per slide with "Show:" hints; figures in notes checked against the screenshots. Images as 1700 px JPEG (`shots-jpg/`) → 15 MB deck; `validate.py` passed; every slide rendered through PowerPoint and reviewed (fixed: form title typed into the header search, stretched portrait images, a wrong badge).
+- Annex B (`extras.js`): +5 value additions (location markers with counts; zoom / show all / back to the map; hotspots and time patterns; click-through from every chart; system status overview) → 32. Annex A (`notes.js`): items 18, 19, 46 updated. Demo Guide (`demo.js`): loading the dataset, ready-made records to open, detailed GIS and analytics steps, report templates, system status. Technical Proposal: 166 tests, map/analytics capabilities. Documents 01–05 regenerated (`node build.js`); PDFs of all six exported to `PDF's/` (Word via a background job with SaveAs2: Word hung when exporting straight into the folder whose name has an apostrophe; the old .pptx copy there removed). `tender-submission/README.md` updated.
+
+### Next session — TODO
+1. Owner: set `EVIDENCE_ENCRYPTION_KEY` on Render equal to `.env.live` (or reseed with Render's key), redeploy; check evidence on live; then delete `server/.env.live`; reset the Supabase database password (exposed in chat) and update Render.
+2. Re-make the demonstration video (07): it shows the old designs and sample data.
+3. Commit and push (code + demo dataset + docs); tender-submission/ is git-ignored by design.
+4. Remaining owner checks in the tender pack (signatory, seal, tender name wording, commitment values).
+
+---
+## Session — 2026-10-12 (continued) — messaging and call check
+
+### What was done
+- Live end-to-end check (two browsers, op_46bgb ↔ op_33bgb): text delivered live, voice message recorded, sent and played, call rang, was answered, connected (TURN relay present) and hung up. All working.
+- Cause of the owner's failed test (audit trail, 14:20–14:21 BST): hq_admin called Lt. Col. Karim (sector_off) three times, all cancelled. sector_off had not signed in since the demo reseed, which removes every session and push subscription, so no device could ring.
+- New: the caller is told when the callee cannot receive the call. `call.ringing` now carries `reach` ('online' | 'push' | 'offline') (`reachOf()` in `server/src/modules/calls/calls.realtime.ts`: connected now, or a session seen in the last 35 min → online; only a notification-enabled device → push; otherwise offline). `CallPanel.jsx` shows it while ringing (amber for offline). Texts `calls.reachOffline` / `calls.reachPush` in en + bn. Test added in `test/realtime-calls.test.ts`; full suite 167/167; checked in the browser.
+
+### Next session — TODO
+1. Deploy to Render (owner). After any reseed, every demo device must sign in again and switch on "Notifications on this device".
+2. Earlier items stand: delete `server/.env.live`, reset the Supabase password, re-make video 07, commit and push.

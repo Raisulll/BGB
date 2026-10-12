@@ -387,7 +387,7 @@ export function CommsProvider({ children }) {
             sendRealtime({ type: 'call.cancel', callId: msg.call.id });
             return;
           }
-          updateCall({ ...c, id: msg.call.id, phase: 'outgoing', other: msg.call.other });
+          updateCall({ ...c, id: msg.call.id, phase: 'outgoing', other: msg.call.other, reach: msg.reach || 'online' });
           stopTone();
           toneRef.current = startTone('ringback');
           return;
