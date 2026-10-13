@@ -122,6 +122,16 @@ describe('calls', () => {
     expect(entry).toMatchObject({ status: 'ended', direction: 'incoming', other: { id: operator.user.id } });
     expect(entry.durationSeconds).toBeGreaterThanOrEqual(1);
     expect((await lastAudit('CALL'))?.details).toContain(`Call #${id}`);
+
+    // The call is also an entry in the two people's chat, already read by both
+    const conv = (await sector.get('/api/v1/messaging/conversations')).body.find((c: { members: { id: string }[] }) => c.members.some((m) => m.id === operator.user.id));
+    const msgs = (await sector.get(`/api/v1/messaging/conversations/${conv.id}/messages`)).body.messages;
+    expect(msgs.at(-1)).toMatchObject({ kind: 'call', sender: { id: operator.user.id }, call: { id, status: 'ended', callerId: operator.user.id } });
+    expect(msgs.at(-1).call.durationSeconds).toBeGreaterThanOrEqual(1);
+    expect(conv.unread).toBe(0);
+    // The busy attempt opened a chat between the third caller and the callee
+    const busyConv = (await verifier.get('/api/v1/messaging/conversations')).body.find((c: { members: { id: string }[] }) => c.members.some((m) => m.id === sector.user.id));
+    expect(busyConv.lastMessage).toMatchObject({ kind: 'call', call: { status: 'failed', endReason: 'busy' } });
   });
 
   it('records declined and missed calls, and tells the callee about a missed call', async () => {
@@ -138,6 +148,15 @@ describe('calls', () => {
     expect(await caller.type('call.ended', 5000)).toMatchObject({ callId: missed, status: 'missed' }); // CALL_RING_SECONDS=1 in tests
     const note = await prisma.notification.findFirst({ where: { userId: verifier.user.id, type: 'call' }, orderBy: { id: 'desc' } });
     expect(note?.message).toContain(operator.user.name);
+
+    // Both calls are in the chat; only the missed one is unread for the callee
+    const conv = (await verifier.get('/api/v1/messaging/conversations')).body.find((c: { members: { id: string }[] }) => c.members.some((m) => m.id === operator.user.id));
+    const msgs = (await verifier.get(`/api/v1/messaging/conversations/${conv.id}/messages`)).body.messages;
+    expect(msgs.slice(-2).map((m: { call: { id: number; status: string } }) => [m.call.id, m.call.status])).toEqual([
+      [declined, 'declined'],
+      [missed, 'missed'],
+    ]);
+    expect(conv.unread).toBe(1);
   });
 
   it('tells the caller when the callee is signed in nowhere, or only reachable by a notification', async () => {

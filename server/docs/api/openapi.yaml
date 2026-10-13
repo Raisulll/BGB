@@ -1654,11 +1654,21 @@ components:
       properties:
         id: { type: integer }
         conversationId: { type: integer }
-        kind: { type: string, enum: [text, voice, system] }
-        body: { type: [string, 'null'] }
+        kind: { type: string, enum: [text, voice, system, call], description: '`call`: a finished call between the two people of a direct conversation, added by the server (sender = caller)' }
+        body: { type: [string, 'null'], description: 'Text; the wording of a system event; for a call, a plain summary such as "Missed call"' }
         sender: { type: object, properties: { id: { type: string }, name: { type: string } } }
         createdAt: { type: string, format: date-time }
         voice: { type: [object, 'null'], properties: { mime: { type: string }, size: { type: integer }, durationMs: { type: integer }, url: { type: string } } }
+        call:
+          type: [object, 'null']
+          description: The call a `call` entry records
+          properties:
+            id: { type: integer }
+            status: { type: string, enum: [ended, declined, missed, cancelled, failed] }
+            callerId: { type: string }
+            calleeId: { type: string }
+            durationSeconds: { type: [integer, 'null'], description: Talk time of an answered call }
+            endReason: { type: [string, 'null'] }
     Conversation:
       type: object
       properties:

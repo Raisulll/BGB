@@ -937,7 +937,7 @@ All endpoints require `Authorization: Bearer <access_token>` unless marked **Pub
 | WS | `/ws` | signed in + messages | Pushed messaging events and call signalling |
 | GET/POST/DELETE | `/push/config`, `/push/status`, `/push/subscriptions` | messages | Web push for calls/messages while the app is closed (VAPID keys; names only, never message text; bound to the session) |
 
-Messages and the call log are permanent records (append-only `messages`; `CALL` audit entry per call). Audio of calls is never stored.
+Messages and the call log are permanent records (append-only `messages`; `CALL` audit entry per call). Every finished call is also a `call` entry (`messages.call_id`) in the pair's direct chat, added by `finalise()` in `calls.service.ts`. Audio of calls is never stored.
 
 ---
 

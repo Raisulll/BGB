@@ -58,7 +58,11 @@ const activeMemberIds = async (conversationId: number, db: Tx | typeof prisma = 
 // ---------------------------------------------------------------------------
 // DTOs
 // ---------------------------------------------------------------------------
-type MessageRow = Prisma.MessageGetPayload<{ include: { sender: { select: { id: true; name: true } } } }>;
+const messageInclude = {
+  sender: { select: { id: true, name: true } },
+  call: { select: { id: true, status: true, callerId: true, calleeId: true, answeredAt: true, endedAt: true, endReason: true } },
+} as const;
+type MessageRow = Prisma.MessageGetPayload<{ include: typeof messageInclude }>;
 
 export function toMessageDto(m: MessageRow) {
   return {
@@ -77,11 +81,22 @@ export function toMessageDto(m: MessageRow) {
             url: `/api/v1/messaging/conversations/${m.conversationId}/messages/${m.id}/audio`,
           }
         : null,
+    // A finished call between the two people (the sender is the caller)
+    call: m.call
+      ? {
+          id: m.call.id,
+          status: m.call.status,
+          callerId: m.call.callerId,
+          calleeId: m.call.calleeId,
+          durationSeconds: m.call.answeredAt && m.call.endedAt ? Math.round((m.call.endedAt.getTime() - m.call.answeredAt.getTime()) / 1000) : null,
+          endReason: m.call.endReason,
+        }
+      : null,
   };
 }
 
 export async function messageDto(messageId: number) {
-  const m = await prisma.message.findUnique({ where: { id: messageId }, include: { sender: { select: { id: true, name: true } } } });
+  const m = await prisma.message.findUnique({ where: { id: messageId }, include: messageInclude });
   return m ? toMessageDto(m) : null;
 }
 
@@ -91,7 +106,7 @@ async function conversationDto(userId: string, conversationId: number) {
     where: { id: conversationId },
     include: {
       members: { where: { leftAt: null }, include: { user: { select: userSelect } }, orderBy: { joinedAt: 'asc' } },
-      messages: { orderBy: { id: 'desc' }, take: 1, include: { sender: { select: { id: true, name: true } } } },
+      messages: { orderBy: { id: 'desc' }, take: 1, include: messageInclude },
     },
   });
   const me = await prisma.conversationMember.findUniqueOrThrow({ where: { conversationId_userId: { conversationId, userId } } });
@@ -164,7 +179,7 @@ export async function history(user: AuthUser, conversationId: number, before: nu
     where: { conversationId, ...(before ? { id: { lt: before } } : {}) },
     orderBy: { id: 'desc' },
     take: limit,
-    include: { sender: { select: { id: true, name: true } } },
+    include: messageInclude,
   });
   return { messages: rows.reverse().map(toMessageDto), hasMore: rows.length === limit };
 }
@@ -265,7 +280,7 @@ async function afterMessage(conversationId: number, messageId: number, sender: A
 export async function sendText(user: AuthUser, conversationId: number, body: string) {
   await loadMembership(user, conversationId);
   const m = await prisma.$transaction(async (tx) => {
-    const msg = await tx.message.create({ data: { conversationId, senderId: user.id, kind: 'text', body }, include: { sender: { select: { id: true, name: true } } } });
+    const msg = await tx.message.create({ data: { conversationId, senderId: user.id, kind: 'text', body }, include: messageInclude });
     await tx.conversation.update({ where: { id: conversationId }, data: { lastMessageAt: msg.createdAt } });
     // Sending implies having read everything up to it
     await tx.conversationMember.update({ where: { conversationId_userId: { conversationId, userId: user.id } }, data: { lastReadId: msg.id } });
@@ -289,7 +304,7 @@ export async function sendVoice(user: AuthUser, conversationId: number, file: Bu
     const m = await prisma.$transaction(async (tx) => {
       const msg = await tx.message.create({
         data: { conversationId, senderId: user.id, kind: 'voice', voicePath: key, voiceMime: mime, voiceSize: file.length, voiceDurationMs: durationMs, voiceSha256: sha256(file) },
-        include: { sender: { select: { id: true, name: true } } },
+        include: messageInclude,
       });
       await tx.conversation.update({ where: { id: conversationId }, data: { lastMessageAt: msg.createdAt } });
       await tx.conversationMember.update({ where: { conversationId_userId: { conversationId, userId: user.id } }, data: { lastReadId: msg.id } });

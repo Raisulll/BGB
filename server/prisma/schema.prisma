@@ -408,17 +408,20 @@ model Message {
   id              Int      @id @default(autoincrement())
   conversationId  Int      @map("conversation_id")
   senderId        String   @map("sender_id") @db.VarChar(10)
-  kind            String   @db.VarChar(10) // 'text' | 'voice' | 'system' (DB CHECK)
-  body            String? // text, or the wording of a system event
+  kind            String   @db.VarChar(10) // 'text' | 'voice' | 'system' | 'call' (DB CHECK)
+  body            String? // text, the wording of a system event, or a plain summary of a call
   voicePath       String?  @map("voice_path") @db.VarChar(500)
   voiceMime       String?  @map("voice_mime") @db.VarChar(100)
   voiceSize       Int?     @map("voice_size")
   voiceDurationMs Int?     @map("voice_duration_ms")
   voiceSha256     String?  @map("voice_sha256") @db.VarChar(64)
+  // kind 'call': the finished call this entry records (sender = the caller)
+  callId          Int?     @unique @map("call_id")
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Restrict)
   sender       User         @relation(fields: [senderId], references: [id])
+  call         Call?        @relation(fields: [callId], references: [id], onDelete: Restrict)
 
   @@index([conversationId, id])
   @@map("messages")
@@ -435,8 +438,9 @@ model Call {
   endedAt    DateTime? @map("ended_at") @db.Timestamptz
   endReason  String?   @map("end_reason") @db.VarChar(40)
 
-  caller User @relation("CallCaller", fields: [callerId], references: [id])
-  callee User @relation("CallCallee", fields: [calleeId], references: [id])
+  caller  User     @relation("CallCaller", fields: [callerId], references: [id])
+  callee  User     @relation("CallCallee", fields: [calleeId], references: [id])
+  message Message?
 
   @@index([callerId, startedAt])
   @@index([calleeId, startedAt])

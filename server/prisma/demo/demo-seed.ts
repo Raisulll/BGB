@@ -17,6 +17,7 @@ import { env } from '../../src/config/env.js';
 import { storage, storageEncrypted } from '../../src/config/storage.js';
 import { prisma } from '../../src/db.js';
 import { CONFIG_DEFAULTS } from '../../src/modules/admin/config.service.js';
+import { callSummary } from '../../src/modules/calls/calls.service.js';
 import { ALLOWED_TYPES, detectMime } from '../../src/modules/evidence/fileType.js';
 import { extractMetadata, sha256 } from '../../src/modules/evidence/metadata.js';
 import { canApprove, canReview, DEFAULT_PERMISSIONS, ROLE_DESCRIPTIONS, ROLES } from '../../src/utils/roles.js';
@@ -399,26 +400,42 @@ const GROUPS: { title: string; creator: string; admins: string[]; members: strin
   },
 ];
 
-async function seedMessaging() {
+async function seedMessaging(calls: SeededCall[]) {
   const touchMsg = (userId: string, at: Date) => touch(userId, at);
-  // Direct conversations
-  for (const d of DIRECT) {
-    const created = ago(d.lines[0]![1] + 0.01, d.lines[0]![2]);
-    const conv = await prisma.conversation.create({
-      data: { kind: 'direct', directKey: [d.a, d.b].sort().join(':'), createdBy: d.lines[0]![0], createdAt: created },
-    });
-    const ids: number[] = [];
-    for (const [sender, days, hm, text] of d.lines) {
-      const at = ago(days, hm);
-      const m = await prisma.message.create({ data: { conversationId: conv.id, senderId: sender, kind: 'text', body: text, createdAt: at } });
-      ids.push(m.id);
-      touchMsg(sender, at);
+  // Direct conversations: the written lines and the pair's calls (as call entries), in time order.
+  // Pairs who only ever called each other get a conversation of call entries.
+  const pairKey = (a: string, b: string) => [a, b].sort().join(':');
+  const pairs = new Map<string, { a: string; b: string; lines: Line[]; unreadFor?: [string, number] }>();
+  for (const d of DIRECT) pairs.set(pairKey(d.a, d.b), d);
+  for (const c of calls) if (!pairs.has(pairKey(c.callerId, c.calleeId))) pairs.set(pairKey(c.callerId, c.calleeId), { a: c.callerId, b: c.calleeId, lines: [] });
+  for (const [directKey, d] of pairs) {
+    type Item = { at: Date; sender: string; text?: string; call?: SeededCall; unreadBy?: string };
+    const items: Item[] = d.lines.map(([sender, days, hm, text]) => ({ at: ago(days, hm), sender, text }));
+    // The last n written lines are unread for d.unreadFor[0]
+    if (d.unreadFor && d.unreadFor[1] > 0) for (const it of items.slice(-d.unreadFor[1])) it.unreadBy = d.unreadFor[0];
+    for (const c of calls.filter((x) => pairKey(x.callerId, x.calleeId) === directKey)) {
+      // A missed call from the last day is still unread for the person who missed it
+      const missed = (c.status === 'missed' || c.status === 'cancelled') && DEMO_NOW.getTime() - c.endedAt.getTime() <= DAY;
+      items.push({ at: c.endedAt, sender: c.callerId, call: c, unreadBy: missed ? c.calleeId : undefined });
     }
-    const lastAt = ago(d.lines[d.lines.length - 1]![1], d.lines[d.lines.length - 1]![2]);
-    await prisma.conversation.update({ where: { id: conv.id }, data: { lastMessageAt: lastAt } });
+    items.sort((x, y) => x.at.getTime() - y.at.getTime());
+    const created = new Date(items[0]!.at.getTime() - 60_000);
+    const conv = await prisma.conversation.create({ data: { kind: 'direct', directKey, createdBy: items[0]!.sender, createdAt: created } });
+    const ids: number[] = [];
+    for (const it of items) {
+      const m = await prisma.message.create({
+        data: it.call
+          ? { conversationId: conv.id, senderId: it.sender, kind: 'call', body: callSummary(it.call), callId: it.call.id, createdAt: it.at }
+          : { conversationId: conv.id, senderId: it.sender, kind: 'text', body: it.text!, createdAt: it.at },
+      });
+      ids.push(m.id);
+      if (it.text) touchMsg(it.sender, it.at);
+    }
+    await prisma.conversation.update({ where: { id: conv.id }, data: { lastMessageAt: items[items.length - 1]!.at } });
     for (const u of [d.a, d.b]) {
-      const unread = d.unreadFor && d.unreadFor[0] === u ? d.unreadFor[1] : 0;
-      await prisma.conversationMember.create({ data: { conversationId: conv.id, userId: u, joinedAt: created, lastReadId: ids[ids.length - 1 - unread] ?? 0 } });
+      // Everything before the first item this person hasn't read
+      const first = items.findIndex((it) => it.unreadBy === u);
+      await prisma.conversationMember.create({ data: { conversationId: conv.id, userId: u, joinedAt: created, lastReadId: first < 0 ? ids[ids.length - 1]! : (ids[first - 1] ?? 0) } });
     }
   }
 
@@ -481,13 +498,17 @@ const CALLS: [string, string, number, string, 'ended' | 'missed' | 'declined' | 
   ['U019', 'U020', 0.6, '16:40', 'ended', 167],
 ];
 
+type SeededCall = { id: number; callerId: string; calleeId: string; status: string; endReason: string | null; answeredAt: Date | null; endedAt: Date };
+
 async function seedCalls() {
+  const seeded: SeededCall[] = [];
   for (const [caller, callee, days, hm, status, secs] of CALLS) {
     const startedAt = ago(days, hm);
     const answeredAt = status === 'ended' ? new Date(startedAt.getTime() + 6000) : null;
     const endedAt = status === 'ended' ? new Date(answeredAt!.getTime() + secs * 1000) : new Date(startedAt.getTime() + (status === 'missed' ? 30000 : 9000));
     const endReason = status === 'missed' ? 'no answer' : null;
     const call = await prisma.call.create({ data: { callerId: caller, calleeId: callee, status, startedAt, answeredAt, endedAt, endReason } });
+    seeded.push({ id: call.id, callerId: caller, calleeId: callee, status, endReason, answeredAt, endedAt });
     const summary = status === 'ended' ? `answered, ${secs} s` : status + (endReason ? ` (${endReason})` : '');
     log(endedAt, caller, 'CALL', `Call #${call.id} ${nameOf(caller)} → ${nameOf(callee)}: ${summary}`);
     touch(caller, startedAt);
@@ -496,6 +517,7 @@ async function seedCalls() {
       notifications.push({ userId: callee, title: 'Missed Call', message: `Missed call from ${nameOf(caller)}`, type: 'call', isRead: DEMO_NOW.getTime() - endedAt.getTime() > DAY, incidentId: null, createdAt: endedAt });
     }
   }
+  return seeded;
 }
 
 // ---------------------------------------------------------------------------
@@ -584,8 +606,8 @@ async function main() {
     await prisma.systemConfig.create({ data: { key: `incident.next_id.${year}`, value: String(next), description: `Next incident reference number for ${year}` } });
   }
   for (const inc of incidents) if (!inc.discardedAt && inc.status !== 'Draft') await notifyIncident(inc);
-  await seedMessaging();
-  await seedCalls();
+  // Calls first: each one is also an entry in the pair's chat
+  await seedMessaging(await seedCalls());
   adminHistory();
   archiveRuns(incidents);
   signIns();

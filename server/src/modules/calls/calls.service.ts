@@ -1,6 +1,8 @@
 import { env } from '../../config/env.js';
+import { logger } from '../../config/logger.js';
 import { prisma } from '../../db.js';
 import { Prisma } from '../../generated/prisma/client.js';
+import { publish } from '../../realtime/bus.js';
 import { paged, toSkipTake } from '../../utils/pagination.js';
 import type { RequestContext } from '../../utils/requestContext.js';
 import { writeAudit } from '../audit/audit.service.js';
@@ -85,6 +87,50 @@ export async function finalise(call: CallRow, ctx: RequestContext) {
     await prisma.notification.create({
       data: { userId: call.calleeId, title: 'Missed Call', message: `Missed call from ${call.caller.name}`, type: 'call' },
     });
+  }
+  await recordInChat(call);
+}
+
+/** Plain wording kept in a call entry's message body (the UI words it from the call itself). */
+export function callSummary(call: { status: string; endReason: string | null; answeredAt: Date | null; endedAt: Date | null }) {
+  if (call.status === 'ended') {
+    const secs = call.answeredAt && call.endedAt ? Math.round((call.endedAt.getTime() - call.answeredAt.getTime()) / 1000) : 0;
+    return `Call, ${secs} s`;
+  }
+  if (call.status === 'failed' && call.endReason === 'busy') return 'Call not connected (busy)';
+  return ({ missed: 'Missed call', declined: 'Call declined', cancelled: 'Call cancelled', failed: 'Call not connected' } as Record<string, string>)[call.status] ?? 'Call';
+}
+
+/**
+ * The finished call as an entry in the two people's direct conversation (opened if they had none).
+ * The caller "sent" it and has read it; the callee has read it only if they answered or declined,
+ * so a missed call is unread for them. Never fails the call: the call record stays the source.
+ */
+async function recordInChat(call: CallRow) {
+  try {
+    const directKey = [call.callerId, call.calleeId].sort().join(':');
+    const conv =
+      (await prisma.conversation.findUnique({ where: { directKey } })) ??
+      (await prisma.conversation
+        .create({ data: { kind: 'direct', directKey, createdBy: call.callerId, members: { create: [{ userId: call.callerId }, { userId: call.calleeId }] } } })
+        .catch(async (err) => {
+          // Both people opened the thread at the same moment: use the one that won
+          if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') return prisma.conversation.findUniqueOrThrow({ where: { directKey } });
+          throw err;
+        }));
+    const conversationId = conv.id;
+    const seenByCallee = call.status === 'ended' || call.status === 'declined';
+    const msg = await prisma.$transaction(async (tx) => {
+      const m = await tx.message.create({ data: { conversationId, senderId: call.callerId, kind: 'call', body: callSummary(call), callId: call.id } });
+      await tx.conversation.update({ where: { id: conversationId }, data: { lastMessageAt: m.createdAt } });
+      const readers = seenByCallee ? [call.callerId, call.calleeId] : [call.callerId];
+      await tx.conversationMember.updateMany({ where: { conversationId, userId: { in: readers }, lastReadId: { lt: m.id } }, data: { lastReadId: m.id } });
+      return m;
+    });
+    await publish({ type: 'message.new', conversationId, messageId: msg.id, recipients: [call.callerId, call.calleeId] });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') return; // already recorded
+    logger.error('Could not add a call to the chat', { callId: call.id, error: (err as Error).message });
   }
 }
 

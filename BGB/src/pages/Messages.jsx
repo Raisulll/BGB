@@ -32,8 +32,23 @@ function shortTime(iso) {
   return formatDateDisplay(iso) === formatDateDisplay(new Date().toISOString()) ? full.slice(11) : full.slice(0, 10);
 }
 
+/** How a call entry reads for this viewer: the label, and whether it is a call they missed. */
+function callLabel(call, t, myId) {
+  const mine = call.callerId === myId;
+  const key = {
+    ended: mine ? 'outgoing' : 'incoming',
+    missed: mine ? 'noAnswer' : 'missed',
+    cancelled: mine ? 'cancelled' : 'missed',
+    declined: mine ? 'declinedByThem' : 'declinedByYou',
+    failed: call.endReason === 'busy' ? (mine ? 'busy' : 'missedBusy') : 'failed',
+  }[call.status] ?? 'failed';
+  const duration = call.status === 'ended' ? ` · ${formatDuration(call.durationSeconds ?? 0)}` : '';
+  return { text: `${t(`msg.call.${key}`)}${duration}`, missed: key === 'missed' || key === 'missedBusy' };
+}
+
 function preview(m, t, myId) {
   if (!m) return t('msg.noMessages');
+  if (m.kind === 'call' && m.call) return callLabel(m.call, t, myId).text;
   const who = m.kind !== 'system' && m.sender?.id === myId ? `${t('msg.you')}: ` : '';
   if (m.kind === 'voice') return `${who}${t('msg.voiceMessage')} (${formatDuration(m.voice?.durationMs / 1000)})`;
   return `${who}${m.body}`;
@@ -119,6 +134,33 @@ function ConversationList({ list, activeId, myId, onNewDirect, onNewGroup }) {
 const RUN_GAP_MS = 5 * 60_000;
 // A gap this long shows the time again between messages
 const TIME_GAP_MS = 15 * 60_000;
+
+/** A finished call between the two people, on the caller's side of the thread. */
+function CallEntry({ m, mine, onCallBack, callDisabled }) {
+  const { t } = useI18n();
+  const myId = mine ? m.call.callerId : m.call.calleeId;
+  const { text, missed } = callLabel(m.call, t, myId);
+  const time = formatDateTime(m.createdAt, { withSeconds: true });
+  return (
+    <li className={cn('mt-3 flex', mine ? 'justify-end' : 'justify-start pl-9')}>
+      <div title={time} className="flex items-center gap-3 rounded-[1.125rem] border border-slate-200 bg-white px-3 py-2">
+        <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-full', missed ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-600')} aria-hidden="true">
+          <i className={cn('fas', missed ? 'fa-phone-slash' : 'fa-phone')} />
+        </span>
+        <div className="min-w-0">
+          <p className={cn('text-sm font-medium', missed ? 'text-red-700' : 'text-slate-900')}>{text}</p>
+          <p className="text-xs text-slate-500">{formatDateTime(m.createdAt).slice(11)}</p>
+        </div>
+        {onCallBack && (
+          <button type="button" onClick={onCallBack} disabled={callDisabled} className="btn btn-secondary btn-sm ml-1">
+            <i className="fas fa-phone" aria-hidden="true" />
+            {t('msg.call.callBack')}
+          </button>
+        )}
+      </div>
+    </li>
+  );
+}
 
 function MessageBubble({ m, mine, first, last, showSender }) {
   const { t } = useI18n();
@@ -311,7 +353,8 @@ function Thread({ conversation, myId, onChanged, onBack }) {
     const list = messages || [];
     const at = (m) => new Date(m.createdAt).getTime();
     const breaksBefore = (prev, m) => !prev || formatDateDisplay(prev.createdAt) !== formatDateDisplay(m.createdAt) || at(m) - at(prev) >= TIME_GAP_MS;
-    const sameRun = (a, b) => a.kind !== 'system' && b.kind !== 'system' && a.sender?.id === b.sender?.id && at(b) - at(a) < RUN_GAP_MS;
+    const solo = (m) => m.kind === 'system' || m.kind === 'call';
+    const sameRun = (a, b) => !solo(a) && !solo(b) && a.sender?.id === b.sender?.id && at(b) - at(a) < RUN_GAP_MS;
     const out = [];
     list.forEach((m, i) => {
       const prev = list[i - 1];
@@ -387,6 +430,14 @@ function Thread({ conversation, myId, onChanged, onBack }) {
                   <li key={r.key} className="mt-4 mb-1 text-center text-xs font-medium text-slate-500" role="separator">
                     {r.sep}
                   </li>
+                ) : r.m.kind === 'call' && r.m.call ? (
+                  <CallEntry
+                    key={r.key}
+                    m={r.m}
+                    mine={r.m.call.callerId === myId}
+                    onCallBack={other ? () => startCall(other) : null}
+                    callDisabled={Boolean(call)}
+                  />
                 ) : (
                   <MessageBubble key={r.key} m={r.m} first={r.first} last={r.last} mine={r.m.sender?.id === myId} showSender={conversation.kind === 'group'} />
                 ),

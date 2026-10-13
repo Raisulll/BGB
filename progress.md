@@ -766,3 +766,23 @@ Added after the session summary: deferred items now appear in **Admin › Operat
 ### Next session — TODO
 1. Deploy to Render (owner). After any reseed, every demo device must sign in again and switch on "Notifications on this device".
 2. Earlier items stand: delete `server/.env.live`, reset the Supabase password, re-make video 07, commit and push.
+
+---
+## Session — 2026-10-13 — call history in the chat
+
+### What was done
+- Tender pack questions (no file changes): keep the signatory block in 01 and 04; options for signing the soft copy (scanned signature + seal image, printed/scanned signature pages, or a DSC). Waiting for the owner's choice and the signatory details.
+- **Calls in the chat**: every finished call (completed, missed, declined, cancelled, not connected/busy) is now also an entry in the direct conversation between the two people, opened if they had none. Migration `20261013120000_call_entries_in_chat`: `messages.call_id` (unique, FK → calls), kind `call` added to `messages_kind_check`, `messages_call_check` (kind = call ⇔ call_id set). Applied to the local dev database.
+- Server: `recordInChat()` in `calls.service.ts`, called from `finalise()` (the one place every finished call passes through); the caller is the sender; read for the caller, and for the callee only when answered or declined (a missed call is unread). Pushed live as `message.new`. Never fails the call. `callSummary()` (exported) gives the plain body ("Missed call", "Call, 95 s"). Message DTO now carries `call { id, status, callerId, calleeId, durationSeconds, endReason }`. OpenAPI `Message` schema updated.
+- Frontend (`pages/Messages.jsx`): `CallEntry` card on the caller's side: phone icon, label for this viewer (Outgoing / Incoming call · duration, Missed call in red, Call not answered, You declined the call, …), time, "Call back" button in direct chats. Conversation list preview shows the same label. 12 `msg.call.*` keys in en + bn (`i18n:check` OK); build OK.
+- Demo dataset: `seedCalls()` runs first and its calls are merged into the pairs' direct chats in time order (pairs who only called get a chat of call entries); missed calls from the last day are unread. Checked on the test database (16 call entries, order and read markers correct).
+- Tests: `realtime-calls.test.ts` checks the entries (completed + busy; declined + missed with unread 1). Server **167/167**, typecheck clean.
+
+### Decisions & rationale
+- Linked message row (not a copy of the call data): the call record stays the single source; the chat entry is append-only like every message.
+- Calls made before this change are not back-filled (inserting them would put old entries after newer messages, since threads are ordered by id). Reloading the demo dataset gives the full history.
+
+### Next session — TODO
+1. Deploy to Render, run `prisma migrate deploy` (runs on start) and reload the demo dataset (`DEMO_RESET=yes npm run db:demo`) so the live chats show the call history; locally the same `db:demo` if wanted.
+2. Signature/seal for the tender soft copy once the owner sends them.
+3. Earlier items stand: delete `server/.env.live`, reset the Supabase password, re-make video 07, commit and push.
