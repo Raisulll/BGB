@@ -10,7 +10,7 @@ import { createCall, finalise, getCall, isBusy, toCallDto, transition } from './
 // Call signalling over the realtime channel. Flow:
 //   caller  call.invite {to}        -> server records "ringing", callee gets call.incoming
 //   callee  call.accept {callId}    -> "answered"; caller gets call.accepted and sends the WebRTC offer
-//   either  call.signal {callId, data} (offer / answer / ICE candidates) -> relayed to the other party
+//   either  call.signal {callId, data} (offer / answer / ICE candidates, mute/hold state) -> relayed to the other party
 //   either  call.end / call.decline / call.cancel -> final state, both sides get call.ended
 // Unanswered calls are missed after CALL_RING_SECONDS. When a participant's socket closes, the call
 // waits CALL_RECONNECT_SECONDS for that user to reconnect and send call.resume {callId}; only then
