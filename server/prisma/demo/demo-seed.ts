@@ -17,13 +17,14 @@ import { env } from '../../src/config/env.js';
 import { storage, storageEncrypted } from '../../src/config/storage.js';
 import { prisma } from '../../src/db.js';
 import { CONFIG_DEFAULTS } from '../../src/modules/admin/config.service.js';
+import { recipientsFor } from '../../src/modules/alerts/alerts.service.js';
 import { callSummary } from '../../src/modules/calls/calls.service.js';
 import { ALLOWED_TYPES, detectMime } from '../../src/modules/evidence/fileType.js';
 import { extractMetadata, sha256 } from '../../src/modules/evidence/metadata.js';
 import { canApprove, canReview, DEFAULT_PERMISSIONS, ROLE_DESCRIPTIONS, ROLES } from '../../src/utils/roles.js';
 import { inScope, resolveScope } from '../../src/utils/scope.js';
 import { INCIDENT_CATEGORIES, ROLES as ROLE_NAMES } from '../data/seed-data.js';
-import { addHours, BOPS, buildIncidents, DEMO_NOW, dhaka, EXTRA_UNITS, nextIds, prng, USERS, userById, type DemoIncident } from './demo-data.js';
+import { addHours, BOPS, buildIncidents, DEMO_NOW, dhaka, EXTRA_UNITS, nextIds, prng, USERS, userById, ymdOf, type DemoIncident } from './demo-data.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const MEDIA = path.join(here, 'media');
@@ -93,7 +94,7 @@ async function wipeStorage() {
     credentials: { accessKeyId: env.S3_ACCESS_KEY_ID!, secretAccessKey: env.S3_SECRET_ACCESS_KEY! },
   });
   let removed = 0;
-  for (const prefix of ['incidents/', 'groups/', 'voice/', 'messages/']) {
+  for (const prefix of ['incidents/', 'groups/', 'voice/', 'messages/', 'alerts/']) {
     let token: string | undefined;
     do {
       const page = await s3.send(new ListObjectsV2Command({ Bucket: env.S3_BUCKET, Prefix: prefix, ContinuationToken: token }));
@@ -521,6 +522,160 @@ async function seedCalls() {
 }
 
 // ---------------------------------------------------------------------------
+// 5b. Flash Alerts (history only: all are closed or expired, so no alert screen opens at sign-in;
+//     raise a live one during the demonstration). Same rules as alerts.service.ts.
+// ---------------------------------------------------------------------------
+type AlertUpdate = [number, string, string]; // hours after raising, user, text
+interface DemoAlert {
+  at: Date;
+  sender: string;
+  title: string;
+  threatType: string;
+  priority: 'flash' | 'immediate';
+  subjectName?: string;
+  subjectDescription?: string;
+  details: string;
+  instructions: string;
+  lastSeen?: { hoursBefore: number; place: string; lat: number; lng: number };
+  sectors: string[]; // empty = every unit
+  incidentId?: string;
+  validHours: number;
+  attachments: [string, string][]; // media file, name shown
+  updates: AlertUpdate[];
+  close?: { hoursAfter: number; by: string; kind: 'resolved' | 'cancelled'; note: string };
+  ackShare: number; // share of recipients who acknowledged
+}
+
+const ALERTS: DemoAlert[] = [
+  {
+    at: dhaka('2026-09-18', '16:40'), sender: 'U019', title: 'Trafficking group expected to move women across at Kakdanga tonight',
+    threatType: 'trafficking', priority: 'immediate',
+    subjectDescription: 'Group of 4–5 men with 6–8 young women, said to travel by battery-driven van from Kalaroa bazar after dark.',
+    details: 'A source in Kalaroa reports that a trafficking ring will take 6–8 women across the border near Kakdanga between 20:00 and 02:00, promising them jobs in Kolkata.',
+    instructions: 'Kalaroa and Kaikhali BOPs: reinforce night ambushes on the Kakdanga crossing routes, check vans on the Kalaroa–Kakdanga road, and report any movement at once to Sector-9.',
+    sectors: ['Sector-9'], validHours: 12, attachments: [],
+    updates: [[1.5, 'U019', 'Police in Kalaroa are checking the source; ambushes stay in place.']],
+    close: { hoursAfter: 3.2, by: 'U019', kind: 'cancelled', note: 'Source retracted: the group was a wedding party, confirmed by Kalaroa police. No crossing planned. Ambushes return to normal duty.' },
+    ackShare: 0.9,
+  },
+  {
+    at: dhaka('2026-09-24', '22:05'), sender: 'U018', title: 'সশস্ত্র দল জাফলং সীমান্তের দিকে আসছে বলে তথ্য · Armed group reported moving towards Jaflong',
+    threatType: 'armed_group', priority: 'immediate',
+    subjectDescription: 'About 6 men, two with long-barrelled weapons, in dark clothing; seen near the Dawki bridge on the Indian side.',
+    details: 'Villagers report an armed group on the Indian side near the Dawki bridge, possibly a stone-smuggling gang planning to cross the Piyain river at night to collect payment.',
+    instructions: 'Tamabil and Bholaganj BOPs: double the river-bank posts on the Piyain, keep the quick reaction team ready, and do not engage across the border; report through Sector-5.',
+    lastSeen: { hoursBefore: 1, place: 'Near the Dawki bridge, opposite Jaflong zero point', lat: 25.1628, lng: 92.0177 },
+    sectors: ['Sector-5'], validHours: 24, attachments: [['jaflong-boats.jpg', 'piyain-crossing-point.jpg']],
+    updates: [[8, 'U018', 'রাতে কোনো চলাচল দেখা যায়নি। No movement seen overnight; posts stay doubled until the alert expires.']],
+    ackShare: 0.8,
+  },
+  {
+    at: dhaka('2026-10-03', '09:40'), sender: 'U002', title: 'Known Yaba carrier expected to cross the Naf at Jadimura today',
+    threatType: 'wanted_person', priority: 'flash', subjectName: 'Md. Jamal alias "Kala Jamal"',
+    subjectDescription: 'Man, about 30, thin, dark complexion, scar on the left cheek; usually wears a blue lungi and carries a fishing net bag. Wanted in two earlier Yaba cases at Teknaf.',
+    details: 'Intelligence from the DGFI detachment: the carrier will land a consignment of about 5,000 Yaba tablets at the Jadimura landing point in the afternoon, from a small fishing boat coming from Maungdaw.',
+    instructions: 'Teknaf River BOP: set an ambush at the Jadimura landing point from 12:00; Teknaf and Shah Porir Dwip BOPs: check fishing boats coming ashore. Arrest and report to Sector-7 at once. Do not open fire unless fired upon.',
+    lastSeen: { hoursBefore: 14, place: 'Maungdaw jetty (Myanmar side), opposite Jadimura', lat: 20.9310, lng: 92.2580 },
+    sectors: ['Sector-7'], incidentId: 'BIRDS-2026-1070', validHours: 24,
+    attachments: [['naf-boats-hills.jpg', 'jadimura-landing-point.jpg'], ['yaba-tablets.jpg', 'earlier-seizure-same-carrier.jpg']],
+    updates: [
+      [3.5, 'U002', 'Source confirms the boat left Maungdaw. Landing expected between 14:00 and 16:00.'],
+      [5.3, 'U002', 'জাদিমুড়া পয়েন্টে অ্যাম্বুশ প্রস্তুত। Ambush in place at Jadimura since 12:00.'],
+    ],
+    close: { hoursAfter: 6.6, by: 'U002', kind: 'resolved', note: 'Carrier arrested at Jadimura with 5,000 Yaba tablets at 15:15. Recorded as incident BIRDS-2026-1070.' },
+    ackShare: 1,
+  },
+  {
+    at: dhaka('2026-10-10', '19:30'), sender: 'U001', title: 'Boat with Rohingya bound for Malaysia may leave from the Teknaf coast tonight',
+    threatType: 'trafficking', priority: 'flash',
+    subjectDescription: 'Wooden trawler, blue hull with a white stripe, about 15 m; 20–30 people expected, including women and children. Brokers from Ukhia camps.',
+    details: 'Coast Guard and police intelligence: brokers plan to board 20–30 people from the camps onto a trawler off the Teknaf / Shah Porir Dwip coast after midnight, bound for Malaysia. All units are informed in case the departure point changes.',
+    instructions: 'Sector-7: patrol the beaches from Shah Porir Dwip to Baharchhara after 22:00 with the Coast Guard; stop and rescue, treat the passengers as victims. Other sectors: report any similar movement on your coast or rivers.',
+    lastSeen: { hoursBefore: 3, place: 'Off Shah Porir Dwip west beach', lat: 20.7650, lng: 92.3190 },
+    sectors: [], incidentId: 'BIRDS-2026-1079', validHours: 24, attachments: [['coxs-fishing-boats.jpg', 'trawler-type-reported.jpg']],
+    updates: [[4, 'U001', 'Coast Guard vessel on station off Shah Porir Dwip. Beach patrols to report every hour.']],
+    close: { hoursAfter: 6.5, by: 'U001', kind: 'resolved', note: '23 people rescued from the trawler at Shah Porir Dwip at 01:20; two brokers arrested. Recorded as incident BIRDS-2026-1079.' },
+    ackShare: 0.95,
+  },
+];
+
+async function seedAlerts(incidentIds: Set<string>) {
+  let seq = 0;
+  for (const al of ALERTS) {
+    if (al.incidentId && !incidentIds.has(al.incidentId)) throw new Error(`Flash Alert demo: incident ${al.incidentId} not in the dataset`);
+    seq++;
+    const reference = `FA-${ymdOf(al.at).slice(0, 4)}-${String(seq).padStart(4, '0')}`;
+    const closedAt = al.close ? addHours(al.at, al.close.hoursAfter) : null;
+    const recipients = (await recipientsFor(al.sectors)).filter((id) => id !== al.sender);
+    const a = await prisma.flashAlert.create({
+      data: {
+        reference, title: al.title, threatType: al.threatType, priority: al.priority, subjectName: al.subjectName ?? null,
+        subjectDescription: al.subjectDescription ?? null, details: al.details, instructions: al.instructions,
+        lastSeenAt: al.lastSeen ? addHours(al.at, -al.lastSeen.hoursBefore) : null, lastSeenPlace: al.lastSeen?.place ?? null,
+        lat: al.lastSeen?.lat ?? null, lng: al.lastSeen?.lng ?? null, targetSectors: al.sectors, incidentId: al.incidentId ?? null,
+        validUntil: addHours(al.at, al.validHours), status: al.close?.kind ?? 'active', declarationAt: new Date(al.at.getTime() - 40_000),
+        createdBy: al.sender, createdAt: al.at, closedBy: al.close?.by ?? null, closedAt, closeNote: al.close?.note ?? null,
+      },
+    });
+    touch(al.sender, al.at);
+    const described: string[] = [];
+    for (const [file, name] of al.attachments) {
+      const buf = media(`images/${file}`);
+      const mime = detectMime(buf);
+      if (!mime) throw new Error(`Not an allowed attachment type: ${file}`);
+      const metadata = await extractMetadata(buf, mime, 'image/jpeg', null);
+      const key = `alerts/${randomUUID()}${ALLOWED_TYPES[mime]}`;
+      await storage.put(key, buf);
+      storedBytes += buf.length;
+      await prisma.flashAlertAttachment.create({
+        data: { alertId: a.id, originalName: name, mimeType: mime, fileSize: BigInt(buf.length), storagePath: key, sha256: sha256(buf), fileMetadata: JSON.parse(JSON.stringify({ ...metadata, scan: { status: 'not_scanned' } })), uploadedAt: al.at },
+      });
+      described.push(name);
+    }
+    log(
+      al.at, al.sender, 'RAISE_FLASH_ALERT',
+      `${reference} (${al.priority}, ${al.threatType}): ${al.title}. Area: ${al.sectors.length ? al.sectors.join(', ') : 'all units'}; ${recipients.length} recipients; ${described.length} attachment(s); valid ${al.validHours} h. False-alert declaration accepted.`,
+    );
+
+    // Delivery within a couple of minutes; most acknowledge within the hour, the rest never do
+    const ackEnd = closedAt ?? addHours(al.at, al.validHours);
+    const viewers: string[] = [];
+    await prisma.flashAlertRecipient.createMany({
+      data: recipients.map((userId) => {
+        const deliveredAt = new Date(al.at.getTime() + r.int(5, 150) * 1000);
+        let acknowledgedAt: Date | null = null;
+        if (r.chance(al.ackShare)) {
+          acknowledgedAt = new Date(Math.min(deliveredAt.getTime() + r.int(1, 55) * 60_000, ackEnd.getTime() - 60_000));
+          log(acknowledgedAt, userId, 'ACKNOWLEDGE_FLASH_ALERT', `${reference}: ${al.title}`);
+          touch(userId, acknowledgedAt);
+          if (described.length && viewers.length < 3 && r.chance(0.4)) viewers.push(userId);
+        }
+        return { alertId: a.id, userId, deliveredAt, acknowledgedAt };
+      }),
+    });
+    for (const [i, userId] of viewers.entries()) {
+      const at = addHours(al.at, 0.5 + i * 0.2);
+      log(at, userId, 'VIEW_ALERT_ATTACHMENT', `${reference}: ${described[i % described.length]} (#${i % described.length + 1})`);
+    }
+
+    for (const [hours, userId, body] of al.updates) {
+      const at = addHours(al.at, hours);
+      await prisma.flashAlertUpdate.create({ data: { alertId: a.id, userId, userName: nameOf(userId), kind: 'update', body, createdAt: at } });
+      log(at, userId, 'UPDATE_FLASH_ALERT', `${reference}: ${body}`);
+      touch(userId, at);
+    }
+    if (al.close) {
+      await prisma.flashAlertUpdate.create({ data: { alertId: a.id, userId: al.close.by, userName: nameOf(al.close.by), kind: al.close.kind, body: al.close.note, createdAt: closedAt! } });
+      log(closedAt!, al.close.by, al.close.kind === 'resolved' ? 'RESOLVE_FLASH_ALERT' : 'CANCEL_FLASH_ALERT', `${reference}: ${al.close.note}`);
+      touch(al.close.by, closedAt!);
+    }
+  }
+  // Next number, as allocateReference() keeps it
+  const year = ymdOf(ALERTS[ALERTS.length - 1]!.at).slice(0, 4);
+  await prisma.systemConfig.create({ data: { key: `alert.next_id.${year}`, value: String(seq + 1), description: `Next Flash Alert number for ${year}` } });
+}
+
+// ---------------------------------------------------------------------------
 // 6. Administration history, sign-ins and the audit trail
 // ---------------------------------------------------------------------------
 function adminHistory() {
@@ -608,6 +763,7 @@ async function main() {
   for (const inc of incidents) if (!inc.discardedAt && inc.status !== 'Draft') await notifyIncident(inc);
   // Calls first: each one is also an entry in the pair's chat
   await seedMessaging(await seedCalls());
+  await seedAlerts(new Set(incidents.filter((i) => !i.discardedAt).map((i) => i.id)));
   adminHistory();
   archiveRuns(incidents);
   signIns();
@@ -633,6 +789,7 @@ async function main() {
     conversations: await prisma.conversation.count(),
     messages: await prisma.message.count(),
     calls: await prisma.call.count(),
+    flashAlerts: await prisma.flashAlert.count(),
     auditLog: await prisma.auditLog.count(),
     auditChainIntact: chain[0]?.first_broken_seq === null,
   };

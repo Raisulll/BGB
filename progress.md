@@ -896,3 +896,19 @@ Added after the session summary: deferred items now appear in **Admin › Operat
 1. Documentation for Flash Alert: Annex B value addition row (+ infrastructure: push, realtime already listed), Annex A #23/#58 notes, Technical Proposal modules table, Demo Guide scene, deck slides (re-capture screens), then regenerate documents and the letterhead copies.
 2. Add a resolved example alert to the demo dataset (`server/prisma/demo`) so the demo shows history.
 3. Commit and deploy (live demo needs `prisma migrate deploy` for the new migration).
+
+---
+## Session — 2026-10-15 (BST), part 5: live migration, demo Flash Alerts
+
+### What was done
+- Live demo: the owner ran `prisma migrate deploy` against Supabase (PowerShell: `$env:DOTENV_CONFIG_PATH = ".env.live"`); `/alerts` now answers on https://birds-demo.onrender.com (before: INTERNAL_ERROR, tables missing).
+- Demo dataset (`server/prisma/demo/demo-seed.ts`, `seedAlerts`): 4 Flash Alerts FA-2026-0001…0004: cancelled (Sector-9 trafficking, source retracted), expired (Sector-5 armed group, Bangla/English), resolved (Sector-7 wanted Yaba carrier → BIRDS-2026-1070, 2 photos), resolved (all units, Rohingya boat → BIRDS-2026-1079). Recipients from `recipientsFor()`; delivery and acknowledgement times (some never acknowledged), updates, close notes; audit RAISE/ACKNOWLEDGE/UPDATE/RESOLVE/CANCEL/VIEW_ALERT_ATTACHMENT in time order; `alert.next_id.2026` = 5; storage wipe now includes `alerts/`. README updated.
+- Loaded locally: 4 alerts, audit chain intact (2,572 rows), attachments download, batt_op sees the two Sector-7/all-unit alerts, `/alerts/active` empty.
+
+### Decisions & rationale
+- Only closed/expired alerts in the dataset: an active alert would open the full-screen siren for every account at sign-in and expire within 7 days anyway; the live alert is raised during the demonstration.
+
+### Next session — TODO
+1. Owner: reload the live dataset (`DEMO_RESET=yes npm run db:demo` with `.env.live`), commit and push.
+2. Flash Alert in the tender documents (Annex A #23/#58, Annex B, proposal, Demo Guide, deck), regenerate.
+3. Re-make the demonstration video; delete `server/.env.live` and reset the Supabase password.

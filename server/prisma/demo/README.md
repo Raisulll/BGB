@@ -29,6 +29,10 @@ Without `DEMO_RESET=yes` the script only prints the target database and storage 
 - Workflow **notifications**, **messaging** (direct conversations, three groups with admins, a group
   photo and a pending join request), a **call log**, and an **audit trail** of about 2,500 entries in
   time order (sign-ins, workflow, uploads, administration, exports); the hash chain verifies.
+- **4 Flash Alerts** (history only, Sept–Oct 2026): one cancelled (Sector-9), one expired (Sector-5), two resolved
+  and linked to the incidents they led to (BIRDS-2026-1070 in Sector-7, BIRDS-2026-1079 to all units), with photo
+  attachments, updates, and delivery/acknowledgement records (a few recipients never acknowledged). None is
+  active, so no alert screen opens at sign-in: raise a live alert during the demonstration.
 
 Places are real; people, events and documents are fictional. The PDFs carry a "fictional data" footer.
 
