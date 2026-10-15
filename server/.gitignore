@@ -11,3 +11,6 @@ storage/
 SupabaseDetails.txt
 Metadata.txt
 CLAUDE.md
+map/*.pmtiles
+map/.bin/
+map/*.part

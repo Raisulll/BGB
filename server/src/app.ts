@@ -21,6 +21,7 @@ import { notificationsRouter } from './modules/notifications/notifications.route
 import { reportsRouter } from './modules/reports/reports.router.js';
 import { usersRouter } from './modules/users/users.router.js';
 import { spaRouter } from './spa.js';
+import { mapRouter } from './map.js';
 
 export function createApp() {
   const app = express();
@@ -40,6 +41,8 @@ export function createApp() {
   );
   app.use(express.json({ limit: '1mb' }));
   app.use(cookieParser());
+  // Offline base map (specs #8, #18): before the request logger, a map view reads many small ranges
+  app.use('/api/v1/map', mapRouter(env.MAP_DIR));
   app.use(requestLogger);
 
   const api = express.Router();

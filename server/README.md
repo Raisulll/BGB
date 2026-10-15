@@ -49,6 +49,22 @@ Development uses a project-local PostgreSQL 18 cluster (`server/.pgdata`, port 5
 
 Production: `npm run build && pm2 start ecosystem.config.cjs` (cluster mode, §26).
 
+## Offline map (specs #8, #18)
+
+BIRDS maps work without internet. `map/bangladesh.pmtiles` (git-ignored, about 340 MB) holds the vector map
+of Bangladesh and the border strip (OpenStreetMap data, Protomaps build, zoom 0–14). The API serves it
+publicly at `/api/v1/map/bangladesh.pmtiles` with HTTP range requests (`src/map.ts`, folder `MAP_DIR`), and
+the web app draws the map in the browser with protomaps-leaflet (`BGB/src/components/map/BaseMap.jsx`),
+with place names in the interface language. Without the file the app falls back to the online
+OpenStreetMap tiles (the Render demo does this).
+
+```bash
+npm run map:download                  # needs internet once; downloads the pmtiles tool and extracts the area
+npm run map:download -- --maxzoom=13  # smaller (about 180 MB), less street detail
+```
+
+Copy the file to `MAP_DIR` on servers without internet. Replace it to update the map.
+
 ## API documentation (specs #31, #52)
 
 The OpenAPI 3.1 description is hand-written in `docs/api/openapi.yaml`. With the dev server running:

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { MapContainer, Marker, TileLayer } from 'react-leaflet';
-import { BD_LIMIT, TILE_ATTRIBUTION, TILE_URL } from '../lib/leaflet';
+import { MapContainer, Marker } from 'react-leaflet';
+import { BD_LIMIT } from '../lib/leaflet';
+import BaseMap from '../components/map/BaseMap';
 import BangladeshFrame from '../components/map/BangladeshFrame';
 import * as alertsApi from '../api/alerts';
 import { errorMessage } from '../api/client';
@@ -148,7 +149,7 @@ export default function AlertDetail() {
               <div className="h-64 overflow-hidden rounded-lg">
                 <MapContainer center={[a.lat, a.lng]} zoom={12} scrollWheelZoom={false} maxBounds={BD_LIMIT} maxBoundsViscosity={1} className="h-full w-full">
                   <BangladeshFrame />
-                  <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} bounds={BD_LIMIT} noWrap />
+                  <BaseMap />
                   <Marker position={[a.lat, a.lng]} />
                 </MapContainer>
               </div>

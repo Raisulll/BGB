@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
-import { MapContainer, Marker, Popup, TileLayer, Tooltip, useMap } from 'react-leaflet';
+import { MapContainer, Marker, Popup, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { BD_LIMIT, BD_VIEW, TILE_ATTRIBUTION, TILE_URL } from '../lib/leaflet';
+import { BD_LIMIT, BD_VIEW } from '../lib/leaflet';
+import BaseMap from '../components/map/BaseMap';
 import BangladeshFrame from '../components/map/BangladeshFrame';
 import { FitToIncidents, focusOn, ZoomControls } from '../components/map/FocusZoom';
 import { useApp } from '../context/AppContext';
@@ -283,7 +284,7 @@ export default function MapView() {
             <FitToIncidents points={locationGroups.map((g) => [g.lat, g.lng])} ready={data != null} keepFirst={Boolean(restored)} />
             <TrackView onChange={saveView} />
             <ZoomControls />
-            <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} bounds={BD_LIMIT} noWrap />
+            <BaseMap />
             {mode === 'clusters' && <ClusterLayer incidents={filtered} labels={layerLabels} />}
             {mode === 'heat' && <HeatLayer incidents={filtered} />}
             {mode === 'points' && locationGroups.map((loc) => (

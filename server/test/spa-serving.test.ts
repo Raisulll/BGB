@@ -36,7 +36,9 @@ describe('SPA serving (SERVE_SPA_DIR)', () => {
       const csp = res.headers['content-security-policy'];
       expect(csp).toContain("script-src 'self'");
       expect(csp).toContain('https://*.tile.openstreetmap.org');
-      expect(csp).toContain('https://fonts.gstatic.com');
+      // Fonts are bundled: the app needs no outside host except the online map fallback
+      expect(csp).not.toContain('fonts.g');
+      expect(csp).toContain("font-src 'self' data:");
       // OpenStreetMap blocks tile requests without a Referer
       expect(res.headers['referrer-policy']).toBe('strict-origin-when-cross-origin');
     }

@@ -1,7 +1,8 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet';
-import { BD_LIMIT, TILE_ATTRIBUTION, TILE_URL } from '../lib/leaflet';
+import { MapContainer, Marker, Popup } from 'react-leaflet';
+import { BD_LIMIT } from '../lib/leaflet';
+import BaseMap from '../components/map/BaseMap';
 import BangladeshFrame from '../components/map/BangladeshFrame';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
@@ -386,7 +387,7 @@ export default function IncidentDetail() {
                 <div className="h-64 overflow-hidden rounded-lg sm:h-80">
                   <MapContainer center={[inc.lat, inc.lng]} zoom={13} scrollWheelZoom={false} maxBounds={BD_LIMIT} maxBoundsViscosity={1} className="h-full w-full">
                     <BangladeshFrame />
-                    <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} bounds={BD_LIMIT} noWrap />
+                    <BaseMap />
                     <Marker position={[inc.lat, inc.lng]}>
                       <Popup>
                         <b>{inc.id}</b>

@@ -23,6 +23,7 @@
     "db:start": "pg_ctl -D .pgdata -l .pgdata/server.log -w start",
     "db:stop": "pg_ctl -D .pgdata -w stop",
     "demo:reset-user": "tsx scripts/reset-demo-user.ts",
+    "map:download": "tsx scripts/map-download.ts",
     "postinstall": "prisma generate",
     "test": "vitest run",
     "test:watch": "vitest",

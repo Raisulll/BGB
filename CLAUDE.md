@@ -418,6 +418,7 @@ When adding a new feature, verify against this checklist:
 
 - **Hosting**: Vercel (config in `BGB/vercel.json`) or any static host with SPA rewrite support.
 - **Installable app (PWA, specs #41/#58)**: `sw.js` and `manifest.webmanifest` must be served with `Cache-Control: no-cache` (Express `spa.ts` does; set the same in Nginx) and over HTTPS. The worker caches only the app (network-first page loads, cache-first `/assets/*`); it must never cache `/api/*`. Bump the cache names in `sw.js` only to force-clear old caches. Registered in production builds only (`utils/pwa.js`).
+- **Offline (intranet)**: the app needs no internet. Fonts are bundled (`@fontsource`, never Google Fonts); maps come from `server/map/bangladesh.pmtiles` served at `/api/v1/map/` (`npm run map:download`, `components/map/BaseMap.jsx`). Use `<BaseMap />` in every `MapContainer`, never a hard-coded `TileLayer`. Online OSM tiles are only the fallback when the file is absent (Render).
 - **Environment**: All routes rewrite to `index.html` (SPA routing).
 - **Backend**: A Node.js/Express or .NET REST API must be added for persistence, AD/LDAP, file storage, and scheduled backup (specs #2, #4, #30–#36, #44–#50).
 - **Database**: Enterprise RDBMS (PostgreSQL or Microsoft SQL Server) recommended to satisfy spec #30.

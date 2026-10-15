@@ -912,3 +912,43 @@ Added after the session summary: deferred items now appear in **Admin › Operat
 1. Owner: reload the live dataset (`DEMO_RESET=yes npm run db:demo` with `.env.live`), commit and push.
 2. Flash Alert in the tender documents (Annex A #23/#58, Annex B, proposal, Demo Guide, deck), regenerate.
 3. Re-make the demonstration video; delete `server/.env.live` and reset the Supabase password.
+
+---
+## Session — 2026-10-15 (BST), part 6: diagrams in the Technical Proposal
+
+### What was done
+- Checked `docSubmissionReq.md` against documents 01–07: the Technical Proposal had no diagrams. Gap list given to the owner (diagrams; test reports for load, ZAP, browser and UAT cases; sample exports; licence list; undertakings; offline map tiles for the demo; CVs/certificates).
+- New `tender-submission/build/diagrams.js`: 9 diagrams drawn as SVG and rendered to PNG through Chrome (playwright-core, 3× scale): architecture, deployment, workflow, security, evidence, backup/DR, Gantt, and two ER diagrams (25 tables from `schema.prisma`; user foreign keys shown as "→ users"; ‡ append-only, § recorded once). Facts checked against the code (workflow.ts, roles.ts, evidence audit actions, DB triggers, indexes). PNGs also in `tender-submission/diagrams/`.
+- `build.js`: `{ fig, caption, scale? }` block, numbered "Figure N", full text width. `proposal.js`: new 4.1 Incident workflow, 4.2 Roles, permissions and scope (default permission matrix + scope rules), 4.3 Evidence handling, 5.5 Database design (integrity rules, indexes, files outside the DB); figures in 5.1, 5.2, 6, 8.3, 11. Existing section numbers unchanged (Annex A references still valid).
+- Proposal regenerated: 22 pages, 9 figures; PDF exported with Word; DOCX + PDF copied to `Final Submission Documents/`. Previous versions in `tender-submission/backup-before-diagrams/`.
+
+### Decisions & rationale
+- Diagrams generated from code (not drawn by hand in a tool), so they can be regenerated after changes: `node diagrams.js && node build.js`.
+- Backup/DR diagram and caption say "set up during implementation" (items 34–36 are not built in the demo).
+
+### Next session — TODO
+1. Offline map tiles for the demo (or a clear statement), test reports (load at 100/250/500, OWASP ZAP, browser/device, functional test cases by spec item), sample PDF/Excel/CSV exports.
+2. Open-source licence list (item 51), undertaking drafts (50, 51, 54), manual tables of contents (52).
+3. Earlier items: commit/push and reload the live demo dataset; Flash Alert in documents; re-make video; delete `server/.env.live`.
+
+---
+## Session — 2026-10-15 (BST), part 7: offline maps and fonts
+
+### What was done
+- **Offline map** (specs #8, #18; docSubmissionReq §1.2 "demo runs fully offline"): `server/map/bangladesh.pmtiles` (336 MB, Protomaps build 20261014 of OpenStreetMap, bbox = BD_LIMIT, zoom 0–14; git-ignored) served by the API at `/api/v1/map/` (`src/map.ts`, `MAP_DIR`, public, range requests, before the request logger). `npm run map:download` (`scripts/map-download.ts`) fetches the go-pmtiles tool (v1.31.2) and re-extracts the latest build.
+- Web app: `components/map/BaseMap.jsx` replaces the OSM `TileLayer` on the map page, incident detail and alert detail; draws the map with protomaps-leaflet 5.1.0 (lazy chunk, 126 KB), labels in English or Bangla; falls back to OSM tiles when the server has no file (`offlineMapAvailable()` in `lib/leaflet.js`).
+- **Fonts bundled**: Inter via `@fontsource/inter` 5.3.0 (Bangla was already bundled); Google Fonts link removed from `index.html` and from the SPA CSP.
+- Verified in Chrome with every non-localhost request blocked: country view, Teknaf at zoom 13, incident detail, Bangla view: 35 local map requests, no outside host, no errors. Tests: new `test/offline-map.test.ts` (ranges, 404 without file, no dotfiles); `spa-serving` CSP test updated; 187/187 pass, typecheck clean.
+- Documents: proposal map paragraph (demo runs offline; no separate map server), supporting-services server no longer holds map tiles (disk 200 → 100 GB, 7.3 text), app servers hold the map data, integration phase wording; architecture and deployment diagrams; deck slides 2 lines. Regenerated 04 and both decks (PDFs exported; copied to `Final Submission Documents/`). README, CLAUDE.md §15, requirements-status #8 updated.
+
+### Decisions & rationale
+- Vector PMTiles drawn in the browser instead of a raster tile server: one file, no extra service, sharp at every zoom, Bangla labels; OSM's tile servers forbid bulk downloading, Protomaps builds are meant for extracts. Data licence ODbL (attribution shown on the map).
+- Zoom 14 (336 MB) instead of 15 (831 MB): street level is already there, deeper zoom draws from zoom 14 data.
+
+### Blockers / waiting on
+- The Render live demo has no map file, so it keeps using online tiles (by design). For the TEC session without internet, run the demo locally (API with `SERVE_SPA_DIR=../BGB/dist`, local DB with the demo dataset, map file in `server/map/`).
+
+### Next session — TODO
+1. Demo Guide: a "running without internet" step (local start-up on the demonstration laptop).
+2. Test reports (load, ZAP, browser/device, functional cases), sample exports, licence list, undertakings, manual contents.
+3. Commit/push; reload live demo dataset; Flash Alert in documents; re-make video; delete `server/.env.live`.

@@ -21,6 +21,9 @@ const schema = z.object({
   // hosting, e.g. the Render demo). Unset when Nginx serves the SPA (§15).
   SERVE_SPA_DIR: z.string().optional(),
 
+  // Specs #8 / #18 — folder holding bangladesh.pmtiles (offline map, `npm run map:download`)
+  MAP_DIR: z.string().default('map'),
+
   JWT_PRIVATE_KEY_PATH: z.string().default('keys/jwt-private.pem'),
   JWT_PUBLIC_KEY_PATH: z.string().default('keys/jwt-public.pem'),
   JWT_ISSUER: z.string().default('birds-api'),

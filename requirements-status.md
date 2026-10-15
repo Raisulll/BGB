@@ -25,7 +25,7 @@
 | 5 | Incident Registration (create, edit, review, submit) | `DONE` | Both | 3-step wizard on the API: draft, submit, edit/resubmit after return; browser-tested (Session 9) |
 | 6 | Incident Classification (categories, subcategories, severity) | `DONE` | Both | Admin > Categories (create, rename unused, add subcategories, (de)activate); form dropdowns from `/incidents/meta` (Session 9) |
 | 7 | Incident Details (all fields) | `DONE` | Both | All fields captured in the form and shown on the detail page from the API |
-| 8 | Geographical Information (GPS + map) | `DONE` | Both | Device GPS or manual entry (no invented coordinates); detail map + `GET /gis/incidents` map (Session 9) |
+| 8 | Geographical Information (GPS + map) | `DONE` | Both | Device GPS or manual entry (no invented coordinates); detail map + `GET /gis/incidents` map (Session 9). 2026-10-15: offline map (no internet): `server/map/bangladesh.pmtiles` served by the API, drawn with protomaps-leaflet, Bangla place names |
 | 9 | Border Sector Information (org hierarchy) | `DONE` | Both | Form limited to the user's units; Admin > Org Hierarchy adds units (Session 9) |
 | 10 | Evidence & Document Management | `DONE` | Both | Upload in the wizard (type/size checked client-side, content-checked server-side), download, removal with reason; browser-tested (Session 9) 2026-10-15: office documents accepted (Word, Excel, PowerPoint current/legacy, OpenDocument, RTF; detected on content, macro-enabled refused); document properties kept (#11). |
 | 11 | Media Metadata preservation | `DONE` | Both | SHA-256 + EXIF/GPS stored; shown on the detail page with an on-demand integrity check (Session 9) |

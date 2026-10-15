@@ -8,17 +8,17 @@ import helmet from 'helmet';
 // One origin keeps the refresh cookie first-party (SameSite=Strict). In the Nginx production
 // layout (§15) Nginx serves the SPA and SERVE_SPA_DIR stays unset.
 
-// The SPA's own resources plus the two outside hosts it uses: Google Fonts (index.html) and
-// OpenStreetMap tiles (src/lib/leaflet.js). Leaflet and Chart.js set inline styles; evidence
-// previews and downloads use blob: URLs.
+// The SPA's own resources (fonts are bundled) plus one outside host: OpenStreetMap tiles, used only
+// when the server has no offline map file (src/lib/leaflet.js, src/map.ts). Leaflet and Chart.js set
+// inline styles; evidence previews and downloads use blob: URLs.
 const SPA_CSP = {
   useDefaults: false,
   directives: {
     defaultSrc: ["'self'"],
     baseUri: ["'self'"],
     scriptSrc: ["'self'"],
-    styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-    fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
+    styleSrc: ["'self'", "'unsafe-inline'"],
+    fontSrc: ["'self'", 'data:'],
     imgSrc: ["'self'", 'data:', 'blob:', 'https://*.tile.openstreetmap.org'],
     mediaSrc: ["'self'", 'blob:'],
     connectSrc: ["'self'"],

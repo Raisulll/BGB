@@ -4,6 +4,11 @@ import { BrowserRouter } from 'react-router-dom';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import 'leaflet/dist/leaflet.css';
 // Spec #43 — Bangla glyphs, bundled so they work offline; each file loads only when Bengali text is shown
+// Interface fonts are bundled, so the app needs no internet (BGB intranet, specs #2, #43)
+import '@fontsource/inter/latin-400.css';
+import '@fontsource/inter/latin-500.css';
+import '@fontsource/inter/latin-600.css';
+import '@fontsource/inter/latin-700.css';
 import '@fontsource/noto-sans-bengali/bengali-400.css';
 import '@fontsource/noto-sans-bengali/bengali-500.css';
 import '@fontsource/noto-sans-bengali/bengali-600.css';
