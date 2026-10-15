@@ -44,7 +44,7 @@ export default function IncidentComments({ incident, onUpdated }) {
                   {timeAgo(c.date, t)}
                 </span>
               </div>
-              <p className="whitespace-pre-line break-words text-sm text-gray-700">{c.body}</p>
+              <p className="whitespace-pre-line text-sm text-gray-700">{c.body}</p>
             </li>
           ))}
         </ul>

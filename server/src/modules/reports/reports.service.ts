@@ -61,6 +61,8 @@ export async function summary(user: AuthUser, f: IncidentFilters) {
   return {
     total,
     pendingReview: sum(PENDING),
+    // Spec #17 — incidents that have passed verification (Verified, then Approved or Closed)
+    verified: sum(['Verified', 'Approved', 'Closed']),
     returned: byStatus.Returned ?? 0,
     approved: byStatus.Approved ?? 0,
     closed: byStatus.Closed ?? 0,

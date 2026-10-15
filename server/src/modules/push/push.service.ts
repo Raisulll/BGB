@@ -20,7 +20,9 @@ type AuthUser = Express.AuthUser;
 export type PushPayload =
   | { kind: 'message'; conversationId: number; senderName: string; groupTitle: string | null; voice: boolean }
   | { kind: 'call'; callId: number; callerName: string; ringSeconds: number; declineToken: string }
-  | { kind: 'call-ended'; callId: number; callerName: string; missed: boolean };
+  | { kind: 'call-ended'; callId: number; callerName: string; missed: boolean }
+  // Flash Alert: reference, priority and sender only; the content is read in the app after sign-in
+  | { kind: 'alert'; alertId: number; reference: string; priority: string; senderName: string; event: 'raised' | 'updated' };
 
 let configured: boolean | null = null;
 export function pushEnabled() {

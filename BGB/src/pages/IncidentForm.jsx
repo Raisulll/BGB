@@ -6,10 +6,11 @@ import * as incidentsApi from '../api/incidents';
 import { errorMessage } from '../api/client';
 import useApi from '../hooks/useApi';
 import useUnsavedChanges from '../hooks/useUnsavedChanges';
-import { cn, FILE_ICONS, fileKind, formatDateTime, formatFileSize, SEVERITY_HEX, todayISO } from '../utils/helpers';
+import { cn, EVIDENCE_EXTENSIONS, EVIDENCE_TYPES, FILE_ICONS, fileKind, formatDateTime, formatFileSize, isAllowedEvidenceFile, SEVERITY_HEX, todayISO } from '../utils/helpers';
 import Card from '../components/ui/Card';
 import EvidenceMedia, { LocalMedia, PREVIEW_TYPES } from '../components/incidents/EvidenceMedia';
 import ReasonBanner from '../components/incidents/ReasonBanner';
+import ReasonDialog from '../components/ui/ReasonDialog';
 import DuplicateWarning from '../components/incidents/DuplicateWarning';
 import ErrorState from '../components/ui/ErrorState';
 import Spinner from '../components/ui/Spinner';
@@ -54,7 +55,9 @@ const MIN_LENGTH = { title: 3, description: 10 };
 const STEP_OF = { title: 1, date: 1, time: 1, category: 1, subcategory: 1, severity: 1, sector: 2, battalion: 2, bop: 2, location: 2, lat: 2, lng: 2 };
 
 // Mirrors the server's upload rules (evidence.router.ts); the server checks file content and is authoritative
-const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf', 'video/mp4', 'video/quicktime'];
+const ALLOWED_TYPES = EVIDENCE_TYPES;
+const ALLOWED_EXTENSIONS = EVIDENCE_EXTENSIONS;
+const isAllowedFile = isAllowedEvidenceFile;
 const MAX_FILE_MB = 50;
 const MAX_FILES_PER_UPLOAD = 10;
 
@@ -96,8 +99,8 @@ export default function IncidentForm() {
       );
     }
     if (!existing) return <Spinner />;
-    // Spec #25 — only the creator may edit, and only while Draft/Returned (server decides)
-    if (!existing.canEdit) return <Navigate to={`/incidents/${id}`} replace />;
+    // Spec #25 — the creator edits while Draft/Returned; spec #14 — a reviewer modifies before approval (server decides)
+    if (!existing.canEdit && !existing.canModify) return <Navigate to={`/incidents/${id}`} replace />;
   }
   return <IncidentFormBody key={existing?.id || 'new'} existing={existing} initialStep={Number(params.get('step')) || 1} />;
 }
@@ -118,7 +121,11 @@ function IncidentFormBody({ existing, initialStep }) {
   const [activeStep, setActiveStep] = useState(Math.min(3, Math.max(1, initialStep)));
   const [files, setFiles] = useState([]); // File objects waiting to be uploaded
   const [savedEvidence, setSavedEvidence] = useState(existing?.evidence || []);
-  const [saving, setSaving] = useState(null); // 'Draft' | 'Submitted'
+  const [saving, setSaving] = useState(null); // 'Draft' | 'Submitted' | 'Modify'
+  // Spec #14 — a supervisory officer modifying someone else's report before approval: no drafts,
+  // no evidence changes; the change needs a reason and is recorded in the timeline and audit trail
+  const reviewerMode = Boolean(existing && !existing.canEdit && existing.canModify);
+  const [askReason, setAskReason] = useState(false);
 
   // Warn before typed input or picked files are lost (not while a save is running)
   const [loadedForm] = useState(() => JSON.stringify(form));
@@ -192,7 +199,7 @@ function IncidentFormBody({ existing, initialStep }) {
     e.target.value = '';
     const ok = [];
     for (const f of picked) {
-      if (!ALLOWED_TYPES.includes(f.type)) showToast(t('form.badType', { name: f.name }), 'error');
+      if (!isAllowedFile(f)) showToast(t('form.badType', { name: f.name }), 'error');
       else if (f.size > MAX_FILE_MB * 1024 * 1024) showToast(t('form.tooBig', { name: f.name, mb: MAX_FILE_MB }), 'error');
       else ok.push(f);
     }
@@ -259,6 +266,28 @@ function IncidentFormBody({ existing, initialStep }) {
     }
   };
 
+  const requestModify = () => {
+    const found = validate('Submitted');
+    if (Object.keys(found).length) return showErrors(found);
+    setAskReason(true);
+  };
+
+  const saveModification = async (reason) => {
+    setSaving('Modify');
+    try {
+      await incidentsApi.update(existing.id, { ...toPayload(form), reason });
+    } catch (err) {
+      setSaving(null);
+      showToast(errorMessage(err), 'error');
+      applyServerErrors(err);
+      return;
+    }
+    setSaving(null);
+    setAskReason(false);
+    showToast(t('form.modified', { id: existing.id }), 'success');
+    navigate(`/incidents/${existing.id}`);
+  };
+
   const save = async (status) => {
     const found = validate(status);
     if (Object.keys(found).length) return showErrors(found);
@@ -309,7 +338,13 @@ function IncidentFormBody({ existing, initialStep }) {
       {/* A returned report: what the reviewer asked to change */}
       {existing && <ReasonBanner incident={existing} />}
 
-      {existing && <h2 className="text-lg font-semibold text-slate-900">{t('form.editTitle', { id: existing.id })}</h2>}
+      {existing && <h2 className="text-lg font-semibold text-slate-900">{t(reviewerMode ? 'form.modifyTitle' : 'form.editTitle', { id: existing.id })}</h2>}
+      {reviewerMode && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" role="note">
+          <i className="fas fa-info-circle mr-2" aria-hidden="true" />
+          {t('form.modifyNotice', { name: existing.createdByName })}
+        </div>
+      )}
 
       {/* Steps */}
       <ol className="grid grid-cols-3 gap-2 text-sm" aria-label={t('form.steps')}>
@@ -336,13 +371,14 @@ function IncidentFormBody({ existing, initialStep }) {
           id="incident-form"
           onSubmit={(e) => {
             e.preventDefault();
-            save('Submitted');
+            if (reviewerMode) requestModify();
+            else save('Submitted');
           }}
           className="space-y-6"
           noValidate
         >
           {/* Same place, around the same time: possibly already reported (advisory) */}
-          {activeStep >= 2 && <DuplicateWarning form={form} excludeId={existing?.id} />}
+          {activeStep >= 2 && !reviewerMode && <DuplicateWarning form={form} excludeId={existing?.id} />}
 
           {/* STEP 1: Basic Information & Threat Classification */}
           {activeStep === 1 && (
@@ -600,6 +636,8 @@ function IncidentFormBody({ existing, initialStep }) {
                 <label className="form-label text-xs font-bold text-gray-700 mb-1.5 block">
                   {t('form.evidenceLabel')}
                 </label>
+                {reviewerMode && <p className="text-xs text-slate-600">{t('form.modifyEvidenceNote')}</p>}
+                {!reviewerMode && (
                 <button
                   type="button"
                   onClick={() => fileRef.current?.click()}
@@ -611,7 +649,8 @@ function IncidentFormBody({ existing, initialStep }) {
                   </p>
                   <p className="mt-1 text-xs text-gray-400 font-medium">{t('form.uploadTypes', { mb: MAX_FILE_MB })}</p>
                 </button>
-                <input ref={fileRef} type="file" className="hidden" multiple accept={ALLOWED_TYPES.join(',')} onChange={handleFiles} />
+                )}
+                <input ref={fileRef} type="file" className="hidden" multiple accept={[...ALLOWED_TYPES, ...ALLOWED_EXTENSIONS].join(',')} onChange={handleFiles} />
 
                 {(savedEvidence.length > 0 || files.length > 0) && (
                   <ul className="mt-3 space-y-2">
@@ -631,9 +670,11 @@ function IncidentFormBody({ existing, initialStep }) {
                                 </p>
                               </div>
                             </div>
-                            <button type="button" onClick={() => removeSaved(ev)} className="btn btn-sm btn-danger-outline" title={t('form.removeFile')} aria-label={t('detail.removeAria', { name: ev.name })}>
-                              {t('common.remove')}
-                            </button>
+                            {!reviewerMode && (
+                              <button type="button" onClick={() => removeSaved(ev)} className="btn btn-sm btn-danger-outline" title={t('form.removeFile')} aria-label={t('detail.removeAria', { name: ev.name })}>
+                                {t('common.remove')}
+                              </button>
+                            )}
                           </div>
                           {ev.available && PREVIEW_TYPES.has(ev.mimeType) && <EvidenceMedia incidentId={existing.id} evidence={ev} size="small" />}
                         </li>
@@ -683,6 +724,12 @@ function IncidentFormBody({ existing, initialStep }) {
               {t('common.cancel')}
             </Link>
 
+            {reviewerMode ? (
+              <button type="submit" disabled={Boolean(saving)} className="btn btn-primary">
+                {saving === 'Modify' && <i className="fas fa-spinner fa-spin" aria-hidden="true" />}
+                {t('form.saveChanges')}
+              </button>
+            ) : (
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -701,9 +748,19 @@ function IncidentFormBody({ existing, initialStep }) {
                 </button>
               )}
             </div>
+            )}
           </div>
         </form>
       </Card>
+      <ReasonDialog
+        open={askReason}
+        title={t('form.modifyReasonTitle', { id: existing?.id })}
+        label={t('form.modifyReasonLabel')}
+        confirmLabel={t('form.saveChanges')}
+        busy={saving === 'Modify'}
+        onCancel={() => setAskReason(false)}
+        onConfirm={saveModification}
+      />
       {unsavedDialog}
     </div>
   );

@@ -7,6 +7,7 @@ import { useApp } from './AppContext';
 import { useToast } from './ToastContext';
 import { useI18n } from '../i18n/I18nContext';
 import { startTone } from '../utils/tones';
+import { canChooseOutput, listDevices, savedDevices, saveDevice } from '../utils/audioDevices';
 import { closeNotifications, resumePush, tellWorkerLanguage } from '../utils/push';
 import CallPanel from '../components/messaging/CallPanel';
 
@@ -27,12 +28,32 @@ import CallPanel from '../components/messaging/CallPanel';
 // arrives, so it plays without another tap. If the browser still blocks it, the panel offers
 // "Turn on sound". While the call is up, the connection's statistics show whether audio actually
 // flows each way, and the panel says when it doesn't.
+//
+// In-call controls: mute, hold (both stop the microphone; hold also silences the other person),
+// speaker/earpiece or any output the browser lets a page choose, microphone choice, volume. Mute
+// and hold are told to the other side through call.signal {state}, so their panel can say so.
+// The connection quality comes from the same statistics, and the screen is kept awake.
+//
+// Incoming call while BIRDS is open: a full call screen (CallPanel), the ring tone, vibration
+// where the phone allows it, the tab title flashing when the tab is in the background, and the
+// screen kept on. "Decline with a message" declines and sends a ready reply in the chat.
 
 const CommsContext = createContext(null);
+
+/** Tells the other side whether this side is muted or holding (shown in their panel). */
+const sendState = (c) => {
+  if (c?.id) sendRealtime({ type: 'call.signal', callId: c.id, data: { state: { muted: Boolean(c.muted), held: Boolean(c.held) } } });
+};
 const UNREAD_POLL_MS = 60_000;
 const ICE_RESTART_WAIT_MS = 15_000; // how long the callee waits for the caller's ICE restart
 const STATS_MS = 2000;
+const VIBRATE = [700, 400, 700]; // repeated every RING_REPEAT_MS while an incoming call rings
+const RING_REPEAT_MS = 3000;
 const SILENT_CHECKS = 3; // ~6 s without audio bytes counts as "no sound"
+const AUDIO_CONSTRAINTS = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+
+/** good | fair | poor, from the round trip (s) and the share of audio packets lost. */
+const rateQuality = (rtt, loss) => (rtt < 0.3 && loss < 0.02 ? 'good' : rtt < 0.7 && loss < 0.08 ? 'fair' : 'poor');
 
 export function CommsProvider({ children }) {
   const { currentUser, hasPermission } = useApp();
@@ -47,6 +68,10 @@ export function CommsProvider({ children }) {
   const [call, setCall] = useState(null); // { id?, phase, other, answeredAt?, muted }
   const [soundBlocked, setSoundBlocked] = useState(false);
   const [audioHealth, setAudioHealth] = useState(null); // { incoming: bool, outgoing: bool } once measured
+  const [quality, setQuality] = useState(null); // 'good' | 'fair' | 'poor' once measured
+  const [remoteState, setRemoteState] = useState({ muted: false, held: false }); // what the other side told us
+  const [devices, setDevices] = useState({ inputs: [], outputs: [] });
+  const [audioPrefs, setAudioPrefs] = useState({ inputId: '', outputId: '', volume: 1 });
 
   const callRef = useRef(null);
   const pcRef = useRef(null);
@@ -59,6 +84,7 @@ export function CommsProvider({ children }) {
   const answerRef = useRef(null); // call id to answer as soon as it rings (Answer on the notification)
   const acceptRef = useRef(null);
   const iceRef = useRef({ restarted: false, timer: null }); // ICE restart after a failed audio path
+  const wakeRef = useRef(null); // screen wake lock while a call is up
 
   const updateCall = useCallback((next) => {
     callRef.current = typeof next === 'function' ? next(callRef.current) : next;
@@ -165,8 +191,11 @@ export function CommsProvider({ children }) {
     queueRef.current = [];
     if (audioRef.current) audioRef.current.srcObject = null;
     remoteRef.current = null;
+    if (audioRef.current) audioRef.current.muted = false;
     setSoundBlocked(false);
     setAudioHealth(null);
+    setQuality(null);
+    setRemoteState({ muted: false, held: false });
     updateCall(null);
   }, [updateCall]);
 
@@ -178,6 +207,9 @@ export function CommsProvider({ children }) {
     el.srcObject = remoteRef.current;
     el.muted = false;
     el.play?.().catch(() => {});
+    // The output chosen last time, if this browser lets a page choose
+    const saved = savedDevices().output;
+    if (saved && canChooseOutput()) el.setSinkId(saved).then(() => setAudioPrefs((p) => ({ ...p, outputId: saved }))).catch(() => {});
   }, []);
 
   /** "Turn on sound" in the panel (a tap, so the browser allows it). */
@@ -191,14 +223,85 @@ export function CommsProvider({ children }) {
   const getMic = useCallback(async () => {
     if (!navigator.mediaDevices?.getUserMedia) throw new Error(t('calls.noMicSupport'));
     try {
-      return await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: false });
+      const saved = savedDevices().input;
+      return await navigator.mediaDevices.getUserMedia({ audio: { ...AUDIO_CONSTRAINTS, ...(saved ? { deviceId: { ideal: saved } } : {}) }, video: false });
     } catch {
       throw new Error(t('calls.micDenied'));
     }
   }, [t]);
 
+  // ---------- Audio devices (named once the microphone is allowed) ----------
+  const refreshDevices = useCallback(async () => {
+    try {
+      const list = await listDevices();
+      setDevices(list);
+      const inputId = streamRef.current?.getAudioTracks()[0]?.getSettings?.().deviceId || '';
+      setAudioPrefs((p) => ({ ...p, inputId }));
+    } catch {}
+  }, []);
+
+  /** Plays the other person on this output (and remembers it for the next call). */
+  const setOutput = useCallback(
+    async (deviceId) => {
+      const el = audioRef.current;
+      if (!el || !canChooseOutput()) return;
+      try {
+        await el.setSinkId(deviceId);
+        saveDevice('output', deviceId);
+        setAudioPrefs((p) => ({ ...p, outputId: deviceId }));
+      } catch {
+        showToast(t('calls.outputFailed'), 'error');
+      }
+    },
+    [showToast, t],
+  );
+
+  /** Firefox lists outputs only after the person picks one in the browser's own prompt. */
+  const chooseOutput = useCallback(async () => {
+    try {
+      const device = await navigator.mediaDevices.selectAudioOutput();
+      await setOutput(device.deviceId);
+      await refreshDevices();
+    } catch {}
+  }, [refreshDevices, setOutput]);
+
+  /** Sends from another microphone without interrupting the call. */
+  const setInput = useCallback(
+    async (deviceId) => {
+      const c = callRef.current;
+      if (!c || !streamRef.current) return;
+      let next;
+      try {
+        next = await navigator.mediaDevices.getUserMedia({ audio: { ...AUDIO_CONSTRAINTS, deviceId: { exact: deviceId } }, video: false });
+      } catch {
+        return showToast(t('calls.micSwitchFailed'), 'error');
+      }
+      const track = next.getAudioTracks()[0];
+      track.enabled = !(c.muted || c.held);
+      const sender = pcRef.current?.getSenders().find((x) => x.track?.kind === 'audio');
+      try {
+        if (sender) await sender.replaceTrack(track);
+      } catch {
+        next.getTracks().forEach((x) => x.stop());
+        return showToast(t('calls.micSwitchFailed'), 'error');
+      }
+      streamRef.current.getTracks().forEach((x) => x.stop());
+      streamRef.current = next;
+      saveDevice('input', deviceId);
+      setAudioPrefs((p) => ({ ...p, inputId: deviceId }));
+    },
+    [showToast, t],
+  );
+
+  const setVolume = useCallback((volume) => {
+    if (audioRef.current) audioRef.current.volume = volume;
+    setAudioPrefs((p) => ({ ...p, volume }));
+  }, []);
+
   const applySignal = useCallback(async (pc, callId, data) => {
-    if (data.sdp) {
+    if (data.state) {
+      setRemoteState({ muted: Boolean(data.state.muted), held: Boolean(data.state.held) });
+    } else if (data.sdp) {
       await pc.setRemoteDescription(data.sdp);
       if (data.sdp.type === 'offer') {
         await pc.setLocalDescription(await pc.createAnswer());
@@ -244,6 +347,7 @@ export function CommsProvider({ children }) {
           clearTimeout(iceRef.current.timer);
           iceRef.current.timer = null;
           updateCall((c) => (c && !c.answeredAt ? { ...c, phase: 'active', answeredAt: Date.now() } : c));
+          sendState(callRef.current);
         } else if (pc.connectionState === 'failed') {
           if (iceRef.current.restarted || iceRef.current.timer) return giveUp();
           if (callRef.current?.role === 'caller') {
@@ -282,6 +386,7 @@ export function CommsProvider({ children }) {
         cleanup();
         return showToast(err.message, 'error');
       }
+      refreshDevices();
       if (!callRef.current) {
         // Hung up while the microphone prompt was open
         streamRef.current.getTracks().forEach((track) => track.stop());
@@ -293,7 +398,7 @@ export function CommsProvider({ children }) {
         showToast(t('msg.offline'), 'error');
       }
     },
-    [cleanup, getMic, showToast, t, unlockAudio, updateCall],
+    [cleanup, getMic, refreshDevices, showToast, t, unlockAudio, updateCall],
   );
 
   const acceptCall = useCallback(async () => {
@@ -304,6 +409,7 @@ export function CommsProvider({ children }) {
     updateCall({ ...c, phase: 'connecting' });
     try {
       streamRef.current = await getMic();
+      refreshDevices();
       await createPeer(c.id);
     } catch (err) {
       sendRealtime({ type: 'call.decline', callId: c.id });
@@ -311,7 +417,7 @@ export function CommsProvider({ children }) {
       return showToast(err.message || t('calls.connectionFailed'), 'error');
     }
     sendRealtime({ type: 'call.accept', callId: c.id });
-  }, [cleanup, createPeer, getMic, showToast, t, unlockAudio, updateCall]);
+  }, [cleanup, createPeer, getMic, refreshDevices, showToast, t, unlockAudio, updateCall]);
   acceptRef.current = acceptCall;
 
   // Is audio flowing? Bytes received/sent on the audio streams, every couple of seconds
@@ -320,20 +426,34 @@ export function CommsProvider({ children }) {
     if (!active) return;
     let last = { in: -1, out: -1 };
     let silent = { in: 0, out: 0 };
+    let packets = { lost: 0, received: 0 };
     const id = setInterval(async () => {
       const pc = pcRef.current;
       if (!pc) return;
       let bytesIn = 0;
       let bytesOut = 0;
+      let lost = 0;
+      let received = 0;
+      let rtt = null;
       try {
         (await pc.getStats()).forEach((r) => {
+          if (r.type === 'candidate-pair' && r.nominated && r.state === 'succeeded' && r.currentRoundTripTime != null) rtt = r.currentRoundTripTime;
           if (r.kind !== 'audio') return;
-          if (r.type === 'inbound-rtp') bytesIn += r.bytesReceived || 0;
+          if (r.type === 'inbound-rtp') {
+            bytesIn += r.bytesReceived || 0;
+            lost += r.packetsLost || 0;
+            received += r.packetsReceived || 0;
+          }
           if (r.type === 'outbound-rtp') bytesOut += r.bytesSent || 0;
         });
       } catch {
         return;
       }
+      // Packets lost out of those expected since the last check
+      const dLost = Math.max(0, lost - packets.lost);
+      const dExpected = dLost + Math.max(0, received - packets.received);
+      packets = { lost, received };
+      if (rtt != null || dExpected) setQuality(rateQuality(rtt ?? 0, dExpected ? dLost / dExpected : 0));
       silent = { in: bytesIn > last.in ? 0 : silent.in + 1, out: bytesOut > last.out ? 0 : silent.out + 1 };
       last = { in: bytesIn, out: bytesOut };
       setAudioHealth({ incoming: silent.in < SILENT_CHECKS, outgoing: silent.out < SILENT_CHECKS });
@@ -348,6 +468,23 @@ export function CommsProvider({ children }) {
     cleanup();
   }, [cleanup]);
 
+  /** Declines and sends a ready reply in the chat with the caller. */
+  const declineWithMessage = useCallback(
+    async (text) => {
+      const other = callRef.current?.other;
+      declineCall();
+      if (!other) return;
+      try {
+        const conv = await messagingApi.openDirect(other.id);
+        await messagingApi.send(conv.id, text);
+        showToast(t('calls.replySent', { name: other.name }), 'success');
+      } catch {
+        showToast(t('calls.replyFailed'), 'error');
+      }
+    },
+    [declineCall, showToast, t],
+  );
+
   const hangUp = useCallback(() => {
     const c = callRef.current;
     if (!c) return;
@@ -357,13 +494,93 @@ export function CommsProvider({ children }) {
     cleanup();
   }, [cleanup, declineCall]);
 
+  // Microphone on only when neither muted nor on hold; the other side is told either way
+  const applyMicAndHold = useCallback(
+    (c) => {
+      streamRef.current?.getAudioTracks().forEach((track) => (track.enabled = !(c.muted || c.held)));
+      if (audioRef.current) audioRef.current.muted = Boolean(c.held);
+      updateCall(c);
+      sendState(c);
+    },
+    [updateCall],
+  );
+
   const toggleMute = useCallback(() => {
     const c = callRef.current;
     if (!c || !streamRef.current) return;
-    const muted = !c.muted;
-    streamRef.current.getAudioTracks().forEach((track) => (track.enabled = !muted));
-    updateCall({ ...c, muted });
-  }, [updateCall]);
+    applyMicAndHold({ ...c, muted: !c.muted });
+  }, [applyMicAndHold]);
+
+  const toggleHold = useCallback(() => {
+    const c = callRef.current;
+    if (!c || c.phase !== 'active') return;
+    applyMicAndHold({ ...c, held: !c.held });
+  }, [applyMicAndHold]);
+
+  /** The chat with the person on the call (every call is also an entry there). */
+  const openChat = useCallback(async () => {
+    const other = callRef.current?.other;
+    if (!other) return;
+    try {
+      const conv = await messagingApi.openDirect(other.id);
+      navigate(`/messages/${conv.id}`);
+    } catch {
+      showToast(t('msg.offline'), 'error');
+    }
+  }, [navigate, showToast, t]);
+
+  // Device list changes (headset plugged in, Bluetooth connected) while a call is up
+  const inCall = Boolean(call);
+  useEffect(() => {
+    if (!inCall || !navigator.mediaDevices?.addEventListener) return;
+    navigator.mediaDevices.addEventListener('devicechange', refreshDevices);
+    return () => navigator.mediaDevices.removeEventListener('devicechange', refreshDevices);
+  }, [inCall, refreshDevices]);
+
+  // Keep the screen on while a call rings in and during the call (a phone that sleeps may suspend
+  // the page and drop the call)
+  const ringingIn = call?.phase === 'incoming';
+  const keepAwake = active || ringingIn;
+  useEffect(() => {
+    if (!keepAwake || !navigator.wakeLock) return;
+    let released = false;
+    const lock = () =>
+      navigator.wakeLock
+        .request('screen')
+        .then((l) => (released ? l.release() : (wakeRef.current = l)))
+        .catch(() => {});
+    const onVisible = () => document.visibilityState === 'visible' && lock();
+    lock();
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      released = true;
+      document.removeEventListener('visibilitychange', onVisible);
+      wakeRef.current?.release().catch(() => {});
+      wakeRef.current = null;
+    };
+  }, [keepAwake]);
+
+  // While a call rings in: vibrate (Android browsers) and flash the tab title
+  const callerName = ringingIn ? call.other?.name || '' : '';
+  useEffect(() => {
+    if (!ringingIn) return;
+    const vibrate = () => navigator.vibrate?.(VIBRATE);
+    vibrate();
+    const buzz = setInterval(vibrate, RING_REPEAT_MS);
+    const title = document.title;
+    const alert = t('calls.incomingTitle', { name: callerName });
+    let on = false;
+    const flash = setInterval(() => {
+      on = !on;
+      document.title = on ? alert : title;
+    }, 1000);
+    return () => {
+      clearInterval(buzz);
+      clearInterval(flash);
+      navigator.vibrate?.(0);
+      document.title = title;
+    };
+  }, [ringingIn, callerName, t]);
 
   // Server -> browser call events
   useEffect(() => {
@@ -461,7 +678,10 @@ export function CommsProvider({ children }) {
     return onRealtimeStatus((up) => {
       const c = callRef.current;
       if (!c) return;
-      if (up && c.id) sendRealtime({ type: 'call.resume', callId: c.id });
+      if (up && c.id) {
+        sendRealtime({ type: 'call.resume', callId: c.id });
+        if (c.phase === 'active') sendState(c);
+      }
       else if (!up && !c.id) {
         cleanup();
         showToast(t('msg.offline'), 'error');
@@ -488,8 +708,8 @@ export function CommsProvider({ children }) {
   useEffect(() => cleanup, [cleanup]);
 
   const value = useMemo(
-    () => ({ enabled, connected, unread, refreshUnread, call, startCall, acceptCall, declineCall, hangUp, toggleMute }),
-    [enabled, connected, unread, refreshUnread, call, startCall, acceptCall, declineCall, hangUp, toggleMute],
+    () => ({ enabled, connected, unread, refreshUnread, call, startCall, acceptCall, declineCall, hangUp, toggleMute, toggleHold }),
+    [enabled, connected, unread, refreshUnread, call, startCall, acceptCall, declineCall, hangUp, toggleMute, toggleHold],
   );
 
   return (
@@ -504,8 +724,18 @@ export function CommsProvider({ children }) {
           onEnableSound={enableSound}
           onAccept={acceptCall}
           onDecline={declineCall}
+          onDeclineWithMessage={declineWithMessage}
           onHangUp={hangUp}
           onToggleMute={toggleMute}
+          onToggleHold={toggleHold}
+          onOpenChat={openChat}
+          quality={quality}
+          remoteState={remoteState}
+          audio={{ ...devices, ...audioPrefs, canChooseOutput: canChooseOutput(), canPickOutput: Boolean(navigator.mediaDevices?.selectAudioOutput) }}
+          onSetInput={setInput}
+          onSetOutput={setOutput}
+          onChooseOutput={chooseOutput}
+          onSetVolume={setVolume}
         />
       )}
     </CommsContext.Provider>

@@ -121,7 +121,7 @@ export default {
     "QUOTA_EXCEEDED": "Evidence storage limit for this incident reached.",
     "RATE_LIMITED": "Too many requests. Please wait and try again.",
     "SELF_CHANGE": "You cannot change your own role or deactivate yourself.",
-    "UNSUPPORTED_FILE_TYPE": "File type not allowed. Use JPEG, PNG, GIF, PDF, MP4 or MOV.",
+    "UNSUPPORTED_FILE_TYPE": "File type not allowed. Use JPEG, PNG, GIF, PDF, MP4, MOV, Word, Excel, PowerPoint, OpenDocument or RTF (no macros).",
     "VALIDATION_ERROR": "Some fields are missing or invalid.",
     "WRONG_PASSWORD": "The current password is incorrect."
   },
@@ -240,6 +240,7 @@ export default {
     "UNARCHIVE_INCIDENT": "Restore incident",
     "UNLOCK_USER": "Unlock user",
     "UPDATE_INCIDENT": "Update incident",
+    "MODIFY_INCIDENT": "Modify incident (reviewer)",
     "UPDATE_USER": "Update user",
     "UPLOAD_EVIDENCE": "Upload evidence",
     "UPLOAD_REJECTED": "Upload rejected",
@@ -247,7 +248,14 @@ export default {
     "VERIFY_EVIDENCE": "Verify evidence",
     "VERIFY_INCIDENT": "Verify incident",
     "VIEW_AUDIT_LOG": "View audit log",
-    "VIEW_EVIDENCE": "View evidence"
+    "VIEW_EVIDENCE": "View evidence",
+    "RAISE_FLASH_ALERT": "Raise Flash Alert",
+    "ACKNOWLEDGE_FLASH_ALERT": "Acknowledge Flash Alert",
+    "UPDATE_FLASH_ALERT": "Flash Alert update",
+    "RESOLVE_FLASH_ALERT": "Resolve Flash Alert",
+    "CANCEL_FLASH_ALERT": "Cancel Flash Alert",
+    "VIEW_ALERT_ATTACHMENT": "View alert attachment",
+    "DENIED_FLASH_ALERT": "Flash Alert action refused"
   },
   "callDirection": {
     "incoming": "Incoming",
@@ -272,6 +280,28 @@ export default {
     "ringing": "Ringing"
   },
   "calls": {
+    "audio": "Audio",
+    "chooseOutput": "Choose sound output",
+    "deviceDefault": "Default",
+    "heldNotice": "The call is on hold. {name} cannot hear you, and you cannot hear them.",
+    "hold": "Hold",
+    "incomingAudio": "Incoming audio call",
+    "incomingTitle": "Incoming call: {name}",
+    "message": "Message",
+    "micSwitchFailed": "That microphone could not be used.",
+    "microphone": "Microphone",
+    "minimise": "Minimise call panel",
+    "minimiseShort": "Minimise",
+    "onHold": "On hold",
+    "openChat": "Open chat",
+    "output": "Sound output",
+    "outputByDevice": "This browser plays the call on the device's own output. Use the phone's controls to switch between earpiece and speaker.",
+    "outputFailed": "The sound output could not be changed.",
+    "quality": {
+      "fair": "Weak connection",
+      "good": "Good connection",
+      "poor": "Poor connection"
+    },
     "reachOffline": "{name} is not signed in on any device. They will see a missed call when they sign in.",
     "reachPush": "{name} is not in BIRDS right now; the call rings on their phone.",
     "alreadyInCall": "You are already in a call.",
@@ -308,7 +338,19 @@ export default {
     "noMicSupport": "This browser cannot use a microphone here. Calls need a secure (HTTPS) connection.",
     "noSoundIn": "No sound is arriving from {name}. Their microphone may be off or blocked.",
     "noSoundOut": "Your microphone is not sending sound. Check that BIRDS may use the microphone.",
+    "remoteHeld": "{name} has put the call on hold.",
+    "remoteMuted": "{name} has muted their microphone.",
+    "reply": {
+      "busy": "I can't talk right now. I'll call you back.",
+      "duty": "I'm on duty. Please send me a message.",
+      "later": "Please call me again in 10 minutes."
+    },
+    "replyFailed": "The call was declined, but the message could not be sent.",
+    "replySent": "Message sent to {name}.",
+    "replyTitle": "Decline with a message",
+    "resume": "Resume",
     "ringing": "Ringing",
+    "show": "Show",
     "starting": "Starting call",
     "tab": {
       "all": "All calls",
@@ -323,6 +365,9 @@ export default {
       "noAnswer": "{name} did not answer."
     },
     "turnOnSound": "Turn on sound",
+    "useEarpiece": "Earpiece",
+    "useSpeaker": "Speaker",
+    "volume": "Volume",
     "unmute": "Unmute"
   },
   "cat": {
@@ -423,6 +468,8 @@ export default {
     "kpiOpen": "Open",
     "kpiPending": "Awaiting review or approval",
     "kpiTotal": "Total filed",
+    "kpiVerified": "Verified",
+    "kpiVerifiedNote": "Passed verification, including approved and closed",
     "map": "GIS map",
     "nIncidents": "{n} incidents",
     "noSector": "No filed incidents in your area yet.",
@@ -469,6 +516,9 @@ export default {
     "attachments": "Attachments",
     "back": "Back to incidents",
     "captured": "captured {date}",
+    "docAuthor": "author {name}",
+    "docCreated": "created {date}",
+    "docModified": "modified {date}",
     "commentLabel": "Add a comment",
     "commentNote": "Comments are part of the record and can't be edited or deleted.",
     "commentPh": "Ask a question or add information for the team handling this report…",
@@ -484,6 +534,7 @@ export default {
     "discard": "Discard draft",
     "discardHint": "The draft disappears from all lists. It is kept in the audit record. Reason (optional):",
     "discardTitle": "Discard draft {id}?",
+    "modify": "Modify report",
     "discarded": "Draft {id} discarded",
     "downloadAria": "Download {name}",
     "enlarge": "Enlarge",
@@ -551,7 +602,7 @@ export default {
   "form": {
     "actionPh": "e.g. Contraband seized, case filed",
     "attached": "Attached {n} file(s); they upload when you save",
-    "badType": "{name}: only JPEG, PNG, GIF, PDF, MP4 and MOV files are accepted",
+    "badType": "{name}: only photos, PDF, video and office documents are accepted",
     "basicHint": "Specify the report title, incident category, and threat level",
     "basicTitle": "Basic information & classification",
     "bopLabel": "BOP",
@@ -561,6 +612,13 @@ export default {
     "detailsTitle": "Operational details & evidence",
     "detectGps": "Detect GPS",
     "editTitle": "Edit incident {id}",
+    "modified": "{id} modified; the change is recorded and the filing officer notified",
+    "modifyEvidenceNote": "Evidence files are added or removed by the filing officer. Return the report if evidence is missing.",
+    "modifyNotice": "You are modifying a report filed by {name} before approval. You will be asked for a reason; the change is recorded field by field in the timeline and the audit trail, and the filing officer is notified.",
+    "modifyReasonLabel": "Reason for the change (recorded in the timeline and audit trail)",
+    "modifyReasonTitle": "Save changes to {id}",
+    "modifyTitle": "Modify incident {id}",
+    "saveChanges": "Save changes",
     "evidenceLabel": "Evidence & media attachments",
     "futureDate": "The incident date cannot be in the future",
     "gpsFailed": "Could not get a GPS fix. Enter coordinates manually.",
@@ -611,7 +669,7 @@ export default {
     "unsavedTitle": "Leave without saving?",
     "uploadCta": "Click to upload evidence files",
     "uploadFailed": "{id} saved, but evidence upload failed: {error}. Remove or replace the file and save again.",
-    "uploadTypes": "JPEG, PNG, GIF images, PDF documents, MP4/MOV video • max {mb} MB per file",
+    "uploadTypes": "JPEG, PNG, GIF images, PDF, MP4/MOV video, Word, Excel, PowerPoint, OpenDocument and RTF documents • max {mb} MB per file",
     "uploadedAt": "uploaded {date}",
     "uploadsOnSave": "uploads on save"
   },
@@ -632,6 +690,7 @@ export default {
     "activeOnly": "Active records",
     "allBattalions": "All battalions",
     "allBops": "All BOPs",
+    "allTypes": "All incident types",
     "allRecords": "All records",
     "allSectors": "All sectors",
     "anyWait": "Any waiting time",
@@ -858,7 +917,8 @@ export default {
     "messages": "Messages",
     "org": "Border Guard Bangladesh",
     "reports": "Reports",
-    "version": "Version {v}"
+    "version": "Version {v}",
+    "alerts": "Flash alerts"
   },
   "notif": {
     "all": "All",
@@ -1024,6 +1084,18 @@ export default {
     "reports": {
       "subtitle": "Generate PDF/Excel official documents",
       "title": "Reports"
+    },
+    "alerts": {
+      "title": "Flash alerts",
+      "subtitle": "Urgent border threat warnings"
+    },
+    "alertNew": {
+      "title": "Raise Flash Alert",
+      "subtitle": "Warn the units in the threatened area"
+    },
+    "alertDetail": {
+      "title": "Flash Alert",
+      "subtitle": "Alert details and acknowledgement"
     }
   },
   "password": {
@@ -1070,7 +1142,8 @@ export default {
       "incidents": "Incident list",
       "map": "GIS map view",
       "messages": "Messages and calls",
-      "reports": "Exportable reports"
+      "reports": "Exportable reports",
+      "raise_alert": "Raise Flash Alerts"
     },
     "moduleHeader": "System module",
     "modulesCount": "{n} / {total} modules",
@@ -1453,6 +1526,7 @@ export default {
     "Edited": "Edited",
     "Evidence added": "Evidence added",
     "Evidence removed": "Evidence removed",
+    "Modified by reviewer": "Modified by reviewer",
     "Rejected": "Rejected",
     "Restored from archive": "Restored from archive",
     "Resubmitted": "Resubmitted",
@@ -1528,13 +1602,15 @@ export default {
       "draftReturned": "Draft / returned"
     },
     "lifecycle": "Incident progression lifecycle",
+    "modify": "Modification before approval",
+    "modifyText": "While a report is submitted, reviewed or verified, an officer who may act on it at that stage can modify it. A reason is required; each changed field is recorded with its old and new value, and the filing officer is notified.",
     "rule": {
       "approve": "Final approval for inclusion in national command reporting.",
       "close": "Permanent closure. Closed records cannot be modified.",
       "reject": "Rejected as invalid or unfounded. A reason is mandatory; the record is kept.",
       "return": "Sent back to the filing officer for correction. A reason is mandatory and is shown in the timeline.",
       "review": "Preliminary cross-check of the reported facts by Sector HQ or higher.",
-      "submit": "Only the officer who created the report can edit and submit it, and only while it is a Draft or Returned.",
+      "submit": "Only the officer who created the report can submit it, and edit it while it is a Draft or Returned.",
       "verify": "Formal confirmation of evidence and intelligence."
     },
     "rules": "State transition authorization rules",
@@ -1552,5 +1628,149 @@ export default {
     "thRule": "Rule",
     "thTransition": "Transition",
     "title": "Workflow pipeline & authorization matrix"
+  },
+  "alerts": {
+    "flashAlert": "Flash Alert",
+    "newUpdate": "{ref}: new update from the sender",
+    "morePending": "{n} more waiting",
+    "areaLabel": "Area: {area}",
+    "area": "Area",
+    "allUnits": "All units",
+    "subject": "Subject",
+    "lastSeen": "Last seen",
+    "validUntil": "Valid until",
+    "untilShort": "until {time}",
+    "intelligence": "Intelligence",
+    "actionRequired": "Action required",
+    "sentBy": "Sent by {name}, {role}, {unit}, at {time}",
+    "attachmentsCount": "{n} attachment(s)",
+    "acknowledge": "Acknowledge",
+    "acknowledgeOpen": "Acknowledge and open the full alert",
+    "silence": "Silence alarm",
+    "ackNote": "Acknowledging records that you have received and read this alert. The sender and HQ see who has acknowledged.",
+    "acknowledged": "Alert acknowledged",
+    "activeRegion": "Active Flash Alerts",
+    "activeCount": "{n} active alerts",
+    "view": "View alert",
+    "moreActive": "{n} more active alerts",
+    "views": "Alert views",
+    "tab": {
+      "active": "Active",
+      "closed": "Closed",
+      "all": "All"
+    },
+    "raise": "Raise Flash Alert",
+    "empty": {
+      "active": "No active Flash Alerts",
+      "closed": "No closed Flash Alerts",
+      "all": "No Flash Alerts"
+    },
+    "emptyHint": "Alerts sent to your area appear here and on screen as soon as they are raised.",
+    "youAcknowledged": "You acknowledged",
+    "youNotAcknowledged": "Not acknowledged by you",
+    "youAcknowledgedAt": "You acknowledged at {time}",
+    "byName": "by {name}",
+    "ackProgress": "{n} of {total} acknowledged",
+    "deliveredCount": "{n} of {total} received on a device",
+    "pageOf": "Page {page} of {total}",
+    "prevPage": "Previous page",
+    "nextPage": "Next page",
+    "notFound": "Alert not found, or not addressed to you.",
+    "linkedIncident": "Related incident",
+    "back": "Back to Flash Alerts",
+    "closedAs": {
+      "resolved": "Resolved by {name} at {time}:",
+      "cancelled": "Cancelled by {name} at {time}:"
+    },
+    "resolve": "Resolve alert",
+    "cancelAlert": "Cancel alert",
+    "evidence": "Evidence ({n})",
+    "updates": "Updates ({n})",
+    "noUpdates": "No updates yet.",
+    "updateKind": {
+      "update": "Update",
+      "resolved": "Resolved",
+      "cancelled": "Cancelled"
+    },
+    "updatePh": "New information for all recipients (sightings, changes, instructions)",
+    "postUpdate": "Send update",
+    "updatePosted": "Update sent to all recipients",
+    "delivery": "Acknowledgement",
+    "ackAt": "Acknowledged {time}",
+    "seenAt": "Received {time}, not acknowledged",
+    "notDelivered": "Not yet received",
+    "declarationRecord": "{name} accepted the false-alert declaration at {time}. Raising a false alert is a punishable offence.",
+    "resolveTitle": "Resolve {ref}",
+    "resolveLabel": "Outcome (for example: apprehended at 02:15 by BOP Teknaf patrol)",
+    "resolvedToast": "Alert resolved; all recipients are informed",
+    "cancelTitle": "Cancel {ref}",
+    "cancelLabel": "Reason for cancelling (for example: information not confirmed)",
+    "cancelledToast": "Alert cancelled; all recipients are informed",
+    "form": {
+      "warningTitle": "Raising a false alert is a punishable offence",
+      "warningText": "A Flash Alert sets units along the border in motion at once and can put lives at risk. Raise one only on genuine information about an imminent threat. Your name, rank, unit and the time are recorded with the alert and in the audit trail. Knowingly raising a false, exaggerated or misleading alert may lead to disciplinary and legal action under the applicable laws and BGB rules.",
+      "threat": "Threat",
+      "title": "Alert title",
+      "titlePh": "For example: Armed smuggler expected to cross near pillar 12 tonight",
+      "threatType": "Type of threat",
+      "priority": "Priority",
+      "priorityHint": {
+        "flash": "Flash: act at once, the threat is imminent (hours).",
+        "immediate": "Immediate: act as soon as possible, the threat is expected soon."
+      },
+      "subjectSection": "Subject",
+      "subjectName": "Name or alias",
+      "subjectNameHint": "If known",
+      "linkedIncident": "Related incident (optional)",
+      "linkedIncidentHint": "Reference number of an incident already filed",
+      "subjectDescription": "Description",
+      "subjectDescriptionHint": "Appearance, clothing, vehicle or boat, companions, weapons",
+      "intelSection": "Intelligence and action",
+      "detailsHint": "What is expected to happen, where and when, and how reliable the information is",
+      "instructionsHint": "What the units must do: patrols, checkpoints, who to report to",
+      "lastSeenPlace": "Last seen at",
+      "lastSeenAt": "Last seen (date and time)",
+      "lat": "Latitude (optional)",
+      "lng": "Longitude (optional)",
+      "areaSection": "Area and validity",
+      "allUnits": "Send to all units in the country",
+      "areaRequired": "Choose at least one sector, or all units",
+      "reach": "This alert will be sent to {n} officers (with HQ).",
+      "reachNone": "Choose the area to see how many officers will receive the alert.",
+      "reachHint": "Every officer serving in the chosen sectors and every HQ-level officer receives it.",
+      "validity": "Valid for",
+      "hours": "{n} hours",
+      "days": "{n} days",
+      "evidenceSection": "Photos, videos and documents",
+      "addFiles": "Add files",
+      "declarationTitle": "Declaration",
+      "declarationText": "I, {name}, confirm that this alert is based on genuine information that I have reason to believe is accurate, and that it is raised for operational purposes only. I understand that raising a false or misleading alert is a punishable offence.",
+      "declarationRequired": "You must accept the declaration to raise a Flash Alert",
+      "incidentFormat": "Use the format BIRDS-2026-1080",
+      "review": "Review and send",
+      "confirmTitle": "Send this Flash Alert?",
+      "confirmText": "It will go at once, with {priority} priority, to {n} officers ({area}). Every recipient must acknowledge it.",
+      "confirmWarning": "Once sent, the alert can be cancelled only with a recorded reason. Your declaration is recorded.",
+      "send": "Send Flash Alert",
+      "sent": "{ref} sent to {n} officers"
+    }
+  },
+  "alertThreat": {
+    "illegal_crossing": "Illegal crossing",
+    "smuggling": "Smuggling",
+    "armed_group": "Armed group",
+    "trafficking": "Human trafficking",
+    "wanted_person": "Wanted person",
+    "other": "Other"
+  },
+  "alertPriority": {
+    "flash": "Flash",
+    "immediate": "Immediate"
+  },
+  "alertState": {
+    "active": "Active",
+    "expired": "Expired",
+    "resolved": "Resolved",
+    "cancelled": "Cancelled"
   }
 };

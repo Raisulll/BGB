@@ -24,6 +24,7 @@ const NOTES = [
   ['wf.sod', 'wf.sodText'],
   ['wf.aor', 'wf.aorText'],
   ['wf.concurrent', 'wf.concurrentText'],
+  ['wf.modify', 'wf.modifyText'], // spec #14
 ];
 
 export default function AdminWorkflow() {
@@ -70,7 +71,7 @@ export default function AdminWorkflow() {
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {NOTES.map(([title, text]) => (
           <div key={title} className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
             <p className="font-semibold text-slate-900">{t(title)}</p>

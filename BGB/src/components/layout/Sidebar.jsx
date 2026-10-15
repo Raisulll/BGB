@@ -1,11 +1,14 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { useComms } from '../../context/CommsContext';
+import { useAlerts } from '../../context/AlertsContext';
 import { cn } from '../../utils/helpers';
 import { useI18n } from '../../i18n/I18nContext';
 
 const NAV_ITEMS = [
   { id: 'dashboard', to: '/', icon: 'fa-tachometer-alt', match: (p) => p === '/' },
+  // Flash Alerts: every user receives them, so no page permission
+  { id: 'alerts', open: true, to: '/alerts', icon: 'fa-triangle-exclamation', badge: 'alerts' },
   { id: 'incidents', to: '/incidents', icon: 'fa-shield-alt', match: (p) => p.startsWith('/incidents') && p !== '/incidents/new' },
   { id: 'create', to: '/incidents/new', icon: 'fa-plus-circle', match: (p) => p === '/incidents/new' },
   { id: 'map', to: '/map', icon: 'fa-map-marked-alt' },
@@ -20,12 +23,13 @@ const NAV_ITEMS = [
 export default function Sidebar({ mobileOpen, collapsed, onClose, onToggleCollapse }) {
   const { currentUser, hasPermission } = useApp();
   const { unread } = useComms();
+  const { active: activeAlerts } = useAlerts();
   const { t } = useI18n();
   const { pathname } = useLocation();
   const hideOnDesktop = collapsed ? 'md:hidden' : '';
 
   // Nothing but the password form is reachable until a required change is done (spec #29)
-  const allowedItems = currentUser?.mustChangePassword ? [] : NAV_ITEMS.filter((item) => hasPermission(currentUser, item.perm || item.id));
+  const allowedItems = currentUser?.mustChangePassword ? [] : NAV_ITEMS.filter((item) => item.open || hasPermission(currentUser, item.perm || item.id));
 
   return (
     <aside
@@ -82,14 +86,14 @@ export default function Sidebar({ mobileOpen, collapsed, onClose, onToggleCollap
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
         {allowedItems.map((item) => {
           const active = item.match ? item.match(pathname) : pathname.startsWith(item.to);
-          const count = item.badge === 'unread' ? unread : 0;
+          const count = item.badge === 'unread' ? unread : item.badge === 'alerts' ? activeAlerts.length : 0;
 
           return (
             <Link
               key={item.to}
               to={item.to}
               title={collapsed ? t(`nav.${item.id}`) : undefined}
-              aria-label={count ? `${t(`nav.${item.id}`)}, ${t('msg.unreadCount', { n: count })}` : undefined}
+              aria-label={count ? `${t(`nav.${item.id}`)}, ${t(item.badge === 'alerts' ? 'alerts.activeCount' : 'msg.unreadCount', { n: count })}` : undefined}
               aria-current={active ? 'page' : undefined}
               className={cn(
                 'flex min-h-11 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors md:min-h-10',

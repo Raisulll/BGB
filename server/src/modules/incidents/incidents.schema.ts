@@ -41,7 +41,12 @@ export const createIncidentSchema = z
   .strict();
 
 // PATCH: any subset of the fields. Status changes go through the workflow endpoints.
-export const updateIncidentSchema = z.object(incidentFields).partial().strict();
+// A reviewer modifying someone else's report (spec #14) must give a reason.
+export const updateIncidentSchema = z
+  .object(incidentFields)
+  .partial()
+  .extend({ reason: trimmed(2_000).optional() })
+  .strict();
 
 // Duplicate check while filing (GET /incidents/similar)
 export const similarQuerySchema = z.object({
@@ -69,6 +74,7 @@ export const listIncidentsSchema = paginationSchema.extend({
   status: csv(STATUSES).optional(),
   severity: csv(SEVERITIES).optional(),
   category: trimmed(100).optional(),
+  subcategory: trimmed(100).optional(), // incident type (spec #16)
   sector: trimmed(50).optional(),
   battalion: trimmed(50).optional(),
   bop: trimmed(100).optional(),

@@ -8,6 +8,7 @@ import { prisma } from './db.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import { adminRouter } from './modules/admin/admin.router.js';
+import { alertsRouter } from './modules/alerts/alerts.router.js';
 import { auditRouter } from './modules/audit/audit.router.js';
 import { authRouter } from './modules/auth/auth.router.js';
 import { evidenceRouter } from './modules/evidence/evidence.router.js';
@@ -69,6 +70,7 @@ export function createApp() {
   api.use('/messaging', messagingRouter);
   api.use('/calls', callsRouter);
   api.use('/push', pushRouter);
+  api.use('/alerts', alertsRouter);
 
   app.use('/api/v1', api);
   if (env.API_DOCS) app.use('/api/docs', swaggerUiRouter());

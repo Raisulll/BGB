@@ -3,7 +3,7 @@ import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { bigJpeg, htmlDisguisedAsJpeg, jpegWithExif, pdf, png } from './fixtures.js';
+import { bigJpeg, docm, docx, htmlDisguisedAsJpeg, jpegWithExif, pdf, plainZip, png } from './fixtures.js';
 import { app, as, lastAudit, newIncident, prisma } from './helpers.js';
 
 type Client = Awaited<ReturnType<typeof as>>;
@@ -55,6 +55,26 @@ describe('upload (specs #10, #11)', () => {
     expect(res.body.error.code).toBe('UNSUPPORTED_FILE_TYPE');
     expect(await prisma.evidence.count({ where: { incidentId: id } })).toBe(0);
     expect((await lastAudit('UPLOAD_REJECTED'))?.details).toContain('photo.jpg');
+  });
+
+  it('accepts office documents with their document properties; refuses macro-enabled files and other archives', async () => {
+    const id = await draft();
+    const res = await operator.upload(ev(id), [[docx(), 'Seizure report.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']]);
+    expect(res.status).toBe(201);
+    expect(res.body[0]).toMatchObject({ mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    expect(res.body[0].metadata.document).toEqual({
+      title: 'Seizure report',
+      author: 'Capt. Rahim',
+      lastModifiedBy: 'Lt. Karim',
+      created: '2026-10-01T03:00:00Z',
+      modified: '2026-10-02T05:30:00Z',
+    });
+
+    for (const [buf, name] of [[docm(), 'macro.docx'], [plainZip(), 'archive.docx']] as const) {
+      const bad = await operator.upload(ev(id), [[buf, name, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']]);
+      expect(bad.status).toBe(415);
+    }
+    expect(await prisma.evidence.count({ where: { incidentId: id } })).toBe(1);
   });
 
   it('rejects one bad file without storing the good ones in the same batch', async () => {

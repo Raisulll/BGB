@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { coverObjectUrl } from '../../api/messaging';
 import { cn } from '../../utils/helpers';
 
-const SIZES = { xs: 'h-7 w-7 text-[11px]', sm: 'h-8 w-8 text-xs', md: 'h-10 w-10 text-sm', lg: 'h-12 w-12 text-base', xl: 'h-20 w-20 text-2xl' };
+const SIZES = { xs: 'h-7 w-7 text-[11px]', sm: 'h-8 w-8 text-xs', md: 'h-10 w-10 text-sm', lg: 'h-12 w-12 text-base', xl: 'h-20 w-20 text-2xl', '2xl': 'h-28 w-28 text-4xl' };
 
 // Muted tints so people are told apart at a glance; never red/amber/orange (reserved for alerts)
 const TINTS = ['bg-bgb-100 text-bgb-800', 'bg-sky-100 text-sky-800', 'bg-indigo-100 text-indigo-800', 'bg-teal-100 text-teal-800', 'bg-slate-200 text-slate-800', 'bg-violet-100 text-violet-800'];

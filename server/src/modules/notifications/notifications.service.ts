@@ -7,7 +7,7 @@ import { enqueueWorkflowEmails, type EmailEvent } from './mailer.js';
 // have the incident inside their access scope. The actor never notifies themself.
 type Tx = Prisma.TransactionClient;
 
-export type WorkflowEvent = 'submitted' | 'reviewed' | 'verified' | 'approved' | 'closed' | 'returned' | 'rejected';
+export type WorkflowEvent = 'submitted' | 'reviewed' | 'verified' | 'approved' | 'closed' | 'returned' | 'rejected' | 'modified';
 
 interface IncidentRef {
   id: string;
@@ -29,6 +29,8 @@ const ROUTING: Record<WorkflowEvent, { roles: string[]; notifyCreator: boolean; 
   closed: { roles: [], notifyCreator: true, title: 'Incident Closed', type: 'review' },
   returned: { roles: [], notifyCreator: true, title: 'Incident Returned', type: 'return' },
   rejected: { roles: [], notifyCreator: true, title: 'Incident Rejected', type: 'review' },
+  // A reviewer changed the filer's report before approval (spec #14)
+  modified: { roles: [], notifyCreator: true, title: 'Incident Modified', type: 'review' },
 };
 
 export async function notifyWorkflow(tx: Tx, incident: IncidentRef, event: WorkflowEvent, actor: { id: string; name: string }, notes?: string | null) {

@@ -237,7 +237,7 @@ export default function OfficialReport({ report, printed, annex, previews }) {
                       <td className={`${TD} ${NUM}`}>{idx + 1}</td>
                       <td className={`${TD} whitespace-nowrap`}>{i.id}</td>
                       <td className={`${TD} whitespace-nowrap`}>{formatDateDisplay(i.date)}</td>
-                      <td className={TD}>{i.title}</td>
+                      <td className={`${TD} wrap-anywhere`}>{i.title}</td>
                       <td className={TD}>{i.category}</td>
                       <td className={TD}>{[i.battalion, i.bop].filter(Boolean).join(' / ')}</td>
                       <td className={`${TD} ${i.severity === 'Critical' ? 'font-semibold' : ''}`}>{tv('severity', i.severity)}</td>

@@ -783,6 +783,116 @@ Added after the session summary: deferred items now appear in **Admin › Operat
 - Calls made before this change are not back-filled (inserting them would put old entries after newer messages, since threads are ordered by id). Reloading the demo dataset gives the full history.
 
 ### Next session — TODO
-1. Deploy to Render, run `prisma migrate deploy` (runs on start) and reload the demo dataset (`DEMO_RESET=yes npm run db:demo`) so the live chats show the call history; locally the same `db:demo` if wanted.
+1. Live: Render does NOT run migrations (build = npm ci + build, start = npm start). First `DOTENV_CONFIG_PATH=.env.live npx prisma migrate deploy` from `server/` (new code needs `messages.call_id`), then push/deploy, then `DOTENV_CONFIG_PATH=.env.live DEMO_RESET=yes npm run db:demo` so the live chats show the call history; locally `DEMO_RESET=yes npm run db:demo` if wanted.
 2. Signature/seal for the tender soft copy once the owner sends them.
 3. Earlier items stand: delete `server/.env.live`, reset the Supabase password, re-make video 07, commit and push.
+
+---
+## Session — 2026-10-13 (continued) — in-call controls, long-text overflow
+
+### What was done
+- **In-call controls** (`components/messaging/CallPanel.jsx`, `context/CommsContext.jsx`, new `utils/audioDevices.js`): Mute (existing), **Speaker / Earpiece** one-tap switch (shown where the browser lets a page choose the output and names both, i.e. some phones), **Hold / Resume** (stops the microphone and silences the other person), **Audio** settings (microphone list with live switch via `replaceTrack`, sound output list via `setSinkId`, Firefox "Choose sound output" via `selectAudioOutput`, volume slider; where the browser can't choose an output it says so), **Open chat** with the person, **Minimise** to a one-line bar (Show / Hang up), Hang up. Mute and hold are sent to the other side as `call.signal {state}` (server relays it unchanged; comment updated), so their panel says "X has muted their microphone" / "X has put the call on hold"; resent after a reconnect. **Connection quality** (good / weak / poor from round-trip time and packet loss in the existing stats loop). **Screen wake lock** during the call. Last microphone/output remembered per browser (localStorage, convenience only). "No sound" warnings suppressed while either side is muted or holding on purpose. 23 `calls.*` keys in en + bn (`i18n:check` OK).
+- **Long unbroken text overflowing on phones**: `body { overflow-wrap: anywhere }` in `index.css` (breaks inside a word only when nothing else fits), tables keep `break-word` and scroll in their own box; explicit `break-words` classes that overrode it removed; chat bubble column gets `min-w-0`; print cells of user text (`IncidentAnnex`, `OfficialReport`) use `wrap-anywhere`.
+- Verified in headless Chrome with fake microphones (two users, phone 390 px + desktop): long text wraps with no sideways scroll; call connects, "Good connection" shown; mute and hold reach the other side; hold mutes playback; device lists fill (3 inputs, 4 outputs); volume 0.4 applied; minimise/show; Open chat navigates; call entries appear in both chats after hang-up. Speaker/earpiece toggle not testable on a computer (needs a phone that names both outputs).
+
+### Decisions & rationale
+- Speaker/earpiece only where the browser exposes the routes: a web page cannot force the route on iPhone (no `setSinkId`) and on many Android browsers; there the panel shows the Audio settings note instead of a button that would do nothing.
+- Global `overflow-wrap: anywhere` instead of per-field fixes, so every current and future user-text spot is covered; tables excluded so their columns don't squeeze words.
+
+### Next session — TODO
+1. Owner: test on real phones (Android Chrome, iPhone Safari) whether the Speaker/Earpiece button appears, and report the phone/browser if not.
+2. Live deploy steps from the previous block (migrate live DB first, deploy, reload demo dataset).
+3. Commit and push.
+
+---
+## Session — 2026-10-13 (continued) — incoming call screen
+
+### What was done
+- **Incoming call screen** (`CallPanel.jsx` `IncomingScreen`): when BIRDS is open, an incoming call takes the whole screen on a phone (large photo/initials, name, role · unit, round Decline / Message / Answer buttons with their names) and is a dialog over a dimmed page on a computer. Answer has focus; nothing scrolls behind it.
+- **Decline with a message**: three ready replies (en + bn: can't talk / on duty / call again in 10 minutes); declines and sends the reply in the chat with the caller (`declineWithMessage` in `CommsContext.jsx`), toast on success or failure.
+- While a call rings in: vibration on Android browsers (`navigator.vibrate`, repeated every 3 s, stopped on answer/decline), the tab title alternates with "Incoming call: {name}", the screen is kept awake (wake lock now covers ringing too).
+- **Phone in-call view** is full screen (person in the middle, controls at the bottom, round Hang up); **Minimise** returns to the app with a one-line bar; Open chat minimises first. Computers keep the bottom-right card. Avatar gets a `2xl` size. 10 new `calls.*` keys in en + bn.
+- Verified in headless Chrome (phone 390 px + computer): full-screen incoming on the phone, vibration pattern recorded and cancelled, reply sent and shown in the caller's chat after "Call declined", full-screen call with quality, minimise/show, phone ringing screen, computer incoming dialog, answer and hang up. Fixed: the Message button's icon was white on white.
+
+### Decisions & rationale
+- A web page cannot wake a locked phone or show over other apps; that remains the push notification's job. The full screen applies whenever BIRDS is open (any tab state), which is what a browser allows.
+- No pulsing/animation on the incoming screen (government style); ring tone and vibration carry the urgency.
+
+### Next session — TODO
+1. Owner: test on real phones (incoming screen, vibration on Android, speaker/earpiece button).
+2. Live deploy steps (migrate live DB first, deploy, reload demo dataset); commit and push.
+
+---
+## Session — 2026-10-15 (BST)
+
+### What was done
+- Tender documents 01–05 now use the official Grace International letterhead (from `Final Submission Documents/Grace_International_Editable_Notepad.docx`): `tender-submission/build/build.js` draws the pad's header wave + company name and footer wave + address/phone/e-mail/QR on every page, with the pad's margins; document name, e-GP number and "Page X of Y" sit in the footer, right-aligned beside the address lines and left of the QR code. Landscape annexes use stretched waves (`build/letterhead/*-wide.png`, QR not distorted). Duplicate tenderer-name line removed from document tops.
+- Regenerated DOCX, exported PDFs with Word (`tender-submission/PDF's/`), copied DOCX + PDF to `Final Submission Documents/`. Previous versions in `tender-submission/backup-before-letterhead/`.
+
+### Decisions & rationale
+- Letterhead built into the generator rather than pasted by hand, so regenerating keeps it.
+- Presentation: separate letterhead copy `06-...-Letterhead.pptx` (+ PDF) made by `build/letterhead-deck.py` from the finished deck (content scaled into the space between the bands); the original deck is unchanged. Video (07) not on the pad.
+
+### Next session — TODO
+- Re-make the demonstration video; remaining items from the previous session.
+
+---
+## Session — 2026-10-15 (BST), part 2: spec mismatch fixes
+
+### What was done
+- Reviewed all tender documents against `projectDetails.md`. Document 01 matches the specification word for word (58 rows, rules 1–5, headings). Logical mismatches found and fixed below.
+- **#17**: dashboard "Verified" card (Verified + Approved + Closed; `summary.verified`).
+- **#16**: incident type (sub-category) filter: `subcategory` on `/incidents` and the shared report filters; Incidents page select narrowed by category.
+- **#14**: reviewer modifies before approval: `PATCH /incidents/:id` now `incidents` permission; an officer with a workflow action on someone else's Submitted/Reviewed/Verified report (`canModify`, `canModifyAsReviewer` in `workflow.ts`) edits with a required `reason`; only changed fields written; `MODIFY_INCIDENT` audit with old → new values; timeline "Modified by reviewer"; creator notified ("Incident Modified"). UI: "Modify report" button, form in reviewer mode (notice, no drafts/evidence changes, reason dialog), Admin › Workflow note; edit route now `incidents`.
+- **#10/#11**: office documents as evidence: DOCX/XLSX/PPTX, DOC/XLS/PPT, ODT/ODS/ODP, RTF, detected on content (`evidence/zip.ts`, `fileType.ts`), macro-enabled refused; document properties (title, author, last modified by, created, modified) in `metadata.document`, shown on the incident page and in printouts.
+- Tests: 171 server tests pass (new: reviewer modify, type filter, verified count, office documents); frontend build and i18n check (1,375 keys) pass; checked in Chrome against the local server.
+- Wording: Annex A #10, #11, #12 (investigation notes as comments), #14, #16, #17, #25; Annex B terms c and d (features that serve a specified item are not removable), SMTP row; Demo Guide (ten scenes, modify step, type filter, Verified card, Word file); Technical Proposal (integrity, uploads, workflow, 171 tests).
+- Deck: 16 screenshots re-captured from a temporary copy of the demo dataset (database `birds_shots`, dropped afterwards), replaced originals in `build/shots-replaced-2026-10-15/`; 3 new slides (office documents, reviewer modification, its record) → 122 slides. Regenerated documents 01–05, both decks and all PDFs; copied to `Final Submission Documents/`.
+
+### Decisions & rationale
+- "Verified incidents" (#17) counted as passed verification (Verified, Approved, Closed), stated on the card.
+- Reviewer modification is limited to the officer who may act at the current stage, never the filer, never after approval (keeps #25 and separation of duties).
+- Reviewers cannot add/remove evidence; they return the report if evidence is missing.
+
+### Blockers / waiting on
+- **Live demo (https://birds-demo.onrender.com) does not yet have these changes**: they must be committed and deployed before the TEC demo; Annex A marks them as Demonstrated.
+- Local `birds` database has two test incidents (BIRDS-2026-1084, 1085, "UI check") from the browser check; reload the demo dataset locally if needed.
+
+### Next session — TODO
+1. Commit and deploy to the live demo; reload the live demo dataset.
+2. Re-make the demonstration video (still outdated).
+
+---
+## Session — 2026-10-15 (BST), part 3: infrastructure sizing for 700 users
+
+### What was done
+- Measured one API process on the demo dataset (mixed read workload as hq_admin, rate limit raised for the test): about 700 req/s, p95 < 100 ms, no errors at 100 concurrent clients (i7-12700H laptop). Measured bytes per row (audit 432 B, messages ~1.3 KB, notifications 512 B, incidents ~3.7 KB).
+- Technical Proposal §7 rewritten: 7.1 workload basis (700 users = 500 + 40 % reserve; ~165 req/s average, ~500 peak; planning 350 req/s per process; 20,000 incidents/yr assumed; ~15 GB/yr database, ~0.5 TB/yr files; 10-year retention), 7.2 recommended (700) vs minimum (500) configuration with totals, 7.3 why each component is needed and what happens without it; network figures. §9 and §12: load test at 100/250/500/700, acceptance at 500. Annex A #38 and the deck updated. Proposal now 14 pages. Regenerated and copied to `Final Submission Documents/`.
+
+### Decisions & rationale
+- Server counts and sizes unchanged from the earlier proposal (they already carry 700 users: one application server alone covers the peak about 5×); what changed is the justification and the cheaper minimum option for comparison.
+- Incident volume (20,000/yr) and per-user activity are assumptions; confirm with BGB, they drive storage cost.
+- Follow-up (owner): the documents must not mention 700 users. §7 now says "dimensioned for the 500 concurrent users of item 38 with reserve capacity"; figures recalculated for 500 (≈115 req/s average, ≈350 peak, ≈10 GB/yr database); configuration columns "Recommended: 500 users with reserve" / "Minimum: 500 users, no reserve"; load test back to 100/250/500; Annex A #38 and deck updated. Server sizes unchanged (they still carry about 700 users internally). Verified: no "700" in any submitted PDF.
+
+---
+## Session — 2026-10-15 (BST), part 4: Flash Alert feature
+
+### What was done
+- New feature **Flash Alert** (owner request; extension of specs #23 notifications and #58): an officer with the new `raise_alert` permission (HQ Administrator, Sector Officer by default) warns every officer in the target sectors (or all units) of an imminent threat, with subject, intelligence, action required, last-seen place/time/GPS, validity (6 h – 7 days), optional linked incident and photo/video/document evidence.
+- Mandatory false-alert declaration ("raising a false alert is a punishable offence"; time stored, audited, red warning on the form, record shown on the alert).
+- Delivery: recipients fixed at raising; realtime event + web push (urgency high, no content on the lock screen) + 30 s background poll. Full-screen red takeover with siren and vibration until acknowledged (siren can be silenced); red banner on every page while active; sidebar "Flash alerts" with count; updates notify again (toast).
+- Sender/HQ admin: updates, resolve / cancel with a note; acknowledgement progress and recipient list (also for admin/audit roles). Expiry derived from valid_until.
+- Server: migration `20261015120000_flash_alerts` (4 tables, CHECKs, append-only triggers, recipient guard trigger, `raise_alert` grants), `modules/alerts/*`, bus/push types, OpenAPI (11 operations, `FlashAlert` schema). 13 new tests; full suite 184 passing.
+- App: `api/alerts.js`, `context/AlertsContext.jsx`, `components/alerts/*` (takeover, banner, badges, media), pages `Alerts`, `AlertForm`, `AlertDetail`; routes, sidebar, header titles; service worker push; `alarm` tone; 150+ i18n keys (en/bn). Evidence file-type list moved to `helpers.js` (shared). Bangla: letter-spacing disabled under `html[lang=bn]` (conjuncts were pulled apart).
+- Browser-tested end to end on a temporary copy of the demo dataset (dropped afterwards): raise with photo → takeover on another desktop after 67 ms and on a phone; acknowledge; banner; update toast; Bangla phone view.
+
+### Decisions & rationale
+- Name "Flash Alert": FLASH is the highest military message precedence; priorities Flash / Immediate.
+- Every user receives alerts (no page permission); only raising is a permission, so admins can grant it to an intelligence role.
+- Legal wording kept general ("under the applicable laws and BGB rules"), no specific Act cited until BGB confirms.
+- Recipients cannot see who else acknowledged; sender, HQ admins and auditors can.
+
+### Next session — TODO
+1. Documentation for Flash Alert: Annex B value addition row (+ infrastructure: push, realtime already listed), Annex A #23/#58 notes, Technical Proposal modules table, Demo Guide scene, deck slides (re-capture screens), then regenerate documents and the letterhead copies.
+2. Add a resolved example alert to the demo dataset (`server/prisma/demo`) so the demo shows history.
+3. Commit and deploy (live demo needs `prisma migrate deploy` for the new migration).

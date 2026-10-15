@@ -54,6 +54,14 @@
   body {
     @apply bg-gray-50 text-gray-800 antialiased;
     -webkit-tap-highlight-color: transparent;
+    /* A long unbroken string (a pasted link, a reference, a typing slip) wraps instead of pushing
+       the page sideways on a phone: it breaks inside the word only when nothing else fits */
+    overflow-wrap: anywhere;
+  }
+  /* Tables keep whole words and scroll inside their own box; cells of user-written text opt in
+     with wrap-anywhere */
+  table {
+    overflow-wrap: break-word;
   }
   /* Printed reports are on white paper even with "Background graphics" enabled */
   @media print {
@@ -206,4 +214,10 @@
 /* No browser focus box around a map point after a mouse click (keyboard focus still shows) */
 .leaflet-container .leaflet-interactive:focus:not(:focus-visible) {
   outline: none;
+}
+
+/* Spec #43 — Bangla script must not be letter-spaced: tracking pulls conjuncts (যুক্তাক্ষর) apart.
+   Uppercase has no effect on Bangla, so only the spacing is reset. */
+html[lang='bn'] [class*='tracking-'] {
+  letter-spacing: normal;
 }

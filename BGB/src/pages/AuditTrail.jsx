@@ -351,7 +351,7 @@ export default function AuditTrail() {
 
               <div>
                 <span className="text-gray-500 font-bold block mb-1">{t('audit.narrative')}</span>
-                <div className="break-words rounded-md bg-gray-900 p-3 text-bgb-400 font-mono text-xs leading-relaxed">
+                <div className="rounded-md bg-gray-900 p-3 text-bgb-400 font-mono text-xs leading-relaxed">
                   {selectedLog.details || '—'}
                 </div>
                 {selectedLog.userAgent && <p className="mt-1 truncate text-xs text-gray-400" title={selectedLog.userAgent}>{selectedLog.userAgent}</p>}

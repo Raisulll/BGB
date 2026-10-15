@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 import exifr from 'exifr';
 import { logger } from '../../config/logger.js';
-import type { AllowedMime } from './fileType.js';
+import { isOfficeDocument, type AllowedMime } from './fileType.js';
+import { readZipText, zipEntries } from './zip.js';
 
 // Spec #11 — preserve the media metadata that matters for evidence: who/what captured it,
 // when, and where. Stored in evidence.file_metadata (JSONB) next to a SHA-256 of the bytes.
@@ -29,8 +30,40 @@ export interface EvidenceMetadata {
   declaredMime: string | null;
   clientLastModified: string | null;
   exif?: Record<string, unknown>;
+  // Office/OpenDocument properties: title, author, last modified by, created, modified
+  document?: Record<string, string>;
   gps?: { latitude: number; longitude: number };
   extractionError?: string;
+}
+
+// Spec #11 — the document's own properties (docProps/core.xml or OpenDocument meta.xml)
+const DOC_FIELDS: [string, string[]][] = [
+  ['title', ['dc:title']],
+  ['author', ['dc:creator', 'meta:initial-creator']],
+  ['lastModifiedBy', ['cp:lastModifiedBy']],
+  ['created', ['dcterms:created', 'meta:creation-date']],
+  ['modified', ['dcterms:modified', 'dc:date']],
+];
+
+const xmlText = (s: string) =>
+  s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&').trim().slice(0, 300);
+
+function documentProperties(buf: Buffer): Record<string, string> | null {
+  const entries = zipEntries(buf);
+  if (!entries) return null; // legacy binary formats: file name, size, dates and fingerprint only
+  const xml = readZipText(buf, entries, 'docProps/core.xml') ?? readZipText(buf, entries, 'meta.xml');
+  if (!xml) return null;
+  const props: Record<string, string> = {};
+  for (const [key, tags] of DOC_FIELDS) {
+    for (const tag of tags) {
+      const m = xml.match(new RegExp(`<${tag}(?:\\s[^>]*)?>([^<]*)</${tag}>`));
+      if (m?.[1]?.trim()) {
+        props[key] = xmlText(m[1]);
+        break;
+      }
+    }
+  }
+  return Object.keys(props).length ? props : null;
 }
 
 export async function extractMetadata(
@@ -40,6 +73,11 @@ export async function extractMetadata(
   clientLastModified: string | null,
 ): Promise<EvidenceMetadata> {
   const meta: EvidenceMetadata = { detectedMime, declaredMime, clientLastModified };
+  if (isOfficeDocument(detectedMime)) {
+    const document = documentProperties(buf);
+    if (document) meta.document = document;
+    return meta;
+  }
   if (detectedMime !== 'image/jpeg' && detectedMime !== 'image/png') return meta;
 
   try {

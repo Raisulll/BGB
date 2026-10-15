@@ -177,7 +177,7 @@ function MessageBubble({ m, mine, first, last, showSender }) {
   return (
     <li className={cn('flex items-end gap-2', mine ? 'justify-end' : 'justify-start', first ? 'mt-3' : 'mt-0.5')}>
       {!mine && (last ? <Avatar name={m.sender.name} size="xs" className="mb-0.5" /> : <span className="w-7 shrink-0" aria-hidden="true" />)}
-      <div className={cn('flex max-w-[78%] flex-col sm:max-w-[65%]', mine ? 'items-end' : 'items-start')}>
+      <div className={cn('flex min-w-0 max-w-[78%] flex-col sm:max-w-[65%]', mine ? 'items-end' : 'items-start')}>
         {showSender && !mine && first && <p className="mb-0.5 px-3 text-xs text-slate-500">{m.sender.name}</p>}
         <div
           title={time}
@@ -191,7 +191,7 @@ function MessageBubble({ m, mine, first, last, showSender }) {
           <span className="sr-only">
             {mine ? t('msg.you') : m.sender.name}, {time}:{' '}
           </span>
-          {m.kind === 'voice' ? <VoiceMessage voice={m.voice} mine={mine} /> : <p className="whitespace-pre-wrap break-words text-sm leading-5">{m.body}</p>}
+          {m.kind === 'voice' ? <VoiceMessage voice={m.voice} mine={mine} /> : <p className="whitespace-pre-wrap text-sm leading-5">{m.body}</p>}
         </div>
       </div>
     </li>

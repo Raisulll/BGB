@@ -7,7 +7,7 @@
 //   - other files of this site (crest, icons, manifest): served from cache, refreshed in the background
 // Never cached: /api/* (incident data, evidence, messages, voice, photos), anything that isn't a
 // GET, and other origins. Data stays behind authentication on the server.
-const SHELL_CACHE = 'birds-shell-v1';
+const SHELL_CACHE = 'birds-shell-v1'; // bump only to force-clear caches (CLAUDE.md §15)
 const ASSET_CACHE = 'birds-assets-v1';
 const ASSET_LIMIT = 120; // bundles of old releases are dropped first
 const SHELL = ['/', '/manifest.webmanifest', '/bgb.png', '/icons/icon-192.png', '/icons/apple-touch-icon.png'];
@@ -99,6 +99,9 @@ const TEXT = {
     decline: 'Decline',
     missed: 'Missed call',
     missedBody: (p) => `Missed call from ${p.callerName}`,
+    alert: (p) => (p.event === 'updated' ? `FLASH ALERT ${p.reference}: update` : `FLASH ALERT ${p.reference}`),
+    alertBody: (p) => `${p.priority === 'flash' ? 'Flash' : 'Immediate'} priority, from ${p.senderName}. Open BIRDS now and acknowledge.`,
+    openAlert: 'Open alert',
   },
   bn: {
     message: (p) => (p.groupTitle ? `${p.groupTitle}-এ ${p.senderName}` : p.senderName),
@@ -109,6 +112,9 @@ const TEXT = {
     decline: 'কাটুন',
     missed: 'মিসড কল',
     missedBody: (p) => `${p.callerName}-এর মিসড কল`,
+    alert: (p) => (p.event === 'updated' ? `ফ্ল্যাশ সতর্কবার্তা ${p.reference}: হালনাগাদ` : `ফ্ল্যাশ সতর্কবার্তা ${p.reference}`),
+    alertBody: (p) => `${p.priority === 'flash' ? 'ফ্ল্যাশ' : 'জরুরি'} অগ্রাধিকার, প্রেরক ${p.senderName}। এখনই BIRDS খুলে প্রাপ্তি নিশ্চিত করুন।`,
+    openAlert: 'সতর্কবার্তা খুলুন',
   },
 };
 const RING_REPEAT_MS = 4000; // a ringing call notification sounds and vibrates again this often
@@ -183,6 +189,22 @@ async function showPush(payload) {
     const still = await self.registration.getNotifications({ tag });
     still.filter((n) => !n.data?.missed).forEach((n) => n.close());
     return;
+  }
+
+  // Flash Alert: shown even with the app open in front (the app also takes over the screen); stays
+  // until tapped, vibrates hard. Reference, priority and sender only: the content is read after sign-in.
+  if (payload.kind === 'alert') {
+    return self.registration.showNotification(t.alert(payload), {
+      body: t.alertBody(payload),
+      tag: `alert-${payload.alertId}`,
+      renotify: true,
+      requireInteraction: true,
+      vibrate: [900, 300, 900, 300, 900, 300, 900],
+      icon,
+      badge,
+      actions: [{ action: 'open', title: t.openAlert }],
+      data: { url: `/alerts/${payload.alertId}` },
+    });
   }
 
   if (payload.kind === 'call-ended' && payload.missed) {

@@ -56,7 +56,8 @@ incidentsRouter.get('/:id/timeline', requirePermission('incidents'), async (req,
   res.json(await service.getTimeline(req.user!, incidentId(req)));
 });
 
-incidentsRouter.patch('/:id', requirePermission('create'), async (req, res) => {
+// The filer edits Draft/Returned reports; a reviewer modifies one before approval (spec #14). Checked in the service.
+incidentsRouter.patch('/:id', requirePermission('incidents'), async (req, res) => {
   const input = updateIncidentSchema.parse(req.body);
   res.json(await service.updateIncident(req.user!, incidentId(req), input, requestContext(req)));
 });

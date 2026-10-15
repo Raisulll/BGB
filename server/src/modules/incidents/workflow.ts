@@ -28,6 +28,14 @@ export const WORKFLOW_ACTIONS = Object.keys(WORKFLOW) as WorkflowAction[];
 export const EDITABLE_STATUSES = ['Draft', 'Returned'] as const;
 export const isEditableStatus = (status: string) => (EDITABLE_STATUSES as readonly string[]).includes(status);
 
+/**
+ * Spec #14 — a supervisory officer may modify a report before it is approved: while it waits in
+ * review/verification, if their role may act on it at that stage (and it is not their own report).
+ */
+export const REVIEW_EDIT_STATUSES = ['Submitted', 'Reviewed', 'Verified'] as const;
+export const canModifyAsReviewer = (status: string, role: string) =>
+  (REVIEW_EDIT_STATUSES as readonly string[]).includes(status) && availableActions(status, role).length > 0;
+
 /** Final statuses; only these can be archived (spec #45, DB CHECK incidents_archive_final_check). */
 export const ARCHIVABLE_STATUSES = ['Closed', 'Rejected'] as const;
 export const isArchivableStatus = (status: string) => (ARCHIVABLE_STATUSES as readonly string[]).includes(status);

@@ -17,12 +17,13 @@ export const ROLE_DESCRIPTIONS: Record<string, string> = {
   [ROLES.AUDITOR]: 'Read-only access to records, reports and the audit trail',
 };
 
-export const PAGE_IDS = ['dashboard', 'incidents', 'create', 'map', 'analytics', 'reports', 'audit', 'admin', 'messages'] as const;
+// 'raise_alert' is a capability rather than a page: raising a Flash Alert (every user receives them)
+export const PAGE_IDS = ['dashboard', 'incidents', 'create', 'map', 'analytics', 'reports', 'audit', 'admin', 'messages', 'raise_alert'] as const;
 export type PageId = (typeof PAGE_IDS)[number];
 
 export const DEFAULT_PERMISSIONS: Record<string, PageId[]> = {
-  [ROLES.HQ_ADMIN]: ['dashboard', 'incidents', 'create', 'map', 'analytics', 'reports', 'audit', 'admin', 'messages'],
-  [ROLES.SECTOR_OFFICER]: ['dashboard', 'incidents', 'create', 'map', 'analytics', 'reports', 'messages'],
+  [ROLES.HQ_ADMIN]: ['dashboard', 'incidents', 'create', 'map', 'analytics', 'reports', 'audit', 'admin', 'messages', 'raise_alert'],
+  [ROLES.SECTOR_OFFICER]: ['dashboard', 'incidents', 'create', 'map', 'analytics', 'reports', 'messages', 'raise_alert'],
   [ROLES.BATTALION_OPERATOR]: ['dashboard', 'incidents', 'create', 'map', 'messages'],
   [ROLES.VERIFIER]: ['dashboard', 'incidents', 'map', 'analytics', 'reports', 'messages'],
   [ROLES.AUDITOR]: ['dashboard', 'incidents', 'analytics', 'reports', 'audit', 'messages'],

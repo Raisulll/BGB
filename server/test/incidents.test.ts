@@ -56,6 +56,12 @@ describe('listing, scope and visibility (specs #3, #15, #16)', () => {
     const dated = await admin.get(`${URL}?dateFrom=2026-10-20&dateTo=2026-10-22&pageSize=100`);
     expect(dated.body.data.every((i: { date: string }) => i.date >= '2026-10-20' && i.date <= '2026-10-22')).toBe(true);
 
+    // Incident type (sub-category), spec #16
+    const typed = await prisma.incident.findFirst({ where: { status: { not: 'Draft' }, subcategory: { not: null } } });
+    const byType = await admin.get(`${URL}?subcategory=${encodeURIComponent(typed!.subcategory!)}&pageSize=100`);
+    expect(byType.body.data.length).toBeGreaterThan(0);
+    expect(byType.body.data.every((i: { subcategory: string }) => i.subcategory === typed!.subcategory)).toBe(true);
+
     const page = await admin.get(`${URL}?pageSize=5&page=2`);
     expect(page.body).toMatchObject({ page: 2, pageSize: 5 });
     expect(page.body.data).toHaveLength(5);
@@ -119,8 +125,51 @@ describe('create and edit (specs #5, #7, #9, #25)', () => {
     expect(blocked.status).toBe(403);
     expect((await lastAudit('DENIED_UPDATE'))?.details).toContain(approved!.id);
 
+    // Read-only roles never edit; a reviewer needs a reason (spec #14, below)
     const submitted = await createSubmitted();
-    expect((await sector.patch(`${URL}/${submitted}`, { title: 'Not mine to edit' })).status).toBe(403);
+    expect((await auditor.patch(`${URL}/${submitted}`, { title: 'Not mine to edit' })).status).toBe(403);
+    expect((await sector.patch(`${URL}/${submitted}`, { title: 'Not mine to edit' })).status).toBe(400);
+  });
+});
+
+describe('reviewer modifies a report before approval (spec #14)', () => {
+  it('lets the reviewer at the current stage modify with a reason; audited field by field; filer notified', async () => {
+    const id = await createSubmitted({ title: 'Original title of the report' });
+    expect((await sector.get(`${URL}/${id}`)).body.canModify).toBe(true);
+    expect((await operator.get(`${URL}/${id}`)).body).toMatchObject({ canModify: false, canEdit: false });
+    expect((await auditor.get(`${URL}/${id}`)).body.canModify).toBe(false);
+
+    const res = await sector.patch(`${URL}/${id}`, { title: 'Corrected title of the report', severity: 'Critical', reason: 'Severity understated' });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ status: 'Submitted', title: 'Corrected title of the report', severity: 'Critical' });
+    expect(res.body.timeline.at(-1)).toMatchObject({ action: 'Modified by reviewer', notes: 'Changed: severity, title. Reason: Severity understated' });
+
+    const audit = await lastAudit('MODIFY_INCIDENT');
+    expect(audit?.details).toContain(id);
+    expect(audit?.details).toContain('title: "Original title of the report" → "Corrected title of the report"');
+    expect(audit?.details).toContain('Reason: Severity understated');
+    expect(await prisma.notification.count({ where: { incidentId: id, userId: 'U003', title: 'Incident Modified' } })).toBe(1);
+
+    // Unchanged values are not a modification
+    expect((await sector.patch(`${URL}/${id}`, { severity: 'Critical', reason: 'No-op' })).status).toBe(400);
+  });
+
+  it('follows the workflow stage: the verifier modifies a Verified report; nobody modifies an approved one', async () => {
+    const id = await createSubmitted();
+    await sector.post(`${URL}/${id}/review`);
+    await verifier.post(`${URL}/${id}/verify`);
+    expect((await verifier.patch(`${URL}/${id}`, { outcome: 'Goods seized and handed over', reason: 'Outcome confirmed by BOP' })).status).toBe(200);
+
+    await verifier.post(`${URL}/${id}/approve`);
+    const blocked = await verifier.patch(`${URL}/${id}`, { outcome: 'Changed after approval', reason: 'Late correction' });
+    expect(blocked.status).toBe(403);
+    expect((await lastAudit('DENIED_UPDATE'))?.details).toContain(id);
+  });
+
+  it('never lets a reviewer modify their own report', async () => {
+    const own = await admin.post(URL, { ...newIncident(), status: 'Submitted' });
+    expect(own.body.canModify).toBe(false);
+    expect((await admin.patch(`${URL}/${own.body.id}`, { title: 'Self-approved edit', reason: 'x' })).status).toBe(403);
   });
 });
 

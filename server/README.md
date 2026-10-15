@@ -89,12 +89,12 @@ Errors always use `{ error: { code, message, details? } }`.
 
 | Method | Path | Permission | Notes |
 |---|---|---|---|
-| GET | `/` | incidents | Filters: `q` (ref no./title/description/location), `status` and `severity` (comma lists), `category`, `sector`, `battalion`, `bop`, `dateFrom`, `dateTo`, `createdBy` (`me` or user id), `overdue=true` (waiting longer than `workflow.overdue_days` in Submitted/Reviewed/Verified/Approved/Returned), `needsAction=true` (what the caller can act on now under the workflow table, never their own reports, plus their own Returned ones), `sort` (`createdAt`, `incidentDate`, `id`), `order`, `page`, `pageSize` (≤100). Returns `{ data, page, pageSize, total, totalPages }` |
+| GET | `/` | incidents | Filters: `q` (ref no./title/description/location), `status` and `severity` (comma lists), `category`, `subcategory` (incident type), `sector`, `battalion`, `bop`, `dateFrom`, `dateTo`, `createdBy` (`me` or user id), `overdue=true` (waiting longer than `workflow.overdue_days` in Submitted/Reviewed/Verified/Approved/Returned), `needsAction=true` (what the caller can act on now under the workflow table, never their own reports, plus their own Returned ones), `sort` (`createdAt`, `incidentDate`, `id`), `order`, `page`, `pageSize` (≤100). Returns `{ data, page, pageSize, total, totalPages }` |
 | GET | `/meta` | incidents | Categories + subcategories, the org hierarchy the user may file under, and `canAct` (the role reviews/approves) |
 | POST | `/` | create | Body = incident fields + `status`: `Draft` (default) or `Submitted` |
 | GET | `/:id` | incidents | Detail incl. `timeline`, `evidence`, `comments`, `statusChangedAt` + `overdue`, and the caller's `actions`, `canEdit`, `canSubmit`, `canDiscard`, `canComment` |
 | GET | `/:id/timeline` | incidents | Append-only history |
-| PATCH | `/:id` | create | Creator only, Draft/Returned only |
+| PATCH | `/:id` | incidents | The creator (needs `create`) while Draft/Returned. Spec #14: an officer who has a workflow action on someone else's Submitted/Reviewed/Verified report (`canModify`) modifies it before approval: `reason` required, only really changed fields are written, `MODIFY_INCIDENT` audit lists each field's old → new value, timeline "Modified by reviewer", the creator is notified ("Incident Modified"). Everything else 403 + `DENIED_UPDATE` |
 | DELETE | `/:id` | create | Discard a never-submitted Draft (creator only; body `{ notes? }`). Timeline rows are append-only, so the record is kept with `discarded_at` set and hidden from every view; DB CHECK allows it only on Drafts. Timeline "Discarded" + audit `DISCARD_DRAFT` |
 | POST | `/:id/submit` | create | Draft/Returned → Submitted (creator only) |
 | POST | `/:id/comments` | incidents | Body `{ body }` (≤4000). Roles that file or review incidents, not on drafts or archived records. Append-only (`incident_comments` triggers), audited `COMMENT_INCIDENT`, notifies the creator and earlier commenters (type `comment`) |
@@ -125,7 +125,7 @@ Rules (enforced in `incidents.service.ts`; see DOUBT-008):
 | POST | `/:eid/verify` | incidents | Recomputes the SHA-256 and compares it with the upload-time hash (chain of custody) |
 | DELETE | `/:eid` | incidents | Soft delete: the creator while editing, or an HQ admin at any stage with `{ reason }` |
 
-- **File types are checked on content**, not on the name or the browser's claim: JPEG, PNG, GIF, PDF, MP4 and MOV only (415 otherwise). If one file in a batch fails, none are stored.
+- **File types are checked on content**, not on the name or the browser's claim: JPEG, PNG, GIF, PDF, MP4, MOV and office documents (Word, Excel, PowerPoint as current or legacy formats, OpenDocument, RTF) only (415 otherwise). Macro-enabled documents (a VBA project inside) are refused. Office/OpenDocument properties (title, author, last modified by, created, modified) are kept in `metadata.document`. If one file in a batch fails, none are stored.
 - **Limits**: `EVIDENCE_MAX_FILE_MB` (50), `EVIDENCE_MAX_INCIDENT_MB` (500), `EVIDENCE_MAX_FILES_PER_UPLOAD` (10).
 - **Metadata (spec #11)**: SHA-256, detected and declared type, the client's last-modified time, and for JPEG/PNG the camera EXIF fields and GPS position, stored in `evidence.file_metadata`.
 - **Virus scanning**: `scanner.ts` is the hook. No engine is configured yet, so every file is recorded as `scan.status: "not_scanned"`.
@@ -174,6 +174,16 @@ All changes are audited (`CONFIG_CHANGE`, `PERMISSION_CHANGE`, `PERMISSION_RESET
 | PATCH | `/:id/read` | Someone else's notification → 404 |
 
 Each recipient gets their own row (read state is per user). There are no shared "broadcast" rows.
+
+## Flash Alerts API (`/api/v1/alerts`)
+
+Urgent warning of an imminent border threat, raised by an officer with the `raise_alert` permission (HQ Administrator and Sector Officer by default; editable in the permission matrix) and delivered at once to every active user whose unit is in the target sectors, plus every HQ-level user (all units when `targetSectors` is empty). The sender is not a recipient.
+
+- **Raise** (`POST /alerts`, multipart): `data` = JSON (`title`, `threatType`, `priority` flash|immediate, `subjectName?`, `subjectDescription?`, `details`, `instructions`, `lastSeenAt?`, `lastSeenPlace?`, `lat?`/`lng?`, `targetSectors`, `validHours` 6|12|24|48|72|168, `incidentId?`, `declaration: true`), `files` = attachments with the same checks as evidence (content type, antivirus hook, encryption, SHA-256). The declaration ("raising a false alert is a punishable offence") is mandatory; its time is stored in `declaration_at` and stated in the `RAISE_FLASH_ALERT` audit entry (also written to `security.log`). Reference `FA-<year>-NNNN` from `system_config` `alert.next_id.<year>`.
+- **Delivery**: recipients are fixed in `flash_alert_recipients` when raised. Bus event `alert` → WebSocket `{ type: 'alert', alertId, event }`; web push `{ kind: 'alert', reference, priority, senderName }` (urgency high, no content on the lock screen); `GET /alerts/active` (polled every 30 s in the background) records `delivered_at`.
+- **Acknowledge** (`POST /:id/acknowledge`): recipients only, recorded once. A trigger forbids changing or clearing `delivered_at` / `acknowledged_at` and deleting recipient rows.
+- **Updates / resolve / cancel**: the sender or an HQ Administrator; resolve and cancel need a note. `flash_alert_updates` and `flash_alert_attachments` are append-only (triggers). An alert expires by itself at `valid_until` (state `expired`, derived).
+- **Visibility**: recipients, the sender, and roles with the `admin` or `audit` page; others get 404. The sender, admins and auditors also get `recipientList` (who received / acknowledged, when).
 
 ## Messaging API (`/api/v1/messaging`, permission `messages`)
 

@@ -123,6 +123,7 @@ export default function Dashboard() {
     total: summary.total,
     open: summary.open,
     pending: summary.pendingReview,
+    verified: summary.verified,
     closed: summary.approved + summary.closed,
     critical: summary.bySeverity.High + summary.bySeverity.Critical,
   };
@@ -192,14 +193,14 @@ export default function Dashboard() {
       </div>
 
       {/* Primary KPI Summary Grid */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 xl:grid-cols-6">
         <StatCard label={t('dash.kpiTotal')} value={stats.total} />
         <StatCard label={t('dash.kpiOpen')} value={stats.open} />
         <StatCard label={t('dash.kpiPending')} value={stats.pending} />
+        {/* Spec #17 — verified incidents */}
+        <StatCard label={t('dash.kpiVerified')} value={stats.verified} note={t('dash.kpiVerifiedNote')} />
         <StatCard label={t('dash.kpiClosed')} value={stats.closed} />
-        <div className="col-span-2 sm:col-span-1">
-          <StatCard label={t('dash.kpiCritical')} value={stats.critical} alert />
-        </div>
+        <StatCard label={t('dash.kpiCritical')} value={stats.critical} alert />
       </div>
 
       {/* Analytics Visualization Cards */}

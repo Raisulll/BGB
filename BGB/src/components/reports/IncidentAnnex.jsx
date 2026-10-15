@@ -1,4 +1,4 @@
-import { formatDateDisplay, formatDateTime, formatFileSize } from '../../utils/helpers';
+import { FILE_ICONS, fileKind, formatDateDisplay, formatDateTime, formatFileSize } from '../../utils/helpers';
 import { formatDuration } from '../../utils/evidencePreview';
 import { useI18n } from '../../i18n/I18nContext';
 import { TD } from './OfficialDocument';
@@ -8,7 +8,14 @@ import { TD } from './OfficialDocument';
 // a still frame for each video, documents listed), timeline and comments.
 const TH = 'border border-gray-500 bg-gray-100 px-2 py-1 text-left font-semibold align-top';
 
-const EXT = { 'image/jpeg': 'JPEG', 'image/png': 'PNG', 'image/gif': 'GIF', 'video/mp4': 'MP4', 'video/quicktime': 'MOV', 'application/pdf': 'PDF' };
+const EXT = {
+  'image/jpeg': 'JPEG', 'image/png': 'PNG', 'image/gif': 'GIF', 'video/mp4': 'MP4', 'video/quicktime': 'MOV', 'application/pdf': 'PDF',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'Word (DOCX)', 'application/msword': 'Word (DOC)',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'Excel (XLSX)', 'application/vnd.ms-excel': 'Excel (XLS)',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'PowerPoint (PPTX)', 'application/vnd.ms-powerpoint': 'PowerPoint (PPT)',
+  'application/vnd.oasis.opendocument.text': 'OpenDocument text', 'application/vnd.oasis.opendocument.spreadsheet': 'OpenDocument spreadsheet',
+  'application/vnd.oasis.opendocument.presentation': 'OpenDocument presentation', 'application/rtf': 'RTF',
+};
 const kindOf = (mime) => (mime?.startsWith('image/') ? 'image' : mime?.startsWith('video/') ? 'video' : 'document');
 // Caption wording: camera JPEGs are photographs; PNG/GIF are usually scans or screenshots
 const labelOf = (mime) => (mime === 'image/jpeg' ? 'photo' : kindOf(mime));
@@ -33,7 +40,7 @@ function Figure({ label, ev, preview }) {
 
   let media;
   if (!ev.available) media = <Placeholder icon="fa-file-circle-xmark">{t('rep.annex.notStored')}</Placeholder>;
-  else if (kind === 'document') media = <Placeholder icon={ev.mimeType === 'application/pdf' ? 'fa-file-pdf' : 'fa-file'}>{t('rep.annex.documentNote')}</Placeholder>;
+  else if (kind === 'document') media = <Placeholder icon={(FILE_ICONS[fileKind(ev.mimeType)] || FILE_ICONS.file).icon}>{t('rep.annex.documentNote')}</Placeholder>;
   else if (!preview || preview.status === 'loading') media = <Placeholder icon={kind === 'video' ? 'fa-film' : 'fa-image'}>{t('rep.annex.loadingPreview')}</Placeholder>;
   else if (preview.status === 'error')
     media = <Placeholder icon={kind === 'video' ? 'fa-film' : 'fa-image'}>{preview.code === 'NO_FRAME' ? t('rep.annex.noFrame') : t('rep.annex.previewFailed', { reason: preview.message })}</Placeholder>;
@@ -73,6 +80,15 @@ function Figure({ label, ev, preview }) {
         <p>{facts.join(' · ')}</p>
         {(m.exif?.DateTimeOriginal || camera) && (
           <p>{[m.exif?.DateTimeOriginal && t('detail.captured', { date: formatDateTime(m.exif.DateTimeOriginal) }), camera].filter(Boolean).join(' · ')}</p>
+        )}
+        {m.document && (m.document.author || m.document.created) && (
+          <p>
+            {[
+              m.document.author && t('detail.docAuthor', { name: m.document.author }),
+              m.document.created && t('detail.docCreated', { date: formatDateTime(m.document.created) }),
+              m.document.modified && t('detail.docModified', { date: formatDateTime(m.document.modified) }),
+            ].filter(Boolean).join(' · ')}
+          </p>
         )}
         {m.gps && <p>{t('rep.annex.gps', { lat: m.gps.latitude.toFixed(5), lng: m.gps.longitude.toFixed(5) })}</p>}
         <p>{t('rep.annex.uploaded', { date: formatDateTime(ev.uploadedAt), id: ev.id })}</p>
@@ -165,7 +181,7 @@ export function IncidentRecord({ inc, previews, figLabel }) {
               <td className={`${TD} whitespace-nowrap`}>{formatDateTime(e.date)}</td>
               <td className={TD}>{tv('timeline', e.action)}</td>
               <td className={TD}>{e.user}</td>
-              <td className={`${TD} whitespace-pre-line`}>{e.notes || ''}</td>
+              <td className={`${TD} whitespace-pre-line wrap-anywhere`}>{e.notes || ''}</td>
             </tr>
           ))}
         </tbody>
@@ -183,7 +199,7 @@ export function IncidentRecord({ inc, previews, figLabel }) {
                     <br />
                     {formatDateTime(c.date)}
                   </td>
-                  <td className={`${TD} whitespace-pre-line`}>{c.body}</td>
+                  <td className={`${TD} whitespace-pre-line wrap-anywhere`}>{c.body}</td>
                 </tr>
               ))}
             </tbody>

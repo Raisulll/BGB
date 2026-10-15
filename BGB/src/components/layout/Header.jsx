@@ -22,6 +22,9 @@ function getPageDetails(pathname) {
   if (pathname === '/profile') return { key: 'profile', icon: 'fa-id-badge' };
   if (pathname.startsWith('/messages')) return { key: 'messages', icon: 'fa-comments' };
   if (pathname === '/calls') return { key: 'calls', icon: 'fa-phone' };
+  if (pathname === '/alerts') return { key: 'alerts', icon: 'fa-triangle-exclamation' };
+  if (pathname === '/alerts/new') return { key: 'alertNew', icon: 'fa-triangle-exclamation' };
+  if (pathname.startsWith('/alerts/')) return { key: 'alertDetail', icon: 'fa-triangle-exclamation' };
   return { key: 'default', icon: 'fa-shield-alt' };
 }
 

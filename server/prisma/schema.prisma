@@ -71,6 +71,10 @@ model User {
   callsMade            Call[]                    @relation("CallCaller")
   callsReceived        Call[]                    @relation("CallCallee")
   refreshTokens        RefreshToken[]
+  alertsRaised         FlashAlert[]              @relation("AlertRaisedBy")
+  alertsClosed         FlashAlert[]              @relation("AlertClosedBy")
+  alertsReceived       FlashAlertRecipient[]
+  alertUpdates         FlashAlertUpdate[]
 
   @@map("users")
 }
@@ -156,6 +160,8 @@ model Incident {
   @@index([createdBy, status], map: "idx_incidents_creator_status")
   @@index([archivedAt], map: "idx_incidents_archived")
   @@index([status, statusChangedAt], map: "idx_incidents_status_since")
+  flashAlerts FlashAlert[]
+
   @@map("incidents")
 }
 
@@ -445,4 +451,94 @@ model Call {
   @@index([callerId, startedAt])
   @@index([calleeId, startedAt])
   @@map("calls")
+}
+
+// Flash Alert (spec #23/#58 extension, 2026-10-15): an urgent warning about an imminent border threat
+// (a person about to cross, a group, a consignment), raised by an authorised officer with
+// intelligence and evidence and delivered at once to every officer in the target sectors. The sender
+// accepts a declaration that a false alert is an offence; recipients must acknowledge. Raising,
+// acknowledging, updates and closing are audited; updates are append-only.
+model FlashAlert {
+  id                 Int       @id @default(autoincrement())
+  reference          String    @unique @db.VarChar(20) // FA-<year>-NNNN
+  title              String    @db.VarChar(200)
+  threatType         String    @map("threat_type") @db.VarChar(30) // DB CHECK, see FLASH_THREATS
+  priority           String    @db.VarChar(10) // 'flash' | 'immediate' (DB CHECK)
+  subjectName        String?   @map("subject_name") @db.VarChar(200) // name or alias, if known
+  subjectDescription String?   @map("subject_description") // appearance, clothing, vehicle, companions
+  details            String // the intelligence: what is expected to happen, where, when
+  instructions       String // action required from the units
+  lastSeenAt         DateTime? @map("last_seen_at") @db.Timestamptz
+  lastSeenPlace      String?   @map("last_seen_place") @db.VarChar(255)
+  lat                Decimal?  @db.Decimal(10, 7)
+  lng                Decimal?  @db.Decimal(10, 7)
+  targetSectors      String[]  @map("target_sectors") // empty = every unit
+  incidentId         String?   @map("incident_id") @db.VarChar(30)
+  validUntil         DateTime  @map("valid_until") @db.Timestamptz
+  status             String    @default("active") @db.VarChar(10) // active | resolved | cancelled (DB CHECK); expiry is derived from valid_until
+  declarationAt      DateTime  @map("declaration_at") @db.Timestamptz // when the sender accepted the false-alert declaration
+  createdBy          String    @map("created_by") @db.VarChar(10)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  closedBy           String?   @map("closed_by") @db.VarChar(10)
+  closedAt           DateTime? @map("closed_at") @db.Timestamptz
+  closeNote          String?   @map("close_note")
+
+  creator     User                    @relation("AlertRaisedBy", fields: [createdBy], references: [id])
+  closer      User?                   @relation("AlertClosedBy", fields: [closedBy], references: [id])
+  incident    Incident?               @relation(fields: [incidentId], references: [id])
+  attachments FlashAlertAttachment[]
+  recipients  FlashAlertRecipient[]
+  updates     FlashAlertUpdate[]
+
+  @@index([status, validUntil])
+  @@index([createdAt])
+  @@map("flash_alerts")
+}
+
+model FlashAlertAttachment {
+  id           Int      @id @default(autoincrement())
+  alertId      Int      @map("alert_id")
+  originalName String   @map("original_name") @db.VarChar(255)
+  mimeType     String   @map("mime_type") @db.VarChar(100)
+  fileSize     BigInt   @map("file_size")
+  storagePath  String   @map("storage_path") @db.VarChar(500)
+  sha256       String   @db.VarChar(64)
+  fileMetadata Json?    @map("file_metadata")
+  uploadedAt   DateTime @default(now()) @map("uploaded_at") @db.Timestamptz
+
+  alert FlashAlert @relation(fields: [alertId], references: [id], onDelete: Restrict)
+
+  @@index([alertId])
+  @@map("flash_alert_attachments")
+}
+
+// Who the alert was sent to (fixed when it is raised), when it reached them and when they acknowledged
+model FlashAlertRecipient {
+  alertId        Int       @map("alert_id")
+  userId         String    @map("user_id") @db.VarChar(10)
+  deliveredAt    DateTime? @map("delivered_at") @db.Timestamptz
+  acknowledgedAt DateTime? @map("acknowledged_at") @db.Timestamptz
+
+  alert FlashAlert @relation(fields: [alertId], references: [id], onDelete: Restrict)
+  user  User       @relation(fields: [userId], references: [id])
+
+  @@id([alertId, userId])
+  @@index([userId])
+  @@map("flash_alert_recipients")
+}
+
+model FlashAlertUpdate {
+  id        Int      @id @default(autoincrement())
+  alertId   Int      @map("alert_id")
+  userId    String   @map("user_id") @db.VarChar(10)
+  userName  String   @map("user_name") @db.VarChar(100)
+  kind      String   @default("update") @db.VarChar(10) // update | resolved | cancelled (DB CHECK)
+  body      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  alert FlashAlert @relation(fields: [alertId], references: [id], onDelete: Restrict)
+  user  User       @relation(fields: [userId], references: [id])
+
+  @@index([alertId, id])
+  @@map("flash_alert_updates")
 }

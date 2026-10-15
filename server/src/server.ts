@@ -5,6 +5,7 @@ import { prisma } from './db.js';
 import { startMailWorker, stopMailWorker } from './modules/notifications/mailer.js';
 import { startArchiveScheduler, stopArchiveScheduler } from './modules/incidents/archive.service.js';
 import { registerMessagingRealtime } from './modules/messaging/messaging.realtime.js';
+import { registerAlertsRealtime } from './modules/alerts/alerts.realtime.js';
 import { registerCallRealtime } from './modules/calls/calls.realtime.js';
 import { sweepStaleCalls } from './modules/calls/calls.service.js';
 import { startBus, stopBus } from './realtime/bus.js';
@@ -21,6 +22,7 @@ const server = createApp().listen(env.PORT, () => {
 
 // Realtime channel (messaging, calls): WebSocket on the same port, events via PostgreSQL NOTIFY
 registerMessagingRealtime();
+registerAlertsRealtime();
 registerCallRealtime();
 sweepStaleCalls().catch((err) => logger.warn('Stale call clean-up failed', { err: String(err) }));
 attachRealtime(server);

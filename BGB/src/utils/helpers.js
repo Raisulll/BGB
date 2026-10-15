@@ -117,14 +117,36 @@ export function todayISO() {
 export const formatFileSize = (bytes) =>
   bytes > 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(2)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 
+// Spec #10 — office documents: Word, Excel, PowerPoint (current and legacy), OpenDocument, RTF
+const DOC_KINDS = [
+  [/wordprocessingml|msword|opendocument\.text|rtf/, 'word'],
+  [/spreadsheetml|ms-excel|opendocument\.spreadsheet/, 'excel'],
+  [/presentationml|ms-powerpoint|opendocument\.presentation/, 'powerpoint'],
+];
 export const fileKind = (mime = '') =>
-  mime.startsWith('image') ? 'image' : mime === 'application/pdf' ? 'pdf' : mime.startsWith('video') ? 'video' : 'file';
+  mime.startsWith('image') ? 'image' : mime === 'application/pdf' ? 'pdf' : mime.startsWith('video') ? 'video' : DOC_KINDS.find(([re]) => re.test(mime))?.[1] ?? 'file';
 
 export const FILE_ICONS = {
   image: { icon: 'fa-image', cls: 'bg-blue-100 text-blue-600' },
   pdf: { icon: 'fa-file-pdf', cls: 'bg-red-100 text-red-600' },
   video: { icon: 'fa-video', cls: 'bg-purple-100 text-purple-600' },
+  word: { icon: 'fa-file-word', cls: 'bg-sky-100 text-sky-700' },
+  excel: { icon: 'fa-file-excel', cls: 'bg-emerald-100 text-emerald-700' },
+  powerpoint: { icon: 'fa-file-powerpoint', cls: 'bg-orange-100 text-orange-700' },
   file: { icon: 'fa-file', cls: 'bg-gray-100 text-gray-600' },
 };
+
+// Spec #10 — the server checks the real content; browsers sometimes report no type for office files, so the extension is checked too
+export const EVIDENCE_TYPES = [
+  'image/jpeg', 'image/png', 'image/gif', 'application/pdf', 'video/mp4', 'video/quicktime',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/msword', 'application/vnd.ms-excel', 'application/vnd.ms-powerpoint',
+  'application/vnd.oasis.opendocument.text', 'application/vnd.oasis.opendocument.spreadsheet', 'application/vnd.oasis.opendocument.presentation',
+  'application/rtf', 'text/rtf',
+];
+export const EVIDENCE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.pdf', '.mp4', '.mov', '.docx', '.xlsx', '.pptx', '.doc', '.xls', '.ppt', '.odt', '.ods', '.odp', '.rtf'];
+export const isAllowedEvidenceFile = (f) => EVIDENCE_TYPES.includes(f.type) || EVIDENCE_EXTENSIONS.some((ext) => f.name.toLowerCase().endsWith(ext));
 
 export const cn = (...classes) => classes.filter(Boolean).join(' ');

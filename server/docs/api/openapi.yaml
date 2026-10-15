@@ -106,6 +106,8 @@ tags:
     description: One-to-one audio calls and the call log (see Calls above)
   - name: Push
     description: Web push to devices while BIRDS is closed (see Push notifications above)
+  - name: Alerts
+    description: 'Flash Alerts: urgent warnings of an imminent border threat, delivered to every officer in the target sectors, who must acknowledge them'
   - name: System
     description: Health check
 
@@ -273,6 +275,7 @@ paths:
         - $ref: '#/components/parameters/Status'
         - $ref: '#/components/parameters/Severity'
         - $ref: '#/components/parameters/Category'
+        - $ref: '#/components/parameters/Subcategory'
         - $ref: '#/components/parameters/Sector'
         - $ref: '#/components/parameters/Battalion'
         - $ref: '#/components/parameters/Bop'
@@ -369,12 +372,19 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
     patch:
       tags: [Incidents]
-      summary: Edit a Draft or Returned incident (creator only)
-      description: 'Spec #25. Any subset of the incident fields.'
-      x-permission: create
+      summary: Edit an incident (the filer while Draft/Returned; a reviewer before approval)
+      description: 'Specs #5, #14, #25. Any subset of the incident fields. The filer edits their own Draft or Returned report. An officer who may act on someone else''s report at its current stage (Submitted, Reviewed or Verified; `canModify` in the detail) modifies it before approval: `reason` is required, the audit entry MODIFY_INCIDENT records each changed field with its old and new value, the timeline shows "Modified by reviewer" and the filer is notified. Anything else is refused (403) and audited as DENIED_UPDATE.'
+      x-permission: incidents
       requestBody:
         required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/IncidentInput' } } }
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/IncidentInput'
+                - type: object
+                  properties:
+                    reason: { type: string, maxLength: 2000, description: 'Required when a reviewer modifies a report filed by another officer' }
       responses:
         '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/IncidentDetail' } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -518,7 +528,7 @@ paths:
       tags: [Evidence]
       summary: Upload evidence (creator, Draft/Returned only)
       description: |
-        Specs #10, #11. JPEG, PNG, GIF, PDF, MP4 and MOV, checked on file content. Up to 10 files per request,
+        Specs #10, #11. JPEG, PNG, GIF, PDF, MP4, MOV and documents (Word .docx/.doc, Excel .xlsx/.xls, PowerPoint .pptx/.ppt, OpenDocument .odt/.ods/.odp, RTF; macro-enabled files refused), checked on file content. Office/OpenDocument files keep their document properties (title, author, last modified by, created, modified) in `metadata.document`. Up to 10 files per request,
         50 MB per file, 500 MB per incident. One bad file rejects the whole batch. The server records SHA-256,
         EXIF/GPS metadata and stores files encrypted (AES-256-GCM).
       x-permission: create
@@ -629,6 +639,7 @@ paths:
         - $ref: '#/components/parameters/Status'
         - $ref: '#/components/parameters/Severity'
         - $ref: '#/components/parameters/Category'
+        - $ref: '#/components/parameters/Subcategory'
         - $ref: '#/components/parameters/Sector'
         - $ref: '#/components/parameters/Battalion'
         - $ref: '#/components/parameters/Bop'
@@ -645,6 +656,7 @@ paths:
                 properties:
                   total: { type: integer }
                   pendingReview: { type: integer }
+                  verified: { type: integer, description: 'Passed verification: Verified, Approved or Closed (spec #17)' }
                   returned: { type: integer }
                   approved: { type: integer }
                   closed: { type: integer }
@@ -745,6 +757,7 @@ paths:
         - $ref: '#/components/parameters/Status'
         - $ref: '#/components/parameters/Severity'
         - $ref: '#/components/parameters/Category'
+        - $ref: '#/components/parameters/Subcategory'
         - $ref: '#/components/parameters/Sector'
         - $ref: '#/components/parameters/Battalion'
         - $ref: '#/components/parameters/Bop'
@@ -796,6 +809,7 @@ paths:
         - $ref: '#/components/parameters/Status'
         - $ref: '#/components/parameters/Severity'
         - $ref: '#/components/parameters/Category'
+        - $ref: '#/components/parameters/Subcategory'
         - $ref: '#/components/parameters/Sector'
         - $ref: '#/components/parameters/Battalion'
         - $ref: '#/components/parameters/DateFrom'
@@ -835,6 +849,7 @@ paths:
         - $ref: '#/components/parameters/Status'
         - $ref: '#/components/parameters/Severity'
         - $ref: '#/components/parameters/Category'
+        - $ref: '#/components/parameters/Subcategory'
         - $ref: '#/components/parameters/Sector'
         - $ref: '#/components/parameters/Battalion'
         - $ref: '#/components/parameters/DateFrom'
@@ -864,6 +879,7 @@ paths:
         - $ref: '#/components/parameters/Status'
         - $ref: '#/components/parameters/Severity'
         - $ref: '#/components/parameters/Category'
+        - $ref: '#/components/parameters/Subcategory'
         - $ref: '#/components/parameters/Sector'
         - $ref: '#/components/parameters/Battalion'
         - $ref: '#/components/parameters/DateFrom'
@@ -891,6 +907,7 @@ paths:
         - $ref: '#/components/parameters/Status'
         - $ref: '#/components/parameters/Severity'
         - $ref: '#/components/parameters/Category'
+        - $ref: '#/components/parameters/Subcategory'
         - $ref: '#/components/parameters/Sector'
         - $ref: '#/components/parameters/Battalion'
         - $ref: '#/components/parameters/DateFrom'
@@ -1570,6 +1587,128 @@ paths:
       x-permission: messages
       responses:
         '200': { description: ICE configuration, content: { application/json: { schema: { type: object, properties: { iceServers: { type: array, items: { type: object } }, relay: { type: boolean } } } } } }
+  /alerts:
+    get:
+      tags: [Alerts]
+      summary: Flash Alerts the caller may see (recipient, sender, or admin/audit permission), newest first
+      x-permission: any signed-in user
+      parameters:
+        - { name: state, in: query, schema: { type: string, enum: [active, closed, all], default: all }, description: 'closed = resolved, cancelled or expired' }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PageSize' }
+      responses:
+        '200': { description: Page of alerts, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/FlashAlert' } }, page: { type: integer }, pageSize: { type: integer }, total: { type: integer }, totalPages: { type: integer } } } } } }
+    post:
+      tags: [Alerts]
+      summary: Raise a Flash Alert (multipart; audited RAISE_FLASH_ALERT)
+      description: 'Form field `data` is the alert as JSON; `files` are optional attachments (same types and limits as incident evidence, checked on content, encrypted, SHA-256). `declaration` must be true: the sender confirms the information is genuine and that raising a false alert is an offence (the time is stored). Recipients are fixed now: every active user whose unit is in `targetSectors` (all units when empty) and every HQ-level user, except the sender. They receive it over the realtime channel (`{type: alert}`), by web push (urgency high) and from GET /alerts/active.'
+      x-permission: raise_alert
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: string
+                  description: 'JSON: { title, threatType (illegal_crossing | smuggling | armed_group | trafficking | wanted_person | other), priority (flash | immediate), subjectName?, subjectDescription?, details, instructions, lastSeenAt? (ISO), lastSeenPlace?, lat?, lng?, targetSectors: string[], validHours (6 | 12 | 24 | 48 | 72 | 168), incidentId?, declaration: true }'
+                files: { type: array, items: { type: string, format: binary } }
+      responses:
+        '201': { description: Raised, content: { application/json: { schema: { $ref: '#/components/schemas/FlashAlert' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '415': { description: An attachment is not an allowed type (audited UPLOAD_REJECTED) }
+  /alerts/active:
+    get:
+      tags: [Alerts]
+      summary: Active alerts addressed to the caller (or sent by them); records delivery
+      x-permission: any signed-in user
+      responses:
+        '200': { description: Active alerts, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/FlashAlert' } } } } }
+  /alerts/options:
+    get:
+      tags: [Alerts]
+      summary: Choices for the raise form (every sector, validity periods, threat types, priorities)
+      x-permission: raise_alert
+      responses:
+        '200': { description: Options, content: { application/json: { schema: { type: object, properties: { sectors: { type: array, items: { type: string } }, validHours: { type: array, items: { type: integer } }, threatTypes: { type: array, items: { type: string } }, priorities: { type: array, items: { type: string } } } } } } }
+  /alerts/preview:
+    get:
+      tags: [Alerts]
+      summary: How many officers an alert to these sectors would reach
+      x-permission: raise_alert
+      parameters: [{ name: sectors, in: query, schema: { type: string }, description: 'Comma-separated sector names; empty = all units' }]
+      responses:
+        '200': { description: Count, content: { application/json: { schema: { type: object, properties: { recipients: { type: integer } } } } } }
+  /alerts/{id}:
+    parameters: [{ $ref: '#/components/parameters/AlertId' }]
+    get:
+      tags: [Alerts]
+      summary: One alert; the sender, administrators and auditors also get `recipientList` with delivery and acknowledgement times
+      x-permission: recipient, sender, or admin/audit permission
+      responses:
+        '200': { description: Alert, content: { application/json: { schema: { $ref: '#/components/schemas/FlashAlert' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /alerts/{id}/acknowledge:
+    parameters: [{ $ref: '#/components/parameters/AlertId' }]
+    post:
+      tags: [Alerts]
+      summary: Acknowledge an alert addressed to the caller (recorded once; audited ACKNOWLEDGE_FLASH_ALERT)
+      x-permission: recipient
+      responses:
+        '200': { description: Acknowledged, content: { application/json: { schema: { $ref: '#/components/schemas/FlashAlert' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /alerts/{id}/updates:
+    parameters: [{ $ref: '#/components/parameters/AlertId' }]
+    post:
+      tags: [Alerts]
+      summary: Post an update to an active alert (sender or HQ administrator; recipients are notified again; append-only; audited)
+      x-permission: sender or HQ Administrator
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [body], properties: { body: { type: string, maxLength: 4000 } } } } }
+      responses:
+        '201': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/FlashAlert' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /alerts/{id}/resolve:
+    parameters: [{ $ref: '#/components/parameters/AlertId' }]
+    post:
+      tags: [Alerts]
+      summary: Resolve an alert, with the outcome (sender or HQ administrator; audited RESOLVE_FLASH_ALERT)
+      x-permission: sender or HQ Administrator
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [notes], properties: { notes: { type: string, maxLength: 4000 } } } } }
+      responses:
+        '200': { description: Resolved, content: { application/json: { schema: { $ref: '#/components/schemas/FlashAlert' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /alerts/{id}/cancel:
+    parameters: [{ $ref: '#/components/parameters/AlertId' }]
+    post:
+      tags: [Alerts]
+      summary: Cancel an alert, with the reason (e.g. raised in error; sender or HQ administrator; audited CANCEL_FLASH_ALERT)
+      x-permission: sender or HQ Administrator
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [notes], properties: { notes: { type: string, maxLength: 4000 } } } } }
+      responses:
+        '200': { description: Cancelled, content: { application/json: { schema: { $ref: '#/components/schemas/FlashAlert' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /alerts/{id}/attachments/{aid}:
+    parameters: [{ $ref: '#/components/parameters/AlertId' }, { name: aid, in: path, required: true, schema: { type: integer } }, { name: inline, in: query, schema: { type: string, enum: ['1'] } }]
+    get:
+      tags: [Alerts]
+      summary: An attachment, integrity-checked (409 EVIDENCE_TAMPERED on mismatch); audited VIEW_ALERT_ATTACHMENT
+      x-permission: recipient, sender, or admin/audit permission
+      responses:
+        '200': { $ref: '#/components/responses/File' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: Integrity check failed }
 components:
   securitySchemes:
     bearerAuth:
@@ -1582,6 +1721,7 @@ components:
       name: birds_rt
 
   parameters:
+    AlertId: { name: id, in: path, required: true, schema: { type: integer } }
     ConversationId: { name: id, in: path, required: true, schema: { type: integer } }
     IncidentId: { name: id, in: path, required: true, schema: { type: string, pattern: '^BIRDS-\d{4}-\d{4,}$', example: BIRDS-2026-1001 } }
     Page: { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
@@ -1590,6 +1730,7 @@ components:
     Status: { name: status, in: query, schema: { type: string, example: 'Submitted,Reviewed' }, description: Comma-separated statuses }
     Severity: { name: severity, in: query, schema: { type: string, example: 'High,Critical' }, description: Comma-separated severities }
     Category: { name: category, in: query, schema: { type: string } }
+    Subcategory: { name: subcategory, in: query, schema: { type: string }, description: 'Incident type (sub-category), spec #16' }
     Sector: { name: sector, in: query, schema: { type: string } }
     Battalion: { name: battalion, in: query, schema: { type: string } }
     Bop: { name: bop, in: query, schema: { type: string } }
@@ -1646,6 +1787,39 @@ components:
     RateLimited: { description: RATE_LIMITED, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   schemas:
+    FlashAlert:
+      type: object
+      properties:
+        id: { type: integer }
+        reference: { type: string, example: FA-2026-0001 }
+        title: { type: string }
+        threatType: { type: string, enum: [illegal_crossing, smuggling, armed_group, trafficking, wanted_person, other] }
+        priority: { type: string, enum: [flash, immediate] }
+        subjectName: { type: [string, 'null'] }
+        subjectDescription: { type: [string, 'null'] }
+        details: { type: string }
+        instructions: { type: string }
+        lastSeenAt: { type: [string, 'null'], format: date-time }
+        lastSeenPlace: { type: [string, 'null'] }
+        lat: { type: [number, 'null'] }
+        lng: { type: [number, 'null'] }
+        targetSectors: { type: array, items: { type: string }, description: Empty = all units }
+        incidentId: { type: [string, 'null'] }
+        validUntil: { type: string, format: date-time }
+        state: { type: string, enum: [active, expired, resolved, cancelled] }
+        createdAt: { type: string, format: date-time }
+        declarationAt: { type: string, format: date-time, description: When the sender accepted the false-alert declaration }
+        sender: { type: object, properties: { id: { type: string }, name: { type: string }, role: { type: string }, scope: { type: string } } }
+        closedAt: { type: [string, 'null'], format: date-time }
+        closedByName: { type: [string, 'null'] }
+        closeNote: { type: [string, 'null'] }
+        attachments: { type: array, items: { type: object, properties: { id: { type: integer }, name: { type: string }, mimeType: { type: string }, size: { type: integer }, sha256: { type: string }, metadata: { type: object }, uploadedAt: { type: string, format: date-time }, downloadUrl: { type: string } } } }
+        updates: { type: array, items: { type: object, properties: { id: { type: integer }, kind: { type: string, enum: [update, resolved, cancelled] }, body: { type: string }, user: { type: string }, userId: { type: string }, date: { type: string, format: date-time } } } }
+        me: { type: object, properties: { recipient: { type: boolean }, deliveredAt: { type: [string, 'null'], format: date-time }, acknowledgedAt: { type: [string, 'null'], format: date-time } } }
+        counts: { type: object, properties: { recipients: { type: integer }, delivered: { type: integer }, acknowledged: { type: integer } } }
+        canUpdate: { type: boolean }
+        canClose: { type: boolean }
+        recipientList: { type: array, description: 'Sender, administrators and auditors only (detail endpoint)', items: { type: object, properties: { userId: { type: string }, name: { type: string }, role: { type: string }, scope: { type: string }, deliveredAt: { type: [string, 'null'] }, acknowledgedAt: { type: [string, 'null'] } } } }
     Person:
       type: object
       properties: { id: { type: string }, name: { type: string }, role: { type: string }, scope: { type: string } }
@@ -1831,6 +2005,7 @@ components:
         overdue: { type: boolean, description: 'Waiting longer than workflow.overdue_days in this step' }
         actions: { type: array, items: { type: string, enum: [review, verify, approve, close, return, reject] }, description: Workflow actions the caller may take now }
         canEdit: { type: boolean }
+        canModify: { type: boolean, description: 'The caller may modify this report before approval as a reviewer (spec #14)' }
         canSubmit: { type: boolean }
         canDiscard: { type: boolean, description: The caller created this never-submitted draft and may discard it }
         canArchive: { type: boolean }

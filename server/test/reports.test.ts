@@ -26,6 +26,7 @@ describe('KPIs and breakdowns (specs #17, #19)', () => {
     expect(statusSum).toBe(res.body.total);
     expect(severitySum).toBe(res.body.total);
     expect(res.body.pendingReview).toBe(await prisma.incident.count({ where: { status: { in: ['Submitted', 'Reviewed', 'Verified'] } } }));
+    expect(res.body.verified).toBe(await prisma.incident.count({ where: { status: { in: ['Verified', 'Approved', 'Closed'] } } }));
 
     await operator.post('/api/v1/incidents', newIncident()); // a draft
     expect((await admin.get(`${R}/summary`)).body.total).toBe(res.body.total);

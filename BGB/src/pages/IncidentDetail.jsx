@@ -28,7 +28,7 @@ function Detail({ label, value }) {
   return (
     <div className="min-w-0">
       <dt className="text-xs text-gray-500">{label}</dt>
-      <dd className="mt-0.5 break-words text-sm font-medium text-gray-800">{value || t('common.na')}</dd>
+      <dd className="mt-0.5 text-sm font-medium text-gray-800">{value || t('common.na')}</dd>
     </div>
   );
 }
@@ -54,6 +54,10 @@ function metadataSummary(ev, t) {
   if (camera) parts.push(camera);
   if (m.exif?.DateTimeOriginal) parts.push(t('detail.captured', { date: formatDateTime(m.exif.DateTimeOriginal) }));
   if (m.gps) parts.push(`GPS ${m.gps.latitude.toFixed(5)}, ${m.gps.longitude.toFixed(5)}`);
+  // Office/OpenDocument properties
+  if (m.document?.author) parts.push(t('detail.docAuthor', { name: m.document.author }));
+  if (m.document?.created) parts.push(t('detail.docCreated', { date: formatDateTime(m.document.created) }));
+  if (m.document?.modified) parts.push(t('detail.docModified', { date: formatDateTime(m.document.modified) }));
   if (ev.sha256) parts.push(`SHA-256 ${ev.sha256.slice(0, 12)}…`);
   return parts.join(' • ') || t('detail.noMetadata');
 }
@@ -244,6 +248,12 @@ export default function IncidentDetail() {
               {inc.canEdit && (
                 <Link to={`/incidents/${inc.id}/edit`} className="btn btn-secondary">
                   {t('common.edit')}
+                </Link>
+              )}
+              {/* Spec #14 — a reviewer modifies the report before approval (reason required, audited) */}
+              {!inc.canEdit && inc.canModify && (
+                <Link to={`/incidents/${inc.id}/edit`} className="btn btn-secondary">
+                  {t('detail.modify')}
                 </Link>
               )}
               {[...actions].sort((x, y) => ACTION_BTN[x].order - ACTION_BTN[y].order).map((a) => (

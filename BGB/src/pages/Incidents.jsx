@@ -13,7 +13,7 @@ import { useI18n } from '../i18n/I18nContext';
 // Specs #15, #16 — search by reference number and filter; the server filters, scopes and paginates.
 // Views: everything in scope, what needs the user's action (server's workflow table), their own
 // records, their drafts. View and filters live in the URL so links and reloads keep them.
-const EMPTY_FILTERS = { q: '', status: '', category: '', severity: '', dateFrom: '', dateTo: '', sector: '', battalion: '', bop: '', archived: '', overdue: '', sort: '' };
+const EMPTY_FILTERS = { q: '', status: '', category: '', subcategory: '', severity: '', dateFrom: '', dateTo: '', sector: '', battalion: '', bop: '', archived: '', overdue: '', sort: '' };
 const DEFAULT_SORT = 'createdAt:desc';
 const SORTS = [
   ['createdAt:desc', 'incidents.sortNewest'],
@@ -95,6 +95,8 @@ export default function Incidents() {
   const hierarchy = meta?.hierarchy || {};
   const battalions = filters.sector ? Object.keys(hierarchy[filters.sector] || {}) : [];
   const bops = filters.sector && filters.battalion ? hierarchy[filters.sector]?.[filters.battalion]?.BOPs || [] : [];
+  // Incident types (sub-categories) of the chosen category (spec #16)
+  const types = (meta?.categories || []).find((c) => c.name === filters.category)?.subcategories || [];
 
   const activeCount = Object.entries(filters).filter(([k, v]) => v && !(k === 'sort' && v === DEFAULT_SORT)).length;
   const [sortField, sortOrder] = (filters.sort || DEFAULT_SORT).split(':');
@@ -104,6 +106,7 @@ export default function Incidents() {
       q,
       status: filters.status,
       category: filters.category,
+      subcategory: filters.subcategory, // incident type (spec #16)
       severity: filters.severity,
       dateFrom: filters.dateFrom,
       dateTo: filters.dateTo,
@@ -118,7 +121,7 @@ export default function Incidents() {
       page,
       pageSize: PAGE_SIZE,
     }),
-    [q, filters.status, filters.category, filters.severity, filters.dateFrom, filters.dateTo, filters.sector, filters.battalion, filters.bop, filters.archived, filters.overdue, sortField, sortOrder, view, page],
+    [q, filters.status, filters.category, filters.subcategory, filters.severity, filters.dateFrom, filters.dateTo, filters.sector, filters.battalion, filters.bop, filters.archived, filters.overdue, sortField, sortOrder, view, page],
   );
   const { data, loading, error, message, reload, setData } = useApi((signal) => incidentsApi.list(query, signal), [query]);
 
@@ -220,9 +223,13 @@ export default function Incidents() {
               ))}
             </select>
           )}
-          <select id="filter-category" value={filters.category} onChange={set('category')} className="form-input" aria-label={t('common.category')}>
+          <select id="filter-category" value={filters.category} onChange={(e) => update({ category: e.target.value, subcategory: '' })} className="form-input" aria-label={t('common.category')}>
             <option value="">{t('common.allCategories')}</option>
             {(meta?.categories || []).map((c) => <option key={c.id}>{c.name}</option>)}
+          </select>
+          <select id="filter-subcategory" value={filters.subcategory} onChange={set('subcategory')} disabled={!filters.category} className="form-input" aria-label={t('common.subcategory')}>
+            <option value="">{t('incidents.allTypes')}</option>
+            {types.map((s) => <option key={s}>{s}</option>)}
           </select>
           <select id="filter-severity" value={filters.severity} onChange={set('severity')} className="form-input" aria-label={t('common.severity')}>
             <option value="">{t('common.allSeverity')}</option>

@@ -13,7 +13,7 @@ import type { CreateIncidentInput, ListIncidentsQuery, UpdateIncidentInput } fro
 import { isAdmin } from '../../utils/roles.js';
 import { permissionsFor } from '../../middleware/rbac.js';
 import { CONFIG_DEFAULTS } from '../admin/config.service.js';
-import { actionableStatuses, availableActions, EDITABLE_STATUSES, isArchivableStatus, isEditableStatus, OVERDUE_STATUSES, WORKFLOW, type WorkflowAction } from './workflow.js';
+import { actionableStatuses, availableActions, canModifyAsReviewer, EDITABLE_STATUSES, isArchivableStatus, isEditableStatus, OVERDUE_STATUSES, WORKFLOW, type WorkflowAction } from './workflow.js';
 
 type AuthUser = Express.AuthUser;
 
@@ -80,6 +80,8 @@ function permittedActions(user: AuthUser, inc: { status: string; createdBy: stri
     // Separation of duties: nobody moves their own report through review/approval
     actions: own || archived ? [] : availableActions(inc.status, user.role),
     canEdit: own && !archived && isEditableStatus(inc.status),
+    // Spec #14 — a supervisory officer modifies the report before approval (reason required, audited)
+    canModify: !own && !archived && canModifyAsReviewer(inc.status, user.role),
     canSubmit: own && !archived && isEditableStatus(inc.status),
     // A never-submitted draft can be discarded by its creator; anything filed stays on record
     canDiscard: own && !archived && inc.status === 'Draft',
@@ -215,6 +217,7 @@ export async function incidentWhere(
   if (q.status?.length) filters.push({ status: { in: q.status } });
   if (q.severity?.length) filters.push({ severity: { in: q.severity } });
   if (q.category) filters.push({ category: q.category });
+  if (q.subcategory) filters.push({ subcategory: q.subcategory });
   if (q.sector) filters.push({ sector: q.sector });
   if (q.battalion) filters.push({ battalion: q.battalion });
   if (q.bop) filters.push({ bop: q.bop });
@@ -408,36 +411,94 @@ async function denied(user: AuthUser, action: string, id: string, reason: string
   await writeAudit({ action, username: user.username, userId: user.id, details: `Blocked on ${id}: ${reason}`, ctx });
 }
 
+// Current value of each editable field, in the request's format, for the change record
+function fieldValues(inc: IncidentDetailRow): Record<string, string | number | null> {
+  return {
+    title: inc.title,
+    category: inc.category,
+    subcategory: inc.subcategory,
+    severity: inc.severity,
+    date: toDateString(inc.incidentDate),
+    time: toTimeString(inc.incidentTime),
+    location: inc.location,
+    sector: inc.sector,
+    battalion: inc.battalion,
+    bop: inc.bop,
+    lat: inc.lat === null ? null : Number(inc.lat),
+    lng: inc.lng === null ? null : Number(inc.lng),
+    description: inc.description,
+    personsInvolved: inc.personsInvolved,
+    actionTaken: inc.actionTaken,
+    outcome: inc.outcome,
+  };
+}
+
+const shown = (v: unknown) => {
+  if (v === null || v === undefined || v === '') return '(empty)';
+  const t = String(v).replace(/\s+/g, ' ');
+  return t.length > 120 ? `"${t.slice(0, 120)}…"` : `"${t}"`;
+};
+
+/**
+ * Spec #5 — the filer edits their own Draft/Returned report. Spec #14 — a supervisory officer who
+ * may act on the report at its current stage modifies it before approval: a reason is required,
+ * the audit entry records each changed field with its old and new value, the timeline shows the
+ * change and the filer is notified. Specs #24, #25 — every other edit is refused and audited.
+ */
 export async function updateIncident(user: AuthUser, id: string, input: UpdateIncidentInput, ctx: RequestContext) {
   const inc = await loadVisible(user, id);
-  if (inc.createdBy !== user.id) {
-    await denied(user, 'DENIED_UPDATE', id, 'not the creator', ctx);
-    throw forbidden('Only the officer who filed this incident can edit it');
+  const own = inc.createdBy === user.id;
+  const reviewerEdit = !own && inc.archivedAt === null && canModifyAsReviewer(inc.status, user.role);
+
+  if (own) {
+    if (!(await permissionsFor(user.role)).includes('create')) {
+      await denied(user, 'DENIED_UPDATE', id, `role ${user.role} cannot file incidents`, ctx);
+      throw forbidden('Your role cannot edit incident reports');
+    }
+    if (!isEditableStatus(inc.status) || inc.archivedAt !== null) {
+      await denied(user, 'DENIED_UPDATE', id, `status is ${inc.status}`, ctx);
+      throw forbidden(`${id} is ${inc.status} and can no longer be edited`);
+    }
+  } else if (!reviewerEdit) {
+    await denied(user, 'DENIED_UPDATE', id, `not the creator and no review authority while ${inc.status}`, ctx);
+    throw forbidden(
+      ['Submitted', 'Reviewed', 'Verified'].includes(inc.status)
+        ? 'Only the filing officer, or an officer who may review or approve it at this stage, can edit this incident'
+        : `${id} is ${inc.status} and can no longer be edited`,
+    );
   }
-  if (!isEditableStatus(inc.status)) {
-    await denied(user, 'DENIED_UPDATE', id, `status is ${inc.status}`, ctx);
-    throw forbidden(`${id} is ${inc.status} and can no longer be edited`);
+
+  const { reason, ...changes } = input;
+  if (Object.keys(changes).length === 0) throw badRequest('No changes supplied');
+  if (reviewerEdit && !reason) throw badRequest('A reason is required to modify a report filed by another officer');
+
+  // Only fields whose value really changes
+  const before = fieldValues(inc);
+  const diff = Object.entries(changes).filter(([k, v]) => (v ?? null) !== (before[k] ?? null)) as [keyof typeof changes, unknown][];
+  if (diff.length === 0) {
+    // The form sends every field; saving an unchanged report changes nothing
+    if (reviewerEdit) throw badRequest('No changes supplied');
+    return getIncident(user, id);
   }
-  if (Object.keys(input).length === 0) throw badRequest('No changes supplied');
 
   const scope = await resolveScope(user.scope);
   const merged = {
-    category: input.category ?? inc.category,
-    subcategory: input.subcategory !== undefined ? input.subcategory : inc.subcategory,
-    sector: input.sector ?? inc.sector ?? '',
-    battalion: input.battalion ?? inc.battalion ?? '',
-    bop: input.bop ?? inc.bop ?? '',
+    category: changes.category ?? inc.category,
+    subcategory: changes.subcategory !== undefined ? changes.subcategory : inc.subcategory,
+    sector: changes.sector ?? inc.sector ?? '',
+    battalion: changes.battalion ?? inc.battalion ?? '',
+    bop: changes.bop ?? inc.bop ?? '',
   };
-  if (input.category !== undefined || input.subcategory !== undefined) await validateClassification(merged.category, merged.subcategory);
-  if (input.sector !== undefined || input.battalion !== undefined || input.bop !== undefined) await validateLocation(user, scope, merged);
-  if (input.date) validateDate(input.date);
+  if (changes.category !== undefined || changes.subcategory !== undefined) await validateClassification(merged.category, merged.subcategory);
+  if (changes.sector !== undefined || changes.battalion !== undefined || changes.bop !== undefined) await validateLocation(user, scope, merged);
+  if (changes.date) validateDate(changes.date);
 
-  const { date, time, ...fields } = input;
-  const changed = Object.keys(input).sort().join(', ');
+  const { date, time, ...fields } = Object.fromEntries(diff) as typeof changes;
+  const changed = diff.map(([k]) => k).sort().join(', ');
   await prisma.$transaction(async (tx) => {
     // Conditional on status so a concurrent workflow action can't be overwritten
     const { count } = await tx.incident.updateMany({
-      where: { id, status: { in: [...EDITABLE_STATUSES] } },
+      where: { id, archivedAt: null, status: reviewerEdit ? inc.status : { in: [...EDITABLE_STATUSES] } },
       data: {
         ...fields,
         ...(date ? { incidentDate: fromDateString(date) } : {}),
@@ -446,11 +507,24 @@ export async function updateIncident(user: AuthUser, id: string, input: UpdateIn
     });
     if (count === 0) throw conflict(`${id} changed state while you were editing; reload and try again`);
     await tx.incidentTimeline.create({
-      data: { incidentId: id, action: 'Edited', userName: user.name, userId: user.id, status: inc.status, notes: `Changed: ${changed}` },
+      data: reviewerEdit
+        ? { incidentId: id, action: 'Modified by reviewer', userName: user.name, userId: user.id, status: inc.status, notes: `Changed: ${changed}. Reason: ${reason}` }
+        : { incidentId: id, action: 'Edited', userName: user.name, userId: user.id, status: inc.status, notes: `Changed: ${changed}` },
     });
+    if (reviewerEdit) await notifyWorkflow(tx, inc, 'modified', user, `${changed}. Reason: ${reason}`);
   });
 
-  await writeAudit({ action: 'UPDATE_INCIDENT', username: user.username, userId: user.id, details: `Updated ${id} (${changed})`, ctx });
+  await writeAudit(
+    reviewerEdit
+      ? {
+          action: 'MODIFY_INCIDENT',
+          username: user.username,
+          userId: user.id,
+          details: `Modified ${id} (${inc.status}, filed by ${inc.creator.name}). Reason: ${reason}. ${diff.map(([k, v]) => `${k}: ${shown(before[k])} → ${shown(v)}`).join('; ')}`,
+          ctx,
+        }
+      : { action: 'UPDATE_INCIDENT', username: user.username, userId: user.id, details: `Updated ${id} (${changed})`, ctx },
+  );
   return getIncident(user, id);
 }
 

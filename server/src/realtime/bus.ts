@@ -14,7 +14,8 @@ export type BusEvent =
   | { type: 'conversation.changed'; conversationId: number; recipients: string[] }
   | { type: 'read'; conversationId: number; userId: string }
   | { type: 'call'; to: string; payload: Record<string, unknown> }
-  | { type: 'call.resumed'; callId: number; userId: string };
+  | { type: 'call.resumed'; callId: number; userId: string }
+  | { type: 'alert'; alertId: number; event: 'raised' | 'updated' | 'acknowledged' | 'closed'; recipients: string[] };
 
 type Handler = (event: BusEvent) => void;
 const handlers = new Set<Handler>();

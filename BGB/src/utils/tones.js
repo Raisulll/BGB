@@ -1,12 +1,15 @@
 // Call tones generated with Web Audio (no audio files to ship or fetch).
 // 'ring': incoming call, a loud trilling double ring that is hard to miss.
 // 'ringback': what the caller hears while the other side rings (a steady, moderate tone).
+// 'alarm': a Flash Alert waiting to be acknowledged.
 //
 // Each pattern is a list of bursts per cycle: [start s, length s, frequencies Hz, trill Hz].
 // A trill alternates the frequencies (like a desk phone's bell); without one they sound together.
 const PATTERNS = {
   ring: { period: 2.6, level: 0.9, wave: 'square', bursts: [[0, 0.45, [1046, 1318], 16], [0.6, 0.45, [1046, 1318], 16]] },
   ringback: { period: 4, level: 0.12, wave: 'sine', bursts: [[0, 1, [425], 0]] },
+  // Flash Alert: a two-tone siren, distinct from the call ring, until the alert is acknowledged
+  alarm: { period: 1.6, level: 0.9, wave: 'sawtooth', bursts: [[0, 0.7, [880], 0], [0.8, 0.7, [660], 0]] },
 };
 
 /** Starts a repeating tone; returns a function that stops it. Never throws. */

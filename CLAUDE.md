@@ -46,6 +46,7 @@ Tender/
         │   ├── activity.js     ← Last user-input time (idle logout + background polling)
         │   ├── pwa.js          ← service worker registration, install prompt
         │   ├── push.js         ← this device's web push (on/off, resume after sign-in, close by tag)
+        │   ├── audioDevices.js ← call microphone/output lists, speaker/earpiece detection, remembered choice
         │   └── tones.js        ← call ring/ringback (Web Audio)
         ├── hooks/
         │   ├── useApi.js       ← Load-on-deps hook (abort, stale-response guard) + useDebounced
@@ -156,8 +157,8 @@ Plus: users act only within their scope, and nobody acts on an incident they fil
 
 | Role | pageIds granted |
 |---|---|
-| `HQ Administrator` | dashboard, incidents, create, map, analytics, reports, audit, admin, messages |
-| `Sector Officer` | dashboard, incidents, create, map, analytics, reports, messages |
+| `HQ Administrator` | dashboard, incidents, create, map, analytics, reports, audit, admin, messages, raise_alert |
+| `Sector Officer` | dashboard, incidents, create, map, analytics, reports, messages, raise_alert |
 | `Battalion Operator` | dashboard, incidents, create, map, messages |
 | `Verifier/Approver` | dashboard, incidents, map, analytics, reports, messages |
 | `Auditor` | dashboard, incidents, analytics, reports, audit, messages |
@@ -272,13 +273,15 @@ All dates **must** be displayed as `DD-MM-YYYY`. Use `formatDateDisplay()` from 
 | `/incidents/:id` | `IncidentDetail.jsx` | `incidents` |
 | `/change-password` | `ChangePassword.jsx` | (just auth; forced while `mustChangePassword`) |
 | `/profile` | `Profile.jsx` | (just auth) |
-| `/incidents/:id/edit` | `IncidentForm.jsx` | `create` |
+| `/incidents/:id/edit` | `IncidentForm.jsx` | `incidents` (the filer edits Draft/Returned; a reviewer modifies before approval: `canEdit` / `canModify`, server decides) |
 | `/map` | `MapView.jsx` | `map` |
 | `/analytics` | `Analytics.jsx` | `analytics` |
 | `/reports` | `Reports.jsx` | `reports` |
 | `/audit` | `AuditTrail.jsx` | `audit` |
 | `/messages`, `/messages/:id` | `Messages.jsx` | `messages` |
 | `/calls` | `CallLog.jsx` | `messages` (the "All calls" tab also needs `admin` or `audit`) |
+| `/alerts`, `/alerts/:id` | `Alerts.jsx`, `AlertDetail.jsx` | just auth (every user receives Flash Alerts for their area) |
+| `/alerts/new` | `AlertForm.jsx` | `raise_alert` |
 | `/admin` | `Admin.jsx` | `admin` |
 
 All routes except `/login` are wrapped in `<RequireAuth>`. Permission-gated routes additionally use `<RequirePermission pageId="...">` which redirects to `/` on failure.
@@ -829,7 +832,7 @@ All endpoints require `Authorization: Bearer <access_token>` unless marked **Pub
 | GET | `/incidents` | incidents | List with pagination + filters (date, status, sector, category, severity, ref#) | #15, #16 |
 | POST | `/incidents` | create | Create new incident (Draft or Submitted) | #5 |
 | GET | `/incidents/:id` | incidents | Get full incident detail including timeline | #7, #12 |
-| PATCH | `/incidents/:id` | create | Edit Draft/Returned incident | #5 |
+| PATCH | `/incidents/:id` | incidents | Filer edits Draft/Returned; reviewer at the current stage modifies Submitted/Reviewed/Verified before approval (`reason` required, MODIFY_INCIDENT audit with old → new values, filer notified) | #5, #14 |
 | DELETE | `/incidents/:id` | create | Discard a never-submitted draft (creator; soft, hidden everywhere, audited) | #5, #25 |
 | POST | `/incidents/:id/comments` | incidents | Comment (filers/reviewers; not drafts/archived); append-only, notifies creator + earlier commenters | #12, #23 |
 | POST | `/incidents/:id/print` | incidents | Audit entry before the browser prints a single incident | #22, #24 |
@@ -936,6 +939,18 @@ All endpoints require `Authorization: Bearer <access_token>` unless marked **Pub
 | GET | `/calls`, `/calls/all`, `/calls/ice` | messages (+ admin or audit for `/all`) | Call log; every call; ICE servers |
 | WS | `/ws` | signed in + messages | Pushed messaging events and call signalling |
 | GET/POST/DELETE | `/push/config`, `/push/status`, `/push/subscriptions` | messages | Web push for calls/messages while the app is closed (VAPID keys; names only, never message text; bound to the session) |
+
+### 19.11 Flash Alerts (spec #23/#58 extension, 2026-10-15)
+
+> Urgent warning of an imminent border threat (e.g. a wanted person about to cross), with intelligence and evidence, sent at once to every officer in the target sectors (HQ-level users always). `raise_alert` permission (HQ Administrator, Sector Officer by default). The sender must accept a false-alert declaration (time stored). Recipients are fixed at raising; delivery and acknowledgement are recorded once (DB trigger). Realtime `{type:'alert'}` + web push (`kind: 'alert'`, urgency high) + 30 s background poll of `/alerts/active`. Frontend: `AlertsContext` (Layout), full-screen `AlertTakeover` with siren until acknowledged, red `AlertBanner` on every page. Updates/attachments append-only; resolve/cancel need a note; expiry derived from `valid_until`. Audited: RAISE/ACKNOWLEDGE/UPDATE/RESOLVE/CANCEL_FLASH_ALERT, VIEW_ALERT_ATTACHMENT, DENIED_FLASH_ALERT. Reference `FA-<year>-NNNN`.
+
+| Method | Path | Permission | Description |
+|---|---|---|---|
+| GET | `/alerts`, `/alerts/active`, `/alerts/:id` | recipient, sender, or admin/audit | List (state active/closed/all); my active alerts (records delivery); one alert (+ `recipientList` for sender/admin/audit) |
+| GET | `/alerts/options`, `/alerts/preview?sectors=` | raise_alert | Form choices (all sectors); recipient count |
+| POST | `/alerts` (multipart `data` + `files`) | raise_alert | Raise |
+| POST | `/alerts/:id/acknowledge` · `/updates` · `/resolve` · `/cancel` | recipient · sender/HQ admin | Acknowledge; update; close with note |
+| GET | `/alerts/:id/attachments/:aid` | as GET `/alerts/:id` | Attachment (integrity-checked, audited) |
 
 Messages and the call log are permanent records (append-only `messages`; `CALL` audit entry per call). Every finished call is also a `call` entry (`messages.call_id`) in the pair's direct chat, added by `finalise()` in `calls.service.ts`. Audio of calls is never stored.
 

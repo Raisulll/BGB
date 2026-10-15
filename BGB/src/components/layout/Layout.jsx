@@ -6,6 +6,9 @@ import useIdleLogout from '../../hooks/useIdleLogout';
 import useOnline from '../../hooks/useOnline';
 import { useApp } from '../../context/AppContext';
 import { PushPrompt } from '../messaging/PushSettings';
+import { AlertsProvider } from '../../context/AlertsContext';
+import AlertBanner from '../alerts/AlertBanner';
+import AlertTakeover from '../alerts/AlertTakeover';
 import { useI18n } from '../../i18n/I18nContext';
 import { CommsProvider } from '../../context/CommsContext';
 
@@ -45,6 +48,7 @@ export default function Layout() {
 
   return (
     <CommsProvider>
+      <AlertsProvider>
       {/* Safe-area padding: the installed app runs full screen under the iPhone notch and home bar */}
       <div className="flex h-dvh overflow-hidden bg-slate-100/60 print:block print:h-auto print:overflow-visible print:bg-white pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]">
         {/* Mobile overlay */}
@@ -65,6 +69,7 @@ export default function Layout() {
 
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden print:block print:overflow-visible">
           <Header onToggleSidebar={toggleSidebar} collapsed={collapsed} />
+          <AlertBanner />
           {!online && (
             <p role="status" className="border-b border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-900 print:hidden">
               <i className="fas fa-wifi mr-2" aria-hidden="true" />
@@ -84,6 +89,9 @@ export default function Layout() {
           </main>
         </div>
       </div>
+      {/* Flash Alerts: full-screen until acknowledged (above calls and dialogs) */}
+      <AlertTakeover />
+      </AlertsProvider>
     </CommsProvider>
   );
 }

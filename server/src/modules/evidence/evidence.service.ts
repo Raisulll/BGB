@@ -83,7 +83,7 @@ export async function uploadEvidence(
         details: `${incidentId}: "${name}" rejected — content is not an allowed type (declared ${file.mimetype})`,
         ctx,
       });
-      throw new AppError(415, 'UNSUPPORTED_FILE_TYPE', `${name}: only JPEG, PNG, GIF, PDF, MP4 and MOV files are accepted`);
+      throw new AppError(415, 'UNSUPPORTED_FILE_TYPE', `${name}: only photos (JPEG, PNG, GIF), PDF, video (MP4, MOV) and documents (Word, Excel, PowerPoint, OpenDocument, RTF; no macros) are accepted`);
     }
     const scan = await scanUpload(file.buffer, name);
     if (scan.status === 'infected') {

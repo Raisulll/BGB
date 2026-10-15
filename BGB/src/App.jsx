@@ -19,6 +19,9 @@ const ChangePassword = lazy(() => import('./pages/ChangePassword'));
 const Profile = lazy(() => import('./pages/Profile'));
 const Messages = lazy(() => import('./pages/Messages'));
 const CallLog = lazy(() => import('./pages/CallLog'));
+const Alerts = lazy(() => import('./pages/Alerts'));
+const AlertForm = lazy(() => import('./pages/AlertForm'));
+const AlertDetail = lazy(() => import('./pages/AlertDetail'));
 
 function RequireAuth({ children }) {
   const { currentUser } = useApp();
@@ -94,7 +97,8 @@ export default function App() {
           <Route
             path="incidents/:id/edit"
             element={
-              <RequirePermission pageId="create">
+              // The filer (create) edits; a reviewer (incidents) modifies before approval — the server decides
+              <RequirePermission pageId="incidents">
                 <IncidentForm />
               </RequirePermission>
             }
@@ -131,6 +135,17 @@ export default function App() {
               </RequirePermission>
             }
           />
+          {/* Flash Alerts (spec #23/#58 extension): every user receives them; raising needs raise_alert */}
+          <Route path="alerts" element={<Alerts />} />
+          <Route
+            path="alerts/new"
+            element={
+              <RequirePermission pageId="raise_alert">
+                <AlertForm />
+              </RequirePermission>
+            }
+          />
+          <Route path="alerts/:id" element={<AlertDetail />} />
           {/* Messaging and audio calls (spec #58 extension) */}
           <Route
             path="messages"

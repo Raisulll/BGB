@@ -34,7 +34,7 @@ function Field({ label, children }) {
   return (
     <div className="min-w-0">
       <dt className="text-xs text-gray-500">{label}</dt>
-      <dd className="mt-0.5 break-words text-sm font-medium text-gray-800">{children}</dd>
+      <dd className="mt-0.5 text-sm font-medium text-gray-800">{children}</dd>
     </div>
   );
 }
