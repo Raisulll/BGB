@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useMap } from 'react-leaflet';
+import { useMap } from './Leaflet';
 import L from 'leaflet';
 import { BD_VIEW } from '../../lib/leaflet';
 import { useI18n } from '../../i18n/I18nContext';

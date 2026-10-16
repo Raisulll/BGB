@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { MapContainer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, Marker, Popup } from '../components/map/Leaflet';
 import { BD_LIMIT } from '../lib/leaflet';
 import BaseMap from '../components/map/BaseMap';
 import BangladeshFrame from '../components/map/BangladeshFrame';

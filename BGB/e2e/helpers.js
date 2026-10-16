@@ -12,10 +12,15 @@ export const ACCOUNTS = {
 /** Signs in through the login page and waits for the app to open. */
 export async function signIn(page, who) {
   const [username, password] = ACCOUNTS[who];
+  // Start from a signed-out browser (the session lives in the refresh cookie; /login redirects a signed-in user)
+  await page.context().clearCookies();
   await page.goto('/login');
   await page.locator('input[autocomplete="username"]').fill(username);
   await page.locator('input[autocomplete="current-password"]').fill(password);
+  const response = page.waitForResponse((r) => r.url().endsWith('/auth/login'));
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  const r = await response;
+  expect(r.status(), `sign-in of ${username}: ${await r.text().catch(() => '')}`).toBe(200);
   await page.waitForURL((u) => !u.pathname.startsWith('/login'));
 }
 
@@ -36,17 +41,21 @@ export async function expectNoSideScroll(page) {
 export async function menuEntries(page) {
   const toggle = page.getByRole('button', { name: 'Toggle navigation' });
   if (await toggle.isVisible()) await toggle.click();
-  const nav = page.getByRole('navigation', { name: 'Main navigation' });
+  const nav = page.getByRole('complementary', { name: 'Main navigation' }).getByRole('navigation');
   await expect(nav).toBeVisible();
-  return (await nav.getByRole('link').allInnerTexts()).map((t) => t.replace(/\d+$/, '').trim()).filter(Boolean);
+  // Link names without unread counts ("Messages, 3 unread" -> "Messages")
+  return (await nav.getByRole('link').evaluateAll((links) => links.map((a) => a.getAttribute('aria-label') || a.textContent)))
+    .map((t) => t.split(',')[0].replace(/\d+$/, '').trim())
+    .filter(Boolean);
 }
 
-/** Runs a workflow action from the incident page and confirms it in the dialog. */
+/** Runs a workflow action from the incident page; return and reject ask for a reason in a dialog. */
 export async function workflowAction(page, action, reason) {
   await page.getByRole('button', { name: action, exact: true }).first().click();
+  if (!reason) return;
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
-  if (reason) await dialog.locator('textarea').fill(reason);
+  await dialog.locator('textarea').fill(reason);
   await dialog.getByRole('button', { name: action, exact: true }).click();
   await expect(dialog).toBeHidden();
 }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
-import { MapContainer, Marker, Popup, Tooltip, useMap } from 'react-leaflet';
+import { MapContainer, Marker, Popup, Tooltip, useMap } from '../components/map/Leaflet';
 import L from 'leaflet';
 import { BD_LIMIT, BD_VIEW } from '../lib/leaflet';
 import BaseMap from '../components/map/BaseMap';
@@ -88,7 +88,7 @@ export default function MapView() {
   const [restored] = useState(() => parseView(params.get('v')));
   const markers = useRef({});
   // False once the page is leaving: Leaflet closes the open popup while tearing down, and that must
-  // not write to the next page's URL. Layout cleanups run before react-leaflet removes its layers.
+  // not write to the next page's URL. This page's layout cleanup runs before the map (components/map/Leaflet.jsx) is removed.
   const active = useRef(true);
   useLayoutEffect(() => {
     active.current = true;

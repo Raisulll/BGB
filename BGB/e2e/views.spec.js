@@ -7,8 +7,8 @@ test('#15 #16 finds an incident by reference and filters the register', async ({
   await signIn(page, 'admin');
   await page.goto('/incidents');
   await page.getByPlaceholder(/Search by reference/).fill('BIRDS-2026-1070');
-  await expect(page.getByText('BIRDS-2026-1070').first()).toBeVisible();
-  await expect(page.getByText('BIRDS-2026-1069')).toHaveCount(0);
+  await expect(page.getByText('BIRDS-2026-1070').filter({ visible: true }).first()).toBeVisible();
+  await expect(page.getByText('BIRDS-2026-1069').filter({ visible: true })).toHaveCount(0);
   await page.getByPlaceholder(/Search by reference/).fill('');
   await page.goto('/incidents?severity=Critical');
   await expect(page.getByText(/Incidents \(\d+\)/).first()).toBeVisible();
@@ -46,13 +46,15 @@ test('#21 #22 a report is generated and exported to Excel and CSV', async ({ pag
   await signIn(page, 'admin');
   await page.goto('/reports');
   await page.getByRole('button', { name: 'Update report' }).click();
-  await expect(page.getByText('CONFIDENTIAL // OPERATIONAL').first()).toBeAttached();
   for (const [button, ext] of [['Export Excel', '.xlsx'], ['CSV', '.csv']]) {
     const download = page.waitForEvent('download');
     await page.getByRole('button', { name: button, exact: true }).click();
     expect((await download).suggestedFilename()).toMatch(new RegExp(`\\${ext}$`));
   }
   await expectNoSideScroll(page);
+  // Print / PDF opens the formal document with the classification banner
+  await page.getByRole('button', { name: 'Print / PDF', exact: true }).click();
+  await expect(page.getByText('CONFIDENTIAL // OPERATIONAL').filter({ visible: true }).first()).toBeVisible();
 });
 
 test('#24 the audit trail verifies its hash chain', async ({ page }) => {

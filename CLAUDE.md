@@ -78,7 +78,7 @@ Tender/
         │   │   └── IncidentList.jsx
         │   ├── dashboard/              ← Dashboard sub-components (charts, KPI cards, etc.)
         │   ├── messaging/              ← CallPanel, Composer (one-tap voice), VoiceMessage, PeoplePicker, Avatar, GroupDialog, PushSettings
-        │   ├── map/                    ← MapLayers (clusters, heatmap), BangladeshFrame (view limits + mask)
+        │   ├── map/                    ← Leaflet (React bindings: MapContainer, Marker, Popup, Tooltip, useMap), BaseMap, MapLayers (clusters, heatmap), BangladeshFrame (view limits + mask)
         │   └── ui/
         │       ├── Badges.jsx          ← StatusBadge, SeverityBadge
         │       ├── Card.jsx
@@ -102,7 +102,7 @@ Tender/
 | Build | Vite 8 | `npm run dev` → `localhost:5173` |
 | Routing | React Router DOM v7 | `<BrowserRouter>`, lazy-loaded routes |
 | Styling | **TailwindCSS v4** (via `@tailwindcss/vite` plugin) | No separate config file — uses `@import "tailwindcss"` in `index.css` |
-| Maps | Leaflet 1.9 + react-leaflet 5 | Import `leaflet/dist/leaflet.css` in `main.jsx` |
+| Maps | Leaflet 1.9 + own React bindings (`components/map/Leaflet.jsx`) | Import `leaflet/dist/leaflet.css` in `main.jsx`. Never add react-leaflet (Hippocratic licence, not open source; removed 2026-10-16) |
 | Charts | Chart.js 4 + react-chartjs-2 5 | Register components before use |
 | Icons | FontAwesome 6 Free | Import `@fortawesome/fontawesome-free/css/all.min.css` in `main.jsx` · **Zero emoji policy** — use FA icons everywhere |
 | Export | Native `Blob` + `URL.createObjectURL` | See `downloadFile()` in `helpers.js` |

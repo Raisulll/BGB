@@ -12,7 +12,7 @@ async function fileIncident(page, title) {
   // Step 1: basic information and classification
   await page.locator('#inc-title').fill(title);
   await page.locator('#inc-time').fill('10:30');
-  await page.getByRole('button', { name: 'High', exact: true }).click();
+  await page.getByRole('radio', { name: 'High', exact: true }).click();
   await page.locator('#inc-category').selectOption({ label: 'Smuggling' });
   await page.locator('#inc-subcategory').selectOption({ index: 1 });
   await page.getByRole('button', { name: 'Next: location' }).click();
@@ -21,6 +21,7 @@ async function fileIncident(page, title) {
     const select = page.locator(id);
     if (!(await select.inputValue())) await select.selectOption({ index: 1 });
   }
+  await page.locator('#inc-location').fill('Jadimura landing point');
   await page.locator('#inc-lat').fill('20.9256');
   await page.locator('#inc-lng').fill('92.2589');
   await page.getByRole('button', { name: 'Next: details' }).click();

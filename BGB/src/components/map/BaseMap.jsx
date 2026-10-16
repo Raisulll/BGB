@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { TileLayer, useMap } from 'react-leaflet';
+import { TileLayer, useMap } from './Leaflet';
 import { useI18n } from '../../i18n/I18nContext';
 import { BD_LIMIT, MAP_FILE, OFFLINE_ATTRIBUTION, offlineMapAvailable, TILE_ATTRIBUTION, TILE_URL } from '../../lib/leaflet';
 

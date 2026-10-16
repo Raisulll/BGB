@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { MapContainer, Marker } from 'react-leaflet';
+import { MapContainer, Marker } from '../components/map/Leaflet';
 import { BD_LIMIT } from '../lib/leaflet';
 import BaseMap from '../components/map/BaseMap';
 import BangladeshFrame from '../components/map/BangladeshFrame';

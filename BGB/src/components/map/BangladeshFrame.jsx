@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useMap } from 'react-leaflet';
+import { useMap } from './Leaflet';
 import L from 'leaflet';
 import { BD_LIMIT, BD_VIEW } from '../../lib/leaflet';
 

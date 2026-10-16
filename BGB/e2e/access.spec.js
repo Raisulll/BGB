@@ -18,7 +18,7 @@ test('#29 a wrong password gets one generic message and no access', async ({ pag
   await page.locator('input[autocomplete="username"]').fill('hq_admin');
   await page.locator('input[autocomplete="current-password"]').fill('Wrong@123');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-  await expect(page.getByRole('alert').first()).toBeVisible();
+  await expect(page.getByText(/Invalid username or password/).first()).toBeVisible();
   await expect(page).toHaveURL(/\/login/);
 });
 
@@ -47,10 +47,15 @@ for (const who of Object.keys(ACCOUNTS)) {
 
 test('#43 switches the interface to Bangla and back', async ({ page }) => {
   await signIn(page, 'admin');
-  await page.locator('button[lang="bn"]').first().click();
+  // On phones the language switch is in the user menu
+  const bangla = page.locator('button[lang="bn"]').filter({ visible: true });
+  if (!(await bangla.count())) await page.getByRole('button', { name: 'User menu' }).click();
+  await bangla.first().click();
   await expect(page.locator('html')).toHaveAttribute('lang', 'bn');
   await expect(page.getByText('ড্যাশবোর্ড').first()).toBeAttached();
   await expectNoSideScroll(page);
-  await page.locator('button[lang="en"]').first().click();
+  const english = page.locator('button[lang="en"]').filter({ visible: true });
+  if (!(await english.count())) await page.locator('header button[aria-expanded]').last().click();
+  await english.first().click();
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
 });

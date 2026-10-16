@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useMap } from 'react-leaflet';
+import { useMap } from './Leaflet';
 import L from 'leaflet';
 import '../../lib/leafletPlugins';
 import { focusOn } from './FocusZoom';
