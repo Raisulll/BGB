@@ -194,14 +194,14 @@ export default function AlertDetail() {
             {a.recipientList && (
               <ul className="max-h-96 divide-y divide-slate-100 overflow-y-auto text-sm">
                 {a.recipientList.map((r) => (
-                  <li key={r.userId} className="flex items-start justify-between gap-2 py-2">
-                    <span className="min-w-0">
+                  <li key={r.userId} className="py-2">
+                    <span className="block min-w-0">
                       <span className="block truncate font-medium text-slate-900">{r.name}</span>
                       <span className="block text-xs text-slate-500">
                         {tv('role', r.role)} · {r.scope}
                       </span>
                     </span>
-                    <span className={cn('shrink-0 text-right text-xs', r.acknowledgedAt ? 'text-emerald-700' : r.deliveredAt ? 'text-amber-700' : 'text-red-700')}>
+                    <span className={cn('mt-0.5 block text-xs', r.acknowledgedAt ? 'text-emerald-700' : r.deliveredAt ? 'text-amber-700' : 'text-red-700')}>
                       {r.acknowledgedAt ? t('alerts.ackAt', { time: formatDateTime(r.acknowledgedAt) }) : r.deliveredAt ? t('alerts.seenAt', { time: formatDateTime(r.deliveredAt) }) : t('alerts.notDelivered')}
                     </span>
                   </li>

@@ -1,0 +1,67 @@
+# OWASP ZAP automation plan for the BIRDS security scan (items 49, 50; Security Assessment Report).
+# Run against a COPY of the database (the active scan writes data), with the server in production mode:
+#   SERVE_SPA_DIR=../BGB/dist PORT=4002 NODE_ENV=production API_DOCS=true \
+#     API_RATE_LIMIT_PER_MINUTE=100000 ACCESS_TOKEN_TTL_MIN=480 node dist/src/server.js
+#   BIRDS_TOKEN=<access token of the HQ administrator, from POST /api/v1/auth/login>
+#   zap.sh -cmd -autorun server/security/zap-plan.yaml       (reports in ./zap-out)
+env:
+  contexts:
+    - name: BIRDS
+      urls:
+        - http://localhost:4002
+      includePaths:
+        - "http://localhost:4002.*"
+      excludePaths:
+        # These would end the scanner's own session
+        - "http://localhost:4002/api/v1/auth/logout.*"
+        - "http://localhost:4002/api/v1/auth/sessions/revoke-others.*"
+        - "http://localhost:4002/api/v1/auth/admin/reset-password.*"
+        - "http://localhost:4002/api/v1/map/.*"
+        - "http://localhost:4002/api/v1/ws.*"
+  parameters:
+    failOnError: false
+    failOnWarning: false
+    progressToStdout: true
+jobs:
+  - type: replacer
+    parameters:
+      deleteAllRules: true
+    rules:
+      - description: "Signed-in session (HQ Administrator)"
+        url: "http://localhost:4002/api/.*"
+        matchType: req_header
+        matchString: Authorization
+        matchRegex: false
+        replacementString: "Bearer ${BIRDS_TOKEN}"
+  - type: openapi
+    parameters:
+      apiUrl: http://localhost:4002/api/v1/openapi.json
+      targetUrl: http://localhost:4002/api/v1
+      context: BIRDS
+  - type: spider
+    parameters:
+      context: BIRDS
+      url: http://localhost:4002/
+      maxDuration: 3
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 10
+  - type: activeScan
+    parameters:
+      context: BIRDS
+      maxRuleDurationInMins: 5
+      maxScanDurationInMins: 60
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 5
+  - type: report
+    parameters:
+      template: traditional-html
+      reportDir: zap-out
+      reportFile: zap-report.html
+      reportTitle: BIRDS security scan
+  - type: report
+    parameters:
+      template: traditional-json
+      reportDir: zap-out
+      reportFile: zap-report.json

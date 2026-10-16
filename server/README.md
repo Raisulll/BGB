@@ -286,7 +286,7 @@ All analytics use the incidents list filters, cover filed incidents only (no dra
 The SPA (`../BGB`, `src/api/client.js`) relies on these behaviours:
 
 - It calls `/api/v1` on its **own origin** (Vite dev proxy, Nginx in production, or this server itself with `SERVE_SPA_DIR`), so the refresh cookie stays first-party.
-- `SERVE_SPA_DIR=../BGB/dist` makes the API serve the built SPA (single-service hosting; the TEC demo on Render, see `docs/installation-guide/demo-hosting-render-supabase.md`). Client routes get `index.html`; `/api/*` and missing files stay JSON 404s. The SPA's CSP allows only its own origin plus OpenStreetMap tiles and Google Fonts.
+- `SERVE_SPA_DIR=../BGB/dist` makes the API serve the built SPA (single-service hosting; the TEC demo on Render, see `docs/installation-guide/demo-hosting-render-supabase.md`). Client routes get `index.html`; `/api/*` and missing files stay JSON 404s. The SPA's CSP allows only its own origin, plus OpenStreetMap tiles for when the server has no offline map file. Fonts are bundled.
 - The access token is kept in memory only. On `401 TOKEN_INVALID` it refreshes once (one refresh at a time, serialised across tabs with the Web Locks API) and retries; any other 401 ends the session in the UI.
 - On page load it calls `/auth/refresh` only if a non-secret `birds.session_hint` flag is set in `localStorage` (set at login, cleared at logout or session end).
 - Workflow buttons and the Edit link come from each incident's `actions` / `canEdit`; the SPA holds no copy of the workflow table.

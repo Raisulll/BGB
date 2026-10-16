@@ -412,3 +412,20 @@ Option 1 (`server/prisma/demo/`, `npm run db:demo`):
 
 ### Resolution (if resolved)
 —
+
+---
+## DOUBT-018 — Map Component Licence (react-leaflet, Hippocratic License 2.1)
+
+**TEC Spec**: #51 — Source Code / Ownership (open-source component list)  
+**Raised on**: 2026-10-16  
+**Status**: RESOLVED  
+
+### The ambiguity
+While preparing the open-source component list, react-leaflet 5 (and @react-leaflet/core) turned out to be under the Hippocratic License 2.1: not an OSI open-source licence; it restricts use that breaches human-rights standards and lets the licensor end the licence. For a border force's system this could be questioned by the TEC or BGB's legal staff, and it contradicts the proposal's statement that all components are open source.
+
+### Options considered
+1. Replace react-leaflet with own React bindings on Leaflet (BSD-2-Clause): small code, re-test maps.
+2. Keep it and disclose the licence in the component list.
+
+### Resolution
+2026-10-16, owner chose option 1. `BGB/src/components/map/Leaflet.jsx` provides MapContainer, Marker, Popup, Tooltip, TileLayer and useMap with the same props; react-leaflet removed. Covered by the browser suite (`e2e/maps.spec.js`: tooltip, popup, zoom, back to the map, incident map) in all six configurations. Never add react-leaflet again (CLAUDE.md §3).

@@ -12,7 +12,7 @@
 > - `SEE DOUBT` — ambiguity logged in `doubt.md`
 >
 > **Update rule**: Update this file immediately whenever a spec item changes state.  
-> Last updated: **2026-10-11** (Session 13 — messaging, calls, push notifications, installable app, live demo on Render)
+> Last updated: **2026-10-16** (test documents 09–10, security assessment 11, licences 12, documentation plan 13, undertakings 14)
 
 ---
 
@@ -25,7 +25,7 @@
 | 5 | Incident Registration (create, edit, review, submit) | `DONE` | Both | 3-step wizard on the API: draft, submit, edit/resubmit after return; browser-tested (Session 9) |
 | 6 | Incident Classification (categories, subcategories, severity) | `DONE` | Both | Admin > Categories (create, rename unused, add subcategories, (de)activate); form dropdowns from `/incidents/meta` (Session 9) |
 | 7 | Incident Details (all fields) | `DONE` | Both | All fields captured in the form and shown on the detail page from the API |
-| 8 | Geographical Information (GPS + map) | `DONE` | Both | Device GPS or manual entry (no invented coordinates); detail map + `GET /gis/incidents` map (Session 9). 2026-10-15: offline map (no internet): `server/map/bangladesh.pmtiles` served by the API, drawn with protomaps-leaflet, Bangla place names |
+| 8 | Geographical Information (GPS + map) | `DONE` | Both | Device GPS or manual entry (no invented coordinates); detail map + `GET /gis/incidents` map (Session 9). 2026-10-15: offline map (no internet): `server/map/bangladesh.pmtiles` served by the API, drawn with protomaps-leaflet, Bangla place names 2026-10-16: maps run on own React bindings for Leaflet (components/map/Leaflet.jsx). |
 | 9 | Border Sector Information (org hierarchy) | `DONE` | Both | Form limited to the user's units; Admin > Org Hierarchy adds units (Session 9) |
 | 10 | Evidence & Document Management | `DONE` | Both | Upload in the wizard (type/size checked client-side, content-checked server-side), download, removal with reason; browser-tested (Session 9) 2026-10-15: office documents accepted (Word, Excel, PowerPoint current/legacy, OpenDocument, RTF; detected on content, macro-enabled refused); document properties kept (#11). |
 | 11 | Media Metadata preservation | `DONE` | Both | SHA-256 + EXIF/GPS stored; shown on the detail page with an on-demand integrity check (Session 9) |
@@ -58,23 +58,23 @@
 | 38 | Concurrent Users (100/250/500) | `NOT STARTED` | Backend | Deferred for the demo version (user decision 2026-10-09). Production plan: k6 load test §26; target unclear (DOUBT-001) Shown in Admin › Operations with a DEMO badge (not functional). |
 | 39 | Performance (< 3s response) | `NOT STARTED` | Backend | Deferred for the demo version (user decision 2026-10-09). Production plan: measure under load §26 Shown in Admin › Operations with a DEMO badge (not functional). |
 | 40 | Availability (99.5% SLA) | `NOT STARTED` | `N/A (INFRA)` | Deferred for the demo version (user decision 2026-10-09). Production plan: uptime monitoring + hosting SLA Shown in Admin › Operations with a DEMO badge (not functional).. Demo hosting: the free Render service keeps itself awake (`KEEP_AWAKE_MINUTES`); an outside uptime monitor (UptimeRobot) is recommended as backup and record |
-| 41 | Mobile Responsiveness | `DONE` | Frontend | Verified at 390 / 820 / 1440 px with no horizontal overflow (Session 10). Installable as an app on phones (PWA: manifest, icons, service worker caching app files only; opens offline with a notice; safe areas on iPhone), 2026-10-11 |
-| 42 | Browser Support (Chrome, Edge, Firefox) | `DONE` | Frontend | Verified in Chrome, Edge and Firefox; full workflow e2e passes in Chrome and Firefox (Session 10) |
+| 41 | Mobile Responsiveness | `DONE` | Frontend | Verified at 390 / 820 / 1440 px with no horizontal overflow (Session 10). Installable as an app on phones (PWA: manifest, icons, service worker caching app files only; opens offline with a notice; safe areas on iPhone), 2026-10-11 2026-10-16: browser suite (Playwright) passes at desktop, laptop, tablet and phone sizes, no horizontal overflow (document 10). |
+| 42 | Browser Support (Chrome, Edge, Firefox) | `DONE` | Frontend | Verified in Chrome, Edge and Firefox; full workflow e2e passes in Chrome and Firefox (Session 10) 2026-10-16: 21 browser test cases pass in Chrome 155, Edge 155 and Firefox 155 (126 runs; documents 09, 10). |
 | 43 | Localization (English + Bangla) | `DONE` | Frontend | Full English/Bangla interface with switcher, bundled Bengali font, translated API errors; `npm run i18n:check` (Session 10). User data is shown as entered. Bangla wording needs review by a fluent officer (DOUBT-003) |
 | 44 | Data Retention (configurable policy) | `DONE` | Both | `data.retention_days` + `archive.after_days` editable; records past retention flagged for review, never auto-deleted (Session 10, DOUBT-012) |
 | 45 | Data Archiving (with audit trail) | `DONE` | Both | Archive/restore + daily job, timeline + audit entries, archive filter in UI (Session 10) |
 | 46 | Administrative Module | `DONE` | Both | Admin UI fully on the API: users, permissions, categories, org hierarchy, settings, system status (Session 9). Backup/log endpoints Phase 5 |
 | 47 | Configuration (without code changes) | `DONE` | Both | Policies, session, retention and backup settings, permissions, categories and hierarchy editable in the Admin UI (Session 9). Session 12: `workflow.overdue_days` (Admin › Security & System › Workflow) |
 | 48 | Logging & Monitoring | `IN PROGRESS` | Backend | Winston (app/error/security logs) + Morgan HTTP log (Session 4). Daily rotation + `/admin/logs/summary`: deferred for the demo version (user decision 2026-10-09). Shown in Admin › Operations with a DEMO badge (not functional). |
-| 49 | Security Hardening (OWASP Top 10) | `IN PROGRESS` | Backend | Helmet, CORS whitelist, rate limits, Zod validation, pinned RS256, generic login errors, `npm audit` clean (Session 4). ZAP scan Phase 4 |
-| 50 | Vulnerability Assessment | `NOT STARTED` | Backend | OWASP ZAP + npm audit before UAT §20; report in `docs/security/` |
-| 51 | Source Code Ownership | `DONE` | Both | Full source in this repository |
-| 52 | Documentation (all manuals) | `IN PROGRESS` | Docs | CLAUDE.md + READMEs done; API documentation (OpenAPI 3.1 + Swagger UI) done (Session 11). Remaining sets §27: user, admin, DB schema, installation, backup/recovery, security |
+| 49 | Security Hardening (OWASP Top 10) | `IN PROGRESS` | Backend | Helmet, CORS whitelist, rate limits, Zod validation, pinned RS256, generic login errors, `npm audit` clean (Session 4). ZAP scan Phase 4 2026-10-16: OWASP ZAP 2.16.1 authenticated scan of the demo build: no high/critical (one false positive verified), CSP style-src unsafe-inline accepted; npm audit 0; OWASP Top 10 (2025) mapping (document 11). Plan in server/security/zap-plan.yaml. |
+| 50 | Vulnerability Assessment | `IN PROGRESS` | Backend | OWASP ZAP + npm audit before UAT §20; report in `docs/security/` 2026-10-16: first assessment of the demo build done (document 11); undertaking for the full VA on BGB's system (document 14). |
+| 51 | Source Code Ownership | `DONE` | Both | Full source in this repository 2026-10-16: open-source component list from the installed dependency trees (document 12); react-leaflet (Hippocratic License 2.1, not open source) replaced by own Leaflet bindings; source code and IP undertaking (document 14). |
+| 52 | Documentation (all manuals) | `IN PROGRESS` | Docs | CLAUDE.md + READMEs done; API documentation (OpenAPI 3.1 + Swagger UI) done (Session 11). Remaining sets §27: user, admin, DB schema, installation, backup/recovery, security 2026-10-16: contents of all six manuals (Documentation Plan, document 13). |
 | 53 | Training | `NOT STARTED` | Docs | 3 training courses + slides planned §28 |
 | 54 | Warranty & Support (1 year) | `NOT STARTED` | `N/A (INFRA)` | Commercial commitment — not a code task |
 | 55 | Customization (forms, workflows, hierarchy) | `IN PROGRESS` | Both | Categories, hierarchy, permissions and policies configurable in the Admin UI (Session 9). Custom form fields / workflow stages are not configurable |
 | 56 | Deployment (installation + commissioning) | `IN PROGRESS` | Infra+Docs | README deployment guide done; full install guide §27.5 planned. TEC demo hosting: Render + Supabase (DOUBT-010). Built and tested locally in Session 12 (`render.yaml`, SPA served by the API, S3 driver, Supabase access SQL, step-by-step guide in `server/docs/installation-guide/demo-hosting-render-supabase.md`). **Live since 2026-10-10** at https://birds-demo.onrender.com (all migrations applied on Supabase, TURN relay and VAPID keys configured). Remaining: full installation guide for BGB servers (§27.5) |
-| 57 | Acceptance Testing (UAT) | `NOT STARTED` | Docs | Test case document + UAT run planned §29 |
+| 57 | Acceptance Testing (UAT) | `IN PROGRESS` | Docs | Test case document + UAT run planned §29 2026-10-16: functional test cases and results mapped to all 58 items: 190 server + 21 browser cases (126 runs), all pass (document 09). UAT with BGB pending. |
 | 58 | Future Expansion (GIS, mobile, surveillance) | `DONE` | Both | Leaflet GIS done; modular architecture supports expansion. Session 12 extension (owner request, DOUBT-013): direct/group messaging, voice messages, 1:1 WebRTC audio calls and call log over a realtime WebSocket channel (PostgreSQL LISTEN/NOTIFY bus for multi-process); permission `messages`; server tests + headless browser suite pass. Session 13: calls survive reconnects, Messenger-style chat, one-tap voice, group admins (requests, remove, roles, rename, photo; DOUBT-014), push notifications with ringing call notifications and Answer/Decline (DOUBT-015), installable app (PWA), GIS map framed on Bangladesh; live on Render |
 
 ---
@@ -85,6 +85,6 @@
 |---|---|
 | `DONE` | 38 |
 | `FRONTEND DONE` | 0 |
-| `IN PROGRESS` | 8 |
-| `NOT STARTED` | 12 |
+| `IN PROGRESS` | 10 |
+| `NOT STARTED` | 10 |
 | **Total** | **58** |
