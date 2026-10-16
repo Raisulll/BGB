@@ -952,3 +952,75 @@ Added after the session summary: deferred items now appear in **Admin › Operat
 1. Demo Guide: a "running without internet" step (local start-up on the demonstration laptop).
 2. Test reports (load, ZAP, browser/device, functional cases), sample exports, licence list, undertakings, manual contents.
 3. Commit/push; reload live demo dataset; Flash Alert in documents; re-make video; delete `server/.env.live`.
+
+---
+## Session — 2026-10-15 (BST), part 8: commit, load-test dry run, sign-in fixes, test plans
+
+### What was done
+- Committed parts 5–7 on branch `offline-map-and-diagrams` (`9a3cfd3`; `tender-submission/` is git-ignored by the owner's .gitignore).
+- Owner decision: no performance *report* from the demo; a **Performance Test Plan** for the real system instead, with the demo measurements as a dry-run annex. Written: `tender-submission/build/perfplan.js` → `08-Performance-Test-Plan.docx` (build.js now has a shared `blockDocument()` used by the proposal and the plan; annex generated from `server/loadtest/results/*.json`).
+- Load tool `server/loadtest/` (`seed-users.ts`, `run.ts`, `common.ts`): 500 accounts in a database copy `birds_load` (refuses databases without "load" in the name); request mix recorded from Chrome; role-interleaved account order; WebSocket with Origin; results JSON incl. server CPU.
+- **Defects found and fixed**:
+  1. `loginLimiter` (express-rate-limit `skipSuccessfulRequests`) counted sign-ins in flight: 20 simultaneous correct sign-ins → 10 refused, and the 429s then blocked the address for 15 min. Replaced by `failedAttemptLimiter` (counts failures at response finish, never its own 429s). Test `test/login-limiter.test.ts`.
+  2. Sign-in burst: interactive transaction in `issueSession` hit Prisma P2028 (2 s wait for a pool connection while bcrypt starved the event loop). Now a batch transaction; 100 simultaneous sign-ins all succeed (~3/s per process).
+- Browser test suite written (not yet run): `BGB/playwright.config.js`, `BGB/e2e/*.spec.js` (Chrome/Edge/Firefox desktop, laptop, tablet, phone); `@playwright/test` 1.63.0, Playwright Firefox 155.
+
+### Next session — TODO
+1. After the load runs: build 08, export PDF, copy to Final Submission Documents.
+2. Run the browser suite on a copy `birds_e2e` (API on port 4001); fix test selectors; write functional test cases document (item 57) and browser compatibility report (41, 42).
+3. Security scan (ZAP) report; then remaining items (licences, undertakings, manual contents, Demo Guide offline start-up).
+4. Drop `birds_load` / `birds_e2e` databases when done; commit.
+
+---
+## Session — 2026-10-15 23:25 (BST), part 9: PAUSED — handover for the next session
+
+### State at pause (owner asked to pause all tests)
+- **All test processes stopped** (load runs and the production API on port 4000). Nothing is running.
+- **Load test results are invalid and were moved aside** to `server/loadtest/results/invalid-2026-10-15/`:
+  u100/u250 used battalion operators only (account-order bug, fixed in `run.ts accountOrder()`); u500 had
+  313 sign-in failures (rate-limiter defect, fixed); the rerun was interrupted. `loadtest/results/` is git-ignored.
+- **Uncommitted code** (branch `offline-map-and-diagrams`):
+  - `server/src/middleware/rateLimiter.ts` — `failedAttemptLimiter` replaces express-rate-limit for sign-in
+  - `server/src/modules/auth/auth.service.ts` — `issueSession` uses a batch transaction
+  - `server/test/login-limiter.test.ts` (new), `server/tsconfig.test.json` (+loadtest), `server/.gitignore`
+  - `server/loadtest/` (new: common.ts, seed-users.ts, run.ts)
+  - `BGB/playwright.config.js`, `BGB/e2e/` (new), `BGB/package.json` (+@playwright/test 1.63.0), `BGB/.gitignore`
+  The full server suite has NOT been re-run after the two sign-in fixes (auth + limiter tests pass).
+- **Databases**: `birds_load` (copy of the demo data + 500 accounts load001–load500, password in
+  `server/loadtest/common.ts`) still exists on the local cluster (port 5433). Local `birds` has the demo dataset.
+- **Submission folder**: `Final Submission Documents/` now holds everything produced so far (01–08, video,
+  Diagrams/) with `00-INDEX-AND-STATUS.md` listing each file's status and what is still missing.
+
+### Resume — in this order
+1. `cd server && npx vitest run` (expect 190 tests) — confirm the sign-in fixes; then commit.
+2. **Load-test dry run** (CPU must be otherwise idle, ~35 min):
+   ```bash
+   cd server && npm run build
+   export DATABASE_URL=<.env URL with /birds_load>      # never the live DB
+   NODE_ENV=production node dist/src/server.js &        # port 4000
+   for u in 100 250 500; do npx tsx loadtest/run.ts --users=$u --hold=300 --think=20 --label=u$u; done
+   npx tsx loadtest/run.ts --users=500 --hold=300 --think=7 --label=u500-peak
+   ```
+   Check each result: `signInFailures` 0, `websocketsOpen` = users. Then `cd tender-submission/build && node build.js`,
+   export 08 PDF with Word, copy 08 .docx/.pdf to `Final Submission Documents/`, update its index.
+3. **Browser suite** (items 41, 42, 57): create `birds_e2e` (`CREATE DATABASE birds_e2e TEMPLATE birds`), run the
+   API with `SERVE_SPA_DIR=../BGB/dist PORT=4001` on it, then
+   `cd BGB && E2E_BASE=http://localhost:4001 npx playwright test`. Expect selector fixes on the first run
+   (written against i18n labels, never run). Results: `BGB/e2e-results/results.json`.
+4. Write document 09 Functional Test Cases and Results (map the 58 items to server tests + browser tests;
+   infrastructure items as UAT items) and 10 Browser and Device Compatibility Report; add to build.js.
+5. Then: security scan (ZAP) report, licence list, undertakings, manual contents, sample exports,
+   Flash Alert in documents 02/03/05/06, Demo Guide "running without internet", re-record video 07.
+6. Afterwards drop `birds_load` and `birds_e2e`.
+
+---
+## Session — 2026-10-16 (BST), part 1: tests after the sign-in fixes, commit
+
+### What was done
+- Local PostgreSQL restarted (normal recovery after shutdown). Full server suite: **190/190 pass** (24 files); `tsc` clean for `src` and `tsconfig.test.json` (incl. `loadtest/`).
+- Committed the sign-in fixes (`failedAttemptLimiter`, batch transaction in `issueSession`), limiter test, load-test tool, Playwright browser suite (not yet run), and the submission folder files (index, 08 draft, Diagrams). The outdated demo video (07, 34 MB) is not committed; commit the re-recorded one.
+
+### Next session — TODO
+1. Load-test runs on `birds_load` (resume step 2 of part 9), then rebuild 08 + PDF.
+2. Browser suite on `birds_e2e`; documents 09 and 10.
+3. ZAP report, licence list, undertakings, manual contents, sample exports; Flash Alert in 02/03/05/06; re-record 07.

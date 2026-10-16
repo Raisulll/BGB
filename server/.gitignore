@@ -14,3 +14,4 @@ CLAUDE.md
 map/*.pmtiles
 map/.bin/
 map/*.part
+loadtest/results/

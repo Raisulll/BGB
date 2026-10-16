@@ -7,3 +7,4 @@ dist-ssr
 npm-debug.log*
 .vercel
 
+e2e-results/

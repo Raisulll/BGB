@@ -1,5 +1,5 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": { "noEmit": true },
-  "include": ["src", "prisma/seed.ts", "prisma/data", "scripts", "test", "vitest.config.ts", "prisma.config.ts"]
+  "include": ["src", "prisma/seed.ts", "prisma/data", "scripts", "loadtest", "test", "vitest.config.ts", "prisma.config.ts"]
 }

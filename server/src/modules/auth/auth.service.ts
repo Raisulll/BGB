@@ -44,21 +44,24 @@ async function issueSession(user: User, ctx: RequestContext, singleSession: bool
   const refreshToken = newRefreshToken();
   const refreshExpiresAt = new Date(Date.now() + env.REFRESH_TOKEN_TTL_HOURS * 3_600_000);
 
-  const session = await prisma.$transaction(async (tx) => {
-    // Spec #28 concurrent-session control: a new login ends the user's other sessions
-    if (singleSession) {
-      await tx.refreshToken.updateMany({ where: { userId: user.id, revoked: false }, data: { revoked: true, revokedReason: 'superseded' } });
-    }
-    return tx.refreshToken.create({
-      data: {
-        userId: user.id,
-        tokenHash: hashToken(refreshToken),
-        expiresAt: refreshExpiresAt,
-        ipAddress: ctx.ip,
-        userAgent: ctx.userAgent,
-      },
-    });
+  // One batch transaction, not an interactive one: it holds a database connection only while its two
+  // statements run. An interactive transaction waited for the event loop between statements, and
+  // during a burst of sign-ins (password hashing is CPU-bound) it ran out of its 2 s wait for a
+  // connection (load test, 15-10-2026).
+  const create = prisma.refreshToken.create({
+    data: {
+      userId: user.id,
+      tokenHash: hashToken(refreshToken),
+      expiresAt: refreshExpiresAt,
+      ipAddress: ctx.ip,
+      userAgent: ctx.userAgent,
+    },
   });
+  // Spec #28 concurrent-session control: a new login ends the user's other sessions
+  const results = singleSession
+    ? await prisma.$transaction([prisma.refreshToken.updateMany({ where: { userId: user.id, revoked: false }, data: { revoked: true, revokedReason: 'superseded' } }), create])
+    : await prisma.$transaction([create]);
+  const session = results[results.length - 1] as Awaited<typeof create>;
 
   return {
     accessToken: signAccessToken({ sub: user.id, sid: session.id, role: user.role }),
