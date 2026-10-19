@@ -1024,3 +1024,83 @@ Added after the session summary: deferred items now appear in **Admin › Operat
 1. Load-test runs on `birds_load` (resume step 2 of part 9), then rebuild 08 + PDF.
 2. Browser suite on `birds_e2e`; documents 09 and 10.
 3. ZAP report, licence list, undertakings, manual contents, sample exports; Flash Alert in 02/03/05/06; re-record 07.
+
+---
+## Session — 2026-10-16 (BST), part 2: browser suite, test and security documents, licences, Flash Alert in documents, video
+
+### What was done
+- **Browser suite** run and fixed against the real screens (selectors, sign-in from a signed-out browser, return/reject dialogs only, phone language switch in the user menu); new `e2e/maps.spec.js`. Final run: 21 cases × 6 configurations = **126/126 pass** (Chrome 155, Edge 155, Firefox 155; desktop, laptop, tablet, phone). `scripts/browser-versions.mjs` records versions and screens. Server suite 190/190 (`test-results/vitest.json`).
+- **react-leaflet removed** (Hippocratic License 2.1, not open source; owner decision, DOUBT-018): own bindings `components/map/Leaflet.jsx` (MapContainer, Marker, Popup, Tooltip, TileLayer, useMap). Commit `207bb99`.
+- **Security scan**: OWASP ZAP 2.16.1, authenticated (HQ admin token via replacer), OpenAPI import (86 paths/104 URLs) + crawl, passive + active, on a copy (`birds_e2e`) with rate limit raised. One High "SQL Injection – SQLite" verified as false positive (Zod rejects in ~4 ms; PostgreSQL); CSP style-src unsafe-inline accepted (Leaflet); private IP in audit CSV by design. npm audit 0/0. Plan saved as `server/security/zap-plan.yaml`.
+- **Flash Alert detail**: acknowledgement status on its own line (names were squeezed). Commit `13bf8d8`.
+- **New documents** (generators in `tender-submission/build/`): 09 Functional Test Cases and Results + 10 Browser and Device Compatibility (`testcases.js`, from the result files), 11 Security Assessment Report (`security.js`) + raw ZAP HTML, 12 Open-Source Component List (`licences.js`, from `npm ls`), 13 Documentation Plan (`docplan.js`), 14 Undertakings (`undertakings.js`), 15 Data Migration Approach + 16 Request for Clarification (`migration.js`). `blockDocument` got `noContents` for letters. `export-pdf.ps1` (Word; no Fields.Update, it hangs) and `export-pptx-pdf.ps1` (PowerPoint).
+- **Flash Alerts in documents**: Annex A items 23/58, Annex B row (33 value additions, under Secure communications), Demo Guide tour + reference, deck section 12 (5 slides; screenshots `shots/f01–f07` from a fresh copy `birds_shots` via `capture-alerts.mjs`), agenda renumbered (128 slides). Demo Guide: "without internet" set-up step (production mode on localhost; phones need HTTPS). Proposal test figures updated.
+- **Sample exports** (`capture-exports.mjs`): operational report PDF with an issued reference (BGB/BIRDS/RPT/2026/0001), Excel, CSV.
+- **Video 07**: script updated (tender name on the intro card, reviewer modification, type filter, offline map, Flash Alert raise + takeover, 33 value additions, phone images x05/x06, dashboard period by id). First recording failed (sector checkbox not ticked; PC slept 70 min); re-recorded with label-based ticking and a keep-awake helper.
+
+### Decisions & rationale
+- Infrastructure-dependent items (32, 34–40) are listed in 09 as "see method" (plans/acceptance on site), never as passed tests.
+- Scan settings that differ from production (rate limit, token lifetime, excluded sign-out endpoints) are stated in document 11.
+
+### Blockers / waiting on
+- Owner: review document 14 (new commitments: IP indemnity, monthly support summary, escalation roles) and decide on sending 16 via e-GP; sign/seal everything.
+
+### Next session — TODO
+1. Load test runs (resume part 9 step 2), then rebuild 08 with Annex A and export its PDF.
+2. Drop `birds_load`, `birds_e2e`, `birds_shots` (and `birds_present` if not needed).
+
+---
+## Session — 2026-10-17 (BST)
+
+### What was done
+- Authorised signatory added to the tender pack: Md. Kamrul Hasan, Managing Partner (`tender-submission/build/tender.js`: SIGNATORY, DESIGNATION, SIGNATURE_IMAGE → `tender-submission/Sign.png`).
+- `build.js`: one `signatureBlock()` for the compliance statement and all letter-style documents (04, 08-16); name and designation filled in; `--signed` puts the scanned signature on the "Signature and seal" line; `--out <dir>` sets the output folder.
+- Generated two sets in `Final Submission Documents/`: `With Signature/` and `Without Signature/` (DOCX 01-05, 08-16 + ZAP annex). PDFs not generated (owner's request). `export-pdf.ps1` gained `-Dir` (Word automation hung this session).
+- Undertakings escalation level 3: "Managing Director" → "Managing Partner".
+
+- Committee-facing review: Demo Guide "Before the session" (dataset reload, commands, browsers, devices, offline start-up) removed from the document (`demo.js`, `build.js`; parts renumbered 1-3; one line that the demo data is fictional added to the intro) and moved to `todo.md` (root). Performance Test Plan: the dry-run annex and its reference are left out while there are no valid results (no more "not yet available"). Other documents and the deck checked: no other presenter notes or placeholders.
+- `todo.md` created in the root: owner tasks, load test, demo preparation.
+- Upload limit 2 MB: `build/compact-images.py` makes JPEG letterhead copies (photographic gold waves; palette showed banding) and 256-colour diagram copies; `build.js` uses them. Technical Proposal 4.57 → 1.47 MB, other documents about 0.2 MB.
+- Open-Source Component List removed from the pack (owner; `licences.js` kept, not built); references in 07, 09 and 11 reworded to "a list of components with licences is delivered with the source code". Before that it had been moved to the end: 10 Documentation Plan, 11 Undertakings, 12 Data Migration, 13 presentation, 14 video.
+- `With Signature/` made the complete pack. Renumbered in serial (owner): 01-05 unchanged, 06 Performance Test Plan, 07 Functional Test Cases, 08 Compatibility Report, 09 Security Assessment, 10 Open-Source Components, 11 Documentation Plan, 12 Undertakings, 13 Data Migration, 14 presentation (letterhead deck), 15 video (16-10 recording). Cross-references in `testcases.js`/`security.js` updated. Clarification letter unnumbered, written with `--letter-out` to `Send Separately (signed|unsigned)/`. ZAP raw report not submitted.
+
+### Blockers / waiting on
+- Signed `08-Performance-Test-Plan.docx` not updated: file locked by a hung hidden Word instance (PIDs 2904, 16056) the owner has to end.
+- The proposal's "measured 650 requests per second" comes from load runs marked invalid; owner to confirm after the new runs.
+
+### Next session — TODO
+- See `todo.md`.
+
+---
+## Session — 2026-10-17 22:10 (BST)
+
+### What was done
+- Project team named (owner): Technical Proposal section 2 now lists the key personnel with designation and responsibilities: Md Raisul Islam Rahad (Project Manager), Md Istiaque Ahmed Arik (Technical Lead and Solution Architect), Ismail Hossain (Senior Full-Stack Software Engineer), Tanvin Sarkar Pallob (Information Security Specialist). DBA/systems duties sit with the technical lead, testing/QA with the security specialist, training with the PM and the full-stack engineer.
+- Undertakings escalation table names the person at each level (1 Ismail Hossain, 2 Md Raisul Islam Rahad, 3 Md. Kamrul Hasan).
+- `build.js`: a table cell given as an array is printed as one paragraph per line, the first in bold.
+- Rebuilt `With Signature/` and `Without Signature/` (and the clarification letters).
+
+### Blockers / waiting on
+- Owner: CVs of the four people; `With Signature/BIRDS-Documents-Signed.zip` predates this rebuild and must be re-made.
+
+### Next session — TODO
+- See `todo.md`.
+
+---
+## Session — 2026-10-19 (BST)
+
+### What was done
+- Tender submitted on 18-10-2026; result awaited. No change to the submission pack.
+- Reviewed awesome-selfhosted.net and its sister list awesome-sysadmin for tools that could run beside BIRDS on BGB's servers if the tender is awarded. None of them is in the demo version or the submitted documents. Future notes in `server/docs/installation-guide/production-tools.md`: Garage/SeaweedFS (evidence storage), Barman + restic (backup, DR), Uptime Kuma, Prometheus + Grafana, Loki, Wazuh, Samba AD / lldap (LDAP test), Smallstep / easy-rsa (internal CA), mail server; not on the lists: ClamAV, coturn, PgBouncer, Patroni/HAProxy/keepalived.
+- CLAUDE.md: status line and §15 pointer to the notes (§16.1 left as built). `todo.md`: "If we win the tender" section.
+
+### Decisions & rationale
+- Suggestion for later, not decided: Garage or SeaweedFS instead of MinIO, because MinIO is no longer on awesome-selfhosted and its community edition reportedly went into maintenance mode (to confirm). The submitted proposal says "MinIO or equivalent", so this would stay within it; the existing `STORAGE_DRIVER=s3` works without code change.
+- Web push cannot work on an offline intranet (browser push services need internet); to be stated in the manuals.
+
+### Blockers / waiting on
+- Tender result.
+
+### Next session — TODO
+- See `todo.md` ("If we win the tender" first if awarded).
+- Later the same session: offline notification plan added to `production-tools.md` §4 (future notes only): keep BIRDS open on desktops, self-hosted ntfy/Gotify for Android phones, SMS backup for Flash Alerts, optional firewall allowance for push services if BGB permits. `todo.md` updated.
